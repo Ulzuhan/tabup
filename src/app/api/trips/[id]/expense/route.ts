@@ -7,6 +7,7 @@ import {
   updateExpense,
 } from "@/lib/store";
 import { authorizeTrip } from "@/lib/authorize";
+import { deleteReceipt } from "@/lib/receipts";
 import { CATEGORIES } from "@/lib/types";
 import type { Trip } from "@/lib/types";
 
@@ -131,6 +132,12 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       exchangeRate: expCurrency !== "EUR" && amountEur > 0 ? parsedAmount / amountEur : undefined,
       rateAvailable: rateUsed,
       note: typeof body.note === "string" && body.note.trim() ? body.note.trim().slice(0, 500) : undefined,
+      // Filename returned by the receipt upload; validated on read, so a made-up value
+      // simply resolves to no photo.
+      receipt:
+        typeof body.receipt === "string" && /^[0-9a-f]{8,40}\.(jpe?g|png|webp)$/i.test(body.receipt)
+          ? body.receipt
+          : undefined,
       // Supplied by queued offline writes so a retry cannot duplicate the expense.
       clientId: typeof body.clientId === "string" ? body.clientId.slice(0, 64) : undefined,
     });
@@ -253,9 +260,17 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/trips
     return NextResponse.json({ error: "expenseId required" }, { status: 400 });
   }
 
+  // Looked up first: once the row is gone there is nothing left pointing at the file,
+  // and it would sit on disk until the nightly sweep noticed it.
+  const trip = await getTrip(id);
+  const receipt = trip?.expenses.find((e) => e.id === expenseId)?.receipt;
+
   const removed = await deleteExpense(id, expenseId);
   if (!removed) {
     return NextResponse.json({ error: "Expense not found" }, { status: 404 });
   }
+
+  if (receipt) await deleteReceipt(id, receipt);
+
   return NextResponse.json({ success: true });
 }

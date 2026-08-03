@@ -111,6 +111,7 @@ export async function getTrip(id: string): Promise<Trip | null> {
         exchangeRate: e.exchangeRate ?? undefined,
         rateAvailable: e.rateAvailable,
         note: e.note ?? undefined,
+        receipt: e.receipt ?? undefined,
       };
     }),
     payments: paymentRows.map((p): Payment => ({
@@ -364,6 +365,7 @@ export interface AddExpenseInput {
   exchangeRate?: number;
   rateAvailable?: boolean;
   note?: string;
+  receipt?: string;
   /** Idempotency key from the client; see the schema for why. */
   clientId?: string;
 }
@@ -405,6 +407,7 @@ export async function addExpense(tripId: string, input: AddExpenseInput): Promis
         exchangeRate: input.exchangeRate ?? null,
         rateAvailable: input.rateAvailable ?? true,
         note: input.note ?? null,
+        receipt: input.receipt ?? null,
         clientId: input.clientId ?? null,
       })
       .run();
@@ -692,5 +695,6 @@ export async function findExpenseByClientId(
     exchangeRate: row.exchangeRate ?? undefined,
     rateAvailable: row.rateAvailable,
     note: row.note ?? undefined,
+    receipt: row.receipt ?? undefined,
   };
 }

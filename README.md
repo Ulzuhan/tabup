@@ -195,6 +195,27 @@ node scripts/generate-icons.mjs
   on a canvas and handed to the share sheet. At the end of a trip somebody sends this to
   the group, and until now that meant a badly cropped screenshot.
 
+## Receipts
+
+Photograph a receipt and a vision model fills the form in: merchant, total, currency,
+date and category. Measured on four receipts — a clean render, a phone photo, a badly
+degraded one, and a Filipino receipt in pesos where the total is *not* the largest
+number on the page — `qwen3.5:397b-cloud` got all four right in 7–15s. `gemma4:31b-cloud`
+also got all four but took 11–67s; `gemma4:e2b` running locally was correct at ~105s,
+which is too slow to use at a table. Set `TABUP_OCR_MODEL` to change it.
+
+The reading is a shortcut, never a gate: if the model is slow, missing or unsure, the
+photo is still attached and the fields are typed by hand.
+
+Photos are re-encoded with sharp on upload. That is not about file size — a phone photo
+carries EXIF, and EXIF carries **GPS coordinates**, so storing the original would mean
+every receipt quietly records where its owner was standing, and a shared trip would hand
+that to everyone with the link. Re-encoding drops it.
+
+They live on disk under `data/receipts/<tripId>/`, never in the database, and travel in
+the nightly backup as their own archive. Deleting an expense deletes its photo; anything
+orphaned by an abandoned form is swept up after a day.
+
 ## Budget and pace
 
 An optional budget per trip, plus the daily average and a bar per day. The total on its

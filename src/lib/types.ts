@@ -33,6 +33,7 @@ export interface Expense {
   exchangeRate?: number;
   rateAvailable?: boolean; // false if no live/cached rate was found
   note?: string; // free text, for what the description has no room for
+  receipt?: string; // filename of the attached receipt photo
 }
 
 export interface Payment {

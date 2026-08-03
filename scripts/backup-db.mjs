@@ -82,10 +82,59 @@ cleanup();
 const size = statSync(compressed).size;
 log(`${compressed} — ${trips} trips, ${expenses} expenses, ${(size / 1024).toFixed(1)} KiB`);
 
+// ── Orphan photos ────────────────────────────────────────────────────
+// A photo is stored the moment it is scanned, before the expense exists, so abandoning
+// the form leaves one behind. Anything older than a day that no expense points at is
+// swept up here rather than accumulating forever. The age check is what stops a scan in
+// progress from being deleted out from under the person doing it.
+{
+  const referenced = new Set(
+    new Database(DB_PATH, { readonly: true })
+      .prepare("SELECT trip_id, receipt FROM expenses WHERE receipt IS NOT NULL")
+      .all()
+      .map((r) => `${r.trip_id}/${r.receipt}`)
+  );
+
+  const root = join(DB_PATH, "..", "receipts");
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  let orphans = 0;
+
+  if (existsSync(root)) {
+    for (const tripDir of readdirSync(root)) {
+      const dir = join(root, tripDir);
+      if (!statSync(dir).isDirectory()) continue;
+      for (const file of readdirSync(dir)) {
+        if (referenced.has(`${tripDir}/${file}`)) continue;
+        if (statSync(join(dir, file)).mtimeMs < cutoff) {
+          unlinkSync(join(dir, file));
+          orphans++;
+        }
+      }
+    }
+  }
+  if (orphans) log(`removed ${orphans} orphaned photo${orphans === 1 ? "" : "s"}`);
+}
+
+// ── Receipt photos ───────────────────────────────────────────────────
+// The database records which photo belongs to which expense, but the photos themselves
+// live on disk. Backing up only the database would restore a trip whose receipts are
+// all broken images, so they travel together.
+const receiptsDir = join(DB_PATH, "..", "receipts");
+if (existsSync(receiptsDir)) {
+  const archive = join(DEST_DIR, `receipts-${stamp}.tar.gz`);
+  try {
+    await execFileAsync("tar", ["-czf", archive, "-C", join(DB_PATH, ".."), "receipts"]);
+    log(`${archive} — ${(statSync(archive).size / 1024 / 1024).toFixed(1)} MiB of photos`);
+  } catch (error) {
+    // A failed photo archive must not lose the database snapshot that already succeeded.
+    console.error(`Receipt archive failed: ${error.message}`);
+  }
+}
+
 // ── Offsite copy, when one is configured ─────────────────────────────
 if (REMOTE) {
   try {
-    await execFileAsync("rsync", ["-a", "--timeout=60", compressed, REMOTE]);
+      await execFileAsync("rsync", ["-a", "--timeout=60", compressed, REMOTE]);
     log(`copied to ${REMOTE}`);
   } catch (error) {
     // A failed offsite copy must not fail the run: the local snapshot is already
@@ -100,5 +149,10 @@ const old = readdirSync(DEST_DIR)
   .sort()
   .slice(0, -KEEP);
 
-for (const file of old) unlinkSync(join(DEST_DIR, file));
+const oldPhotos = readdirSync(DEST_DIR)
+  .filter((f) => f.startsWith("receipts-") && f.endsWith(".tar.gz"))
+  .sort()
+  .slice(0, -KEEP);
+
+for (const file of [...old, ...oldPhotos]) unlinkSync(join(DEST_DIR, file));
 if (old.length) log(`removed ${old.length} snapshot${old.length === 1 ? "" : "s"} beyond the last ${KEEP}`);

@@ -150,6 +150,7 @@ export default function TripPage() {
   const [stale, setStale] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [filters, setFilters] = useState<ExpenseFilters>(NO_FILTERS);
+  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
 
   const [confirm, setConfirm] = useState<{
     type: "expense" | "payment" | "trip";
@@ -254,6 +255,8 @@ export default function TripPage() {
         paidBy: expenseDraft.paidBy,
         splitAmong: expenseDraft.splitAmong,
         category: expenseDraft.category,
+        note: expenseDraft.note.trim() || undefined,
+        receipt: expenseDraft.receipt,
         splitShares:
           expenseDraft.splitMode !== "equal" && Object.keys(shares).length > 0
             ? shares
@@ -440,6 +443,7 @@ export default function TripPage() {
       splitAmong: [...expense.splitAmong],
       category: expense.category,
       note: expense.note ?? "",
+      receipt: expense.receipt,
       splitMode: expense.splitShares ? "percent" : "equal",
       splitValues: normaliseToPercent(expense.splitShares),
       date: today(),
@@ -458,6 +462,7 @@ export default function TripPage() {
       splitAmong: [...expense.splitAmong],
       category: expense.category,
       note: expense.note ?? "",
+      receipt: expense.receipt,
       splitMode: expense.splitShares ? "percent" : "equal",
       // Stored shares are proportions on an arbitrary scale, so they are normalised to
       // percentages — the one reading that is always right, whatever scale was used.
@@ -759,7 +764,20 @@ export default function TripPage() {
                           : "border-border"
                       )}
                     >
-                      <CategoryBadge category={expense.category} />
+                      {expense.receipt ? (
+                        // The photo replaces the category icon rather than sitting next
+                        // to it: the row has no room for both, and a thumbnail of the
+                        // actual receipt says more than the category ever did.
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`/api/trips/${id}/receipt?file=${encodeURIComponent(expense.receipt)}`}
+                          alt=""
+                          className="size-10 shrink-0 cursor-zoom-in rounded-xl object-cover"
+                          onClick={() => setViewingReceipt(expense.receipt ?? null)}
+                        />
+                      ) : (
+                        <CategoryBadge category={expense.category} />
+                      )}
 
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{expense.description}</p>
@@ -972,6 +990,7 @@ export default function TripPage() {
         setDraft={patchExpense}
         busy={busy}
         onSubmit={submitExpense}
+        tripId={id}
       />
 
       <SettleDialog
@@ -998,6 +1017,23 @@ export default function TripPage() {
         anonymous={trip.anonymous}
         onChanged={loadTrip}
       />
+
+      {/* Receipt viewer */}
+      <Dialog open={Boolean(viewingReceipt)} onOpenChange={(o) => !o && setViewingReceipt(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("expense.receipt")}</DialogTitle>
+          </DialogHeader>
+          {viewingReceipt && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/api/trips/${id}/receipt?file=${encodeURIComponent(viewingReceipt)}`}
+              alt={t("expense.receipt")}
+              className="max-h-[70vh] w-full rounded-lg object-contain"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete confirmation */}
       <Dialog open={Boolean(confirm)} onOpenChange={(open) => !open && setConfirm(null)}>

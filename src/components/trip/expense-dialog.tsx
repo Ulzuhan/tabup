@@ -1,6 +1,9 @@
 "use client";
 
-import { Check, Loader2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
+
+import { Camera, Check, Loader2 } from "lucide-react";
 import { CATEGORIES, CURRENCIES } from "@/lib/types";
 import type { Member } from "@/lib/types";
 import { CategoryIcon, useCategoryName } from "@/components/category-icon";
@@ -37,6 +40,8 @@ export interface ExpenseDraft {
   splitAmong: string[];
   category: string;
   note: string;
+  /** Filename of an uploaded receipt photo, if one was attached. */
+  receipt?: string;
   splitMode: SplitMode;
   /** Per-member figure, meaning percent or currency depending on splitMode. */
   splitValues: Record<string, string>;
@@ -59,6 +64,7 @@ export function ExpenseDialog({
   setDraft,
   busy,
   onSubmit,
+  tripId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -68,6 +74,7 @@ export function ExpenseDialog({
   setDraft: (patch: Partial<ExpenseDraft>) => void;
   busy: boolean;
   onSubmit: () => void;
+  tripId: string;
 }) {
   const t = useT();
   const categoryName = useCategoryName();
@@ -110,6 +117,22 @@ export function ExpenseDialog({
           }}
           className="space-y-5"
         >
+          <ReceiptScanner
+            tripId={tripId}
+            receipt={draft.receipt}
+            onScanned={(fields, filename) =>
+              setDraft({
+                receipt: filename,
+                ...(fields.merchant ? { description: fields.merchant } : {}),
+                ...(fields.total ? { amount: String(fields.total) } : {}),
+                ...(fields.currency ? { currency: fields.currency } : {}),
+                ...(fields.date ? { date: fields.date } : {}),
+                ...(fields.category ? { category: fields.category } : {}),
+              })
+            }
+            onRemoved={() => setDraft({ receipt: undefined })}
+          />
+
           <div className="space-y-2">
             <Label htmlFor="desc">{t("expense.description")}</Label>
             <Input
@@ -461,5 +484,122 @@ function SplitEditor({
         </div>
       )}
     </div>
+  );
+}
+
+interface ScannedFields {
+  merchant?: string;
+  total?: number;
+  currency?: string;
+  date?: string;
+  category?: string;
+}
+
+/**
+ * Photograph a receipt and let a vision model fill the form in.
+ *
+ * The photo is uploaded and read in one request, and whatever comes back is applied to
+ * the fields the model was confident about — anything it omitted is simply left alone.
+ * The OCR is a shortcut over a form that still works perfectly well by hand, so every
+ * failure here is quiet: the photo stays attached, the fields stay as they were, and
+ * nothing blocks.
+ */
+function ReceiptScanner({
+  tripId,
+  receipt,
+  onScanned,
+  onRemoved,
+}: {
+  tripId: string;
+  receipt?: string;
+  onScanned: (fields: ScannedFields, filename: string) => void;
+  onRemoved: () => void;
+}) {
+  const t = useT();
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const upload = async (file: File) => {
+    setBusy(true);
+    try {
+      const form = new FormData();
+      form.append("photo", file);
+
+      const res = await fetch(`/api/trips/${tripId}/receipt`, { method: "POST", body: form });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        toast.error(data.error || t("expense.scanFailed"));
+        return;
+      }
+
+      onScanned(data.fields ?? {}, data.receipt);
+      toast[data.fields ? "success" : "info"](
+        data.fields ? t("expense.scanned") : t("expense.scanFailed")
+      );
+    } catch {
+      toast.error(t("common.serverUnreachable"));
+    } finally {
+      setBusy(false);
+      // Cleared so choosing the same file twice still fires a change event.
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  if (receipt) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-secondary/40 p-2">
+        {/* eslint-disable-next-line @next/next/no-img-element -- a private, auth-gated
+            route that next/image cannot optimise anyway */}
+        <img
+          src={`/api/trips/${tripId}/receipt?file=${encodeURIComponent(receipt)}`}
+          alt={t("expense.receipt")}
+          className="size-14 shrink-0 rounded-lg object-cover"
+        />
+        <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+          {t("expense.receipt")}
+        </span>
+        <Button type="button" variant="ghost" size="sm" onClick={onRemoved}>
+          {t("expense.removePhoto")}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        // capture="environment" opens the rear camera straight away on a phone, which
+        // is the whole point at a restaurant table.
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) upload(file);
+        }}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        className="h-11 w-full border-dashed"
+        disabled={busy}
+        onClick={() => inputRef.current?.click()}
+      >
+        {busy ? (
+          <>
+            <Loader2 className="size-4 animate-spin" />
+            {t("expense.scanning")}
+          </>
+        ) : (
+          <>
+            <Camera className="size-4" />
+            {t("expense.scan")}
+          </>
+        )}
+      </Button>
+    </>
   );
 }

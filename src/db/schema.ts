@@ -140,6 +140,8 @@ export const expenses = sqliteTable(
     exchangeRate: real("exchange_rate"),
     /** Free text, for what a description has no room for. */
     note: text("note"),
+    /** Filename of the receipt photo under data/receipts/<tripId>/, if there is one. */
+    receipt: text("receipt"),
     /**
      * Idempotency key chosen by the client, unique per trip.
      *
