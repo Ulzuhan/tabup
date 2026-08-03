@@ -58,8 +58,15 @@ function QrCode({ value, className, label }: { value: string; className?: string
 /**
  * Sharing a trip.
  *
- * For an anonymous trip the link is the credential, so this says as much rather than
- * letting someone hand it around assuming it is private.
+ * There is exactly one link here, and it is the invitation.
+ *
+ * This used to open on a QR of the trip's own URL, with the invitation offered
+ * separately below — two codes, two links, and no way to tell from looking which one
+ * a person should send. The plain URL was the wrong one every time: every trip belongs
+ * to an account, so anybody who did not already have access got a 404 from it, and
+ * anybody who did have access already had the trip in their list and needed no link at
+ * all. So it is gone, and the QR now appears only once there is something worth
+ * scanning.
  */
 export function ShareDialog({
   open,
@@ -86,13 +93,7 @@ export function ShareDialog({
   const locale = useIntlLocale();
   const { build, busy } = useSummaryImage();
 
-  /**
-   * What the QR and the copy button actually hand over.
-   *
-   * The plain URL is useless to anyone else: every trip belongs to an account, so a
-   * stranger opening it gets a 404. An invitation link is the only thing worth handing
-   * over, and it replaces the URL here as soon as one exists.
-   */
+  /** Nothing to scan, copy or share until this exists. */
   const [invite, setInvite] = useState<{
     url: string;
     role: "editor" | "viewer";
@@ -108,7 +109,6 @@ export function ShareDialog({
    * everybody an editor is exactly what this avoids.
    */
   const [role, setRole] = useState<"editor" | "viewer">("editor");
-  const shareUrl = invite?.url ?? url;
 
   const createInvite = async () => {
     setCreatingInvite(true);
@@ -127,7 +127,7 @@ export function ShareDialog({
         });
       }
     } catch {
-      /* the plain link stays on screen; it still works for anyone already invited */
+      /* the picker stays on screen, so the button can simply be pressed again */
     } finally {
       setCreatingInvite(false);
     }
@@ -135,8 +135,9 @@ export function ShareDialog({
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
+    if (!invite) return;
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(invite.url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -146,8 +147,9 @@ export function ShareDialog({
   };
 
   const nativeShare = async () => {
+    if (!invite) return;
     try {
-      await navigator.share({ title: tripName, url: shareUrl });
+      await navigator.share({ title: tripName, url: invite.url });
     } catch {
       // Includes the user simply dismissing the sheet, which is not an error.
     }
@@ -159,40 +161,111 @@ export function ShareDialog({
         <DialogHeader>
           <DialogTitle>{t("shareTrip.title")}</DialogTitle>
           <DialogDescription>
-            {t("shareTrip.subtitle")}
+            {invite ? t("shareTrip.subtitle") : t("shareTrip.subtitleNew")}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex justify-center">
-          <div className="rounded-2xl bg-white p-3">
-            <QrCode value={shareUrl} className="size-48" label={t("shareTrip.title")} />
+        {invite ? (
+          <>
+            <div className="flex justify-center">
+              <div className="rounded-2xl bg-white p-3">
+                <QrCode value={invite.url} className="size-48" label={t("shareTrip.title")} />
+              </div>
+            </div>
+
+            {/* What the code grants, right next to the code: a QR looks identical
+                whether it hands over editing or not. */}
+            <div className="flex items-center justify-center gap-2 text-xs">
+              <span className="rounded-md border border-border bg-secondary/60 px-1.5 py-0.5 font-medium">
+                {invite.role === "viewer" ? t("manage.viewer") : t("manage.editor")}
+              </span>
+              <span className="text-muted-foreground">
+                {t("join.inviteExpires", {
+                  date: new Intl.DateTimeFormat(locale, {
+                    day: "numeric",
+                    month: "long",
+                  }).format(new Date(invite.expiresAt)),
+                })}
+              </span>
+            </div>
+
+            {/* min-w-0 on this row: DialogContent is a grid, and grid children default
+                to min-width:auto, so without it the long URL sets the width of the whole
+                dialog and `truncate` never gets a chance to apply. */}
+            <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-secondary/50 p-2">
+              <span className="min-w-0 flex-1 truncate pl-1 font-mono text-xs text-muted-foreground">
+                {invite.url}
+              </span>
+              <Button size="sm" variant="ghost" onClick={copy} className="shrink-0">
+                {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
+                {copied ? t("common.copied") : t("common.copy")}
+              </Button>
+            </div>
+
+            {typeof navigator !== "undefined" && "share" in navigator && (
+              <Button variant="outline" onClick={nativeShare} className="w-full">
+                <Share2 className="size-4" />
+                {t("common.share")}
+              </Button>
+            )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-muted-foreground"
+              onClick={() => setInvite(null)}
+            >
+              {t("join.inviteAnother")}
+            </Button>
+          </>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">{t("join.inviteHint")}</p>
+
+            {/*
+              Two buttons rather than a dropdown: with only two answers, a select hides
+              one of them behind a tap and says nothing about what either means, while
+              this shows both choices and their consequence at once.
+            */}
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-medium">{t("join.inviteWhatCan")}</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    { value: "editor", label: t("manage.editor"), hint: t("join.editorHint") },
+                    { value: "viewer", label: t("manage.viewer"), hint: t("join.viewerHint") },
+                  ] as const
+                ).map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={role === option.value}
+                    onClick={() => setRole(option.value)}
+                    className={cn(
+                      "rounded-lg border px-2.5 py-2 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      role === option.value
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:bg-secondary/60"
+                    )}
+                  >
+                    <span className="block text-sm font-medium">{option.label}</span>
+                    <span className="block text-xs text-muted-foreground">{option.hint}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <Button className="h-11 w-full" onClick={createInvite} disabled={creatingInvite}>
+              {creatingInvite ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <>
+                  <UserPlus className="size-4" />
+                  {t("join.createInvite")}
+                </>
+              )}
+            </Button>
           </div>
-        </div>
-
-        {/* min-w-0 on this row too: DialogContent is a grid, and grid children default
-            to min-width:auto, so without it the long URL sets the width of the whole
-            dialog and `truncate` never gets a chance to apply. */}
-        <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-secondary/50 p-2">
-          <span className="min-w-0 flex-1 truncate pl-1 font-mono text-xs text-muted-foreground">
-            {shareUrl}
-          </span>
-          <Button size="sm" variant="ghost" onClick={copy} className="shrink-0">
-            {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
-            {copied ? t("common.copied") : t("common.copy")}
-          </Button>
-        </div>
-
-        {/* Said out loud, because the QR above looks equally shareable either way and
-            only one of the two links lets a stranger in. */}
-        {!invite && (
-          <p className="-mt-1 px-1 text-xs text-muted-foreground">{t("shareTrip.plainLinkHint")}</p>
-        )}
-
-        {typeof navigator !== "undefined" && "share" in navigator && (
-          <Button variant="outline" onClick={nativeShare} className="w-full">
-            <Share2 className="size-4" />
-            {t("common.share")}
-          </Button>
         )}
 
         <div className="space-y-2 rounded-xl border border-border p-3">
@@ -241,93 +314,6 @@ export function ShareDialog({
             />
           </div>
         </div>
-
-        {invite ? (
-          <div className="space-y-1.5 rounded-xl border border-primary/25 bg-primary/[0.06] p-3">
-            <div className="flex items-center gap-2">
-              <UserPlus className="size-4 shrink-0 text-primary" />
-              <p className="min-w-0 flex-1 truncate text-sm font-medium">
-                {t("join.inviteActive")}
-              </p>
-              <span className="shrink-0 rounded-md border border-border bg-background px-1.5 py-0.5 text-[11px] font-medium">
-                {invite.role === "viewer" ? t("manage.viewer") : t("manage.editor")}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {t("join.inviteExpires", {
-                date: new Intl.DateTimeFormat(locale, {
-                  day: "numeric",
-                  month: "long",
-                }).format(new Date(invite.expiresAt)),
-              })}
-            </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-full text-muted-foreground"
-              onClick={() => setInvite(null)}
-            >
-              {t("join.inviteAnother")}
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-2.5 rounded-xl border border-border p-3">
-            <div>
-              <p className="text-sm font-medium">{t("join.inviteTitle")}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{t("join.inviteHint")}</p>
-            </div>
-
-            {/*
-              Two buttons rather than a dropdown: with only two answers, a select hides
-              one of them behind a tap and says nothing about what either means, while
-              this shows both choices and their consequence at once.
-            */}
-            <fieldset>
-              <legend className="sr-only">{t("join.inviteWhatCan")}</legend>
-              <div className="grid grid-cols-2 gap-2">
-                {(
-                  [
-                    { value: "editor", label: t("manage.editor"), hint: t("join.editorHint") },
-                    { value: "viewer", label: t("manage.viewer"), hint: t("join.viewerHint") },
-                  ] as const
-                ).map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    aria-pressed={role === option.value}
-                    onClick={() => setRole(option.value)}
-                    className={cn(
-                      "rounded-lg border px-2.5 py-2 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      role === option.value
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:bg-secondary/60"
-                    )}
-                  >
-                    <span className="block text-sm font-medium">{option.label}</span>
-                    <span className="block text-xs text-muted-foreground">{option.hint}</span>
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={createInvite}
-              disabled={creatingInvite}
-            >
-              {creatingInvite ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <>
-                  <UserPlus className="size-4" />
-                  {t("join.createInvite")}
-                </>
-              )}
-            </Button>
-          </div>
-        )}
 
       </DialogContent>
     </Dialog>

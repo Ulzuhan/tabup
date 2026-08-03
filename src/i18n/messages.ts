@@ -194,13 +194,12 @@ export const es = {
   shareTrip: {
     title: "Compartir este viaje",
     subtitle: "Apunta con la cámara al código, o envía el enlace.",
+    subtitleNew: "Crea una invitación y mándasela a quien quieras que entre.",
     summary: "Resumen para el grupo",
     summaryHint: "Una imagen con el total y quién debe a quién, lista para enviar.",
     saveImage: "Guardar imagen",
     shareImage: "Compartir imagen",
     printable: "Ver para imprimir o PDF",
-    plainLinkHint:
-      "Este enlace solo funciona para quien ya tiene acceso. Para alguien nuevo, crea una invitación.",
   },
 
   confirm: {
@@ -352,11 +351,9 @@ export const es = {
     createInvite: "Crear invitación",
     creating: "Creando…",
     role: "Puede",
-    inviteTitle: "Invitar con un enlace",
     inviteWhatCan: "¿Qué podrá hacer quien entre?",
     editorHint: "Añadir y editar gastos",
     viewerHint: "Solo mirar",
-    inviteActive: "Invitación activa",
     inviteExpires: "Caduca el {date}",
     inviteAnother: "Crear otra con distinto permiso",
   },
@@ -563,13 +560,12 @@ export const en: Messages = {
   shareTrip: {
     title: "Share this trip",
     subtitle: "Point a camera at the code, or send the link.",
+    subtitleNew: "Create an invitation and send it to whoever should join.",
     summary: "Summary for the group",
     summaryHint: "An image with the total and who owes whom, ready to send.",
     saveImage: "Save image",
     shareImage: "Share image",
     printable: "Open printable view or PDF",
-    plainLinkHint:
-      "This link only works for someone who already has access. For anyone new, create an invitation.",
   },
 
   confirm: {
@@ -721,11 +717,9 @@ export const en: Messages = {
     createInvite: "Create invitation",
     creating: "Creating…",
     role: "Can",
-    inviteTitle: "Invite with a link",
     inviteWhatCan: "What can whoever joins do?",
     editorHint: "Add and edit expenses",
     viewerHint: "Look only",
-    inviteActive: "Invitation active",
     inviteExpires: "Expires on {date}",
     inviteAnother: "Create another with different access",
   },
