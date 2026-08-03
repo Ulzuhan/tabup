@@ -152,6 +152,8 @@ function migrate(sqlite: Database.Database) {
   // Columns added after the first release. CREATE TABLE IF NOT EXISTS above is a no-op
   // on databases that already have the table, so new columns need adding separately.
   addColumn(sqlite, "trips", "owner_id", "TEXT REFERENCES users(id) ON DELETE SET NULL");
+  addColumn(sqlite, "users", "role", "TEXT NOT NULL DEFAULT 'user'");
+  addColumn(sqlite, "users", "approved_at", "INTEGER");
   addColumn(sqlite, "expenses", "client_id", "TEXT");
   addColumn(sqlite, "expenses", "note", "TEXT");
   addColumn(sqlite, "expenses", "receipt", "TEXT");
@@ -170,11 +172,37 @@ function migrate(sqlite: Database.Database) {
   );
 
   adoptOrphanTrips(sqlite);
+  seedFirstAdmin(sqlite);
 
   // Sessions and invitations are cheap to clear and there is no other moment that
   // reliably runs.
   sqlite.prepare("DELETE FROM sessions WHERE expires_at < ?").run(Date.now());
   sqlite.prepare("DELETE FROM invites WHERE expires_at < ?").run(Date.now());
+}
+
+/**
+ * Makes the oldest account the admin, and marks every existing account approved.
+ *
+ * Accounts created before approvals existed have no role and no approval date, which
+ * would lock everyone out of their own data — including the person who has been using
+ * this all along. Runs on every start and is a no-op once an admin exists.
+ */
+function seedFirstAdmin(sqlite: Database.Database) {
+  const [{ count }] = sqlite
+    .prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin'")
+    .all() as { count: number }[];
+  if (count > 0) return;
+
+  const oldest = sqlite.prepare("SELECT id FROM users ORDER BY created_at LIMIT 1").get() as
+    | { id: string }
+    | undefined;
+  if (!oldest) return;
+
+  sqlite.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(oldest.id);
+  sqlite
+    .prepare("UPDATE users SET approved_at = created_at WHERE approved_at IS NULL")
+    .run();
+  console.log("Marked the oldest account as admin and approved existing accounts.");
 }
 
 /**

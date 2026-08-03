@@ -2,7 +2,7 @@ import { randomBytes, scrypt, timingSafeEqual, createHash } from "crypto";
 import type { BinaryLike, ScryptOptions } from "crypto";
 import { promisify } from "util";
 import { cookies } from "next/headers";
-import { eq, lt, sql, isNull } from "drizzle-orm";
+import { eq, lt, sql, isNull, and } from "drizzle-orm";
 import { db, users, sessions, trips } from "@/db";
 import type { UserRow } from "@/db";
 
@@ -168,19 +168,27 @@ export function passwordProblem(password: string): string | null {
 export async function createUser(
   email: string,
   name: string,
-  password: string
+  password: string,
+  /** Invitations and the open mode skip the queue; a plain request does not. */
+  options: { approved?: boolean } = {}
 ): Promise<UserRow | null> {
   const id = randomBytes(16).toString("hex");
+  const now = Date.now();
+
+  const [{ count }] = db.select({ count: sql<number>`count(*)` }).from(users).all();
+  const isFirst = count === 0;
+
   const row = {
     id,
     email: normalizeEmail(email),
     name: name.trim().slice(0, 80),
     passwordHash: await hashPassword(password),
-    createdAt: Date.now(),
+    createdAt: now,
     plan: "free",
+    // Whoever sets the instance up runs it: there is nobody else to approve them.
+    role: isFirst ? "admin" : "user",
+    approvedAt: isFirst || options.approved ? now : null,
   };
-
-  const wasEmpty = db.select({ count: sql<number>`count(*)` }).from(users).all()[0].count === 0;
 
   try {
     db.insert(users).values(row).run();
@@ -191,7 +199,7 @@ export async function createUser(
 
   // On a fresh install the first account adopts any trip left without an owner, which
   // is how a database restored from before accounts existed stays reachable.
-  if (wasEmpty) {
+  if (isFirst) {
     db.update(trips).set({ ownerId: id }).where(isNull(trips.ownerId)).run();
   }
 
@@ -262,15 +270,68 @@ export function clientKey(request: Request, suffix = ""): string {
 // ── Registration policy ──────────────────────────────────────────────────
 
 /**
- * Whether new accounts may be created.
+ * How this instance handles people asking for an account.
  *
- * `TABUP_ALLOW_REGISTRATION=true` opens it. Otherwise only the very first account is
- * allowed, so a fresh instance can be set up and then stops accepting strangers —
- * which matters because this is reachable from the internet, and people who are handed
- * a trip link do not need an account at all to use it.
+ *   closed    only invitations get anyone in (the default)
+ *   approval  anyone may ask; the admin lets them in
+ *   open      anyone may register and use it straight away
+ *
+ * A single setting rather than a boolean, because "closed" and "needs approving" are
+ * different answers to the same question and the old flag could not tell them apart.
+ * `TABUP_ALLOW_REGISTRATION=true` is still honoured as "open" so an existing deployment
+ * does not change behaviour on upgrade.
  */
+export type RegistrationMode = "closed" | "approval" | "open";
+
+export function registrationMode(): RegistrationMode {
+  const raw = process.env.TABUP_REGISTRATION?.trim().toLowerCase();
+  if (raw === "open" || raw === "approval" || raw === "closed") return raw;
+  if (process.env.TABUP_ALLOW_REGISTRATION?.trim().toLowerCase() === "true") return "open";
+  return "closed";
+}
+
+/** Whether the sign-up form is worth showing at all. */
 export function registrationOpen(): boolean {
-  if (process.env.TABUP_ALLOW_REGISTRATION?.trim().toLowerCase() === "true") return true;
+  // The very first account is always allowed, or a fresh install could never be set up.
   const [{ count }] = db.select({ count: sql<number>`count(*)` }).from(users).all();
-  return count === 0;
+  if (count === 0) return true;
+  return registrationMode() !== "closed";
+}
+
+// ── Approvals ────────────────────────────────────────────────────────
+
+export const isAdmin = (user: UserRow | null) => user?.role === "admin";
+export const isApproved = (user: UserRow) => user.approvedAt != null;
+
+/** Accounts waiting on the admin, oldest request first. */
+export function pendingUsers() {
+  return db
+    .select({ id: users.id, email: users.email, name: users.name, createdAt: users.createdAt })
+    .from(users)
+    .where(isNull(users.approvedAt))
+    .orderBy(users.createdAt)
+    .all();
+}
+
+export function approveUser(userId: string): boolean {
+  const result = db
+    .update(users)
+    .set({ approvedAt: Date.now() })
+    .where(and(eq(users.id, userId), isNull(users.approvedAt)))
+    .run();
+  return result.changes > 0;
+}
+
+/**
+ * Turns a request down by deleting the account.
+ *
+ * Only ever reaches an account that was never approved, so there is nothing of theirs
+ * to lose — and it frees the email address in case they typo'd it and want to try again.
+ */
+export function rejectUser(userId: string): boolean {
+  const result = db
+    .delete(users)
+    .where(and(eq(users.id, userId), isNull(users.approvedAt)))
+    .run();
+  return result.changes > 0;
 }

@@ -44,6 +44,7 @@ export function TripsView() {
   const [trips, setTrips] = useState<TripSummary[]>([]);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [usage, setUsage] = useState<{ trips: number; tripLimit: number | null } | null>(null);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [tripName, setTripName] = useState("");
@@ -65,6 +66,7 @@ export function TripsView() {
       if (cancelled) return;
 
       setUser(session.user ?? null);
+      setPendingApprovals(session.pendingApprovals ?? 0);
       setUsage(session.usage ?? null);
       setTrips([...(owned.trips ?? [])].sort((a, b) => b.createdAt - a.createdAt));
       setLoading(false);
@@ -130,7 +132,7 @@ export function TripsView() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-16 sm:pt-8">
-      <AppHeader user={user} loading={loading} onSignOut={signOut} showWordmark={false} />
+      <AppHeader user={user} loading={loading} onSignOut={signOut} showWordmark={false} pendingApprovals={pendingApprovals} />
       <SectionTabs current="trips" />
 
       {showCreate ? (

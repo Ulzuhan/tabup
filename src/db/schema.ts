@@ -40,6 +40,17 @@ export const users = sqliteTable("users", {
   createdAt: integer("created_at").notNull(),
   /** "free" or "pro". Quotas are enforced in the store, not here. */
   plan: text("plan").notNull().default("free"),
+  /** "admin" or "user". The first account to exist becomes the admin. */
+  role: text("role").notNull().default("user"),
+  /**
+   * When the account was let in. Null means it is a request waiting on the admin.
+   *
+   * Stored on the user rather than in a separate requests table: a pending account is
+   * already a real account with a hashed password and a claimed email address, and
+   * keeping a second half-user shape around would mean two places to get password
+   * handling right.
+   */
+  approvedAt: integer("approved_at"),
 });
 
 /**

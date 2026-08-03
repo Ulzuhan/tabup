@@ -96,10 +96,25 @@ else with an error they could not explain. Only the owner can create them.
 
 ### Registration
 
-Once an instance has its first account, sign-ups are refused unless
-`TABUP_ALLOW_REGISTRATION=true`. Anything reachable from the internet with an open
-registration endpoint collects accounts that are not yours. Nobody needs an account to
-use a trip — the link is enough — so opening it is rarely the right answer.
+`TABUP_REGISTRATION` takes three values:
+
+| Value | Who gets in |
+| --- | --- |
+| `closed` *(default)* | Invitation links only |
+| `approval` | Anyone may ask; the admin lets them in |
+| `open` | Anyone, immediately |
+
+The very first account is always allowed regardless — otherwise a fresh install could
+never be set up — and it becomes the **admin**, who is the only one who can see or act
+on account requests.
+
+A pending account is a real account with `approved_at` still null, rather than a row in
+a separate requests table: it already has a hashed password and a claimed email address,
+and a second half-user shape would mean getting password handling right in two places.
+Signing in before approval returns 403 with `pending_approval`, told apart from a wrong
+password on purpose — somebody waiting needs to know that is what is happening.
+
+An invitation counts as an approval: the person who owns the trip is vouching for them.
 
 ### No cap on trips
 

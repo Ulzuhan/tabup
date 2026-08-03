@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check, Globe, LogOut, User as UserIcon } from "lucide-react";
+import { Check, Globe, LogOut, User as UserIcon, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -19,6 +19,7 @@ export interface SessionUser {
   email: string;
   name: string;
   plan: string;
+  admin?: boolean;
 }
 
 /** Wordmark. Kept in one place so the two pages that show it cannot drift. */
@@ -43,11 +44,13 @@ export function AppHeader({
   onSignOut,
   /** Off on the home screen, where the hero already shows the wordmark. */
   showWordmark = true,
+  pendingApprovals = 0,
 }: {
   user: SessionUser | null;
   loading: boolean;
   onSignOut: () => void;
   showWordmark?: boolean;
+  pendingApprovals?: number;
 }) {
   const t = useT();
 
@@ -71,8 +74,11 @@ export function AppHeader({
           <DropdownMenuTrigger
             render={
               <Button variant="ghost" size="sm" className="gap-2 rounded-full pr-3 pl-2">
-                <span className="flex size-6 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
+                <span className="relative flex size-6 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
                   {user.name.slice(0, 1).toUpperCase()}
+                  {pendingApprovals > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-primary ring-2 ring-background" />
+                  )}
                 </span>
                 <span className="max-w-28 truncate text-sm">{user.name}</span>
               </Button>
@@ -90,6 +96,20 @@ export function AppHeader({
               <p className="truncate text-xs text-muted-foreground">{user.email}</p>
             </div>
             <DropdownMenuSeparator />
+            {user.admin && (
+              <>
+                <DropdownMenuItem render={<Link href="/admin" />}>
+                  <UserCheck className="size-4" />
+                  {t("admin.title")}
+                  {pendingApprovals > 0 && (
+                    <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                      {pendingApprovals}
+                    </span>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <LanguageItems />
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onSignOut}>

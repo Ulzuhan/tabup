@@ -66,6 +66,10 @@ export const es = {
     alreadyHaveAccount: "¿Ya tienes cuenta?",
     newHere: "¿Es tu primera vez?",
     createOne: "Crea una",
+    requested: "Solicitud enviada",
+    requestedHint: "Tu cuenta queda pendiente de que el administrador la apruebe. Vuelve a entrar más tarde con este correo y contraseña.",
+    pendingApproval: "Tu cuenta todavía está pendiente de aprobación",
+    requestAccount: "Solicitar cuenta",
     closed: "Este servidor no admite cuentas nuevas",
     closedHint: "Si te han invitado a un viaje, abre el enlace de la invitación: desde ahí sí puedes crear tu cuenta.",
     signingIn: "Entrando…",
@@ -291,6 +295,18 @@ export const es = {
     thisMonth: "Cobros de este mes",
   },
 
+  admin: {
+    title: "Solicitudes de cuenta",
+    subtitle: "Gente que ha pedido entrar en este servidor.",
+    none: "No hay solicitudes pendientes",
+    approve: "Aprobar",
+    reject: "Rechazar",
+    approved: "{name} ya puede entrar",
+    rejected: "Solicitud rechazada",
+    requestedOn: "Pidió acceso el {date}",
+    badge: "{count} pendientes",
+  },
+
   landing: {
     headline: "Las cuentas del viaje, claras al volver",
     sub: "Apunta lo que paga cada uno, en cualquier moneda, y TabUp calcula quién debe a quién con los menos pagos posibles.",
@@ -414,6 +430,10 @@ export const en: Messages = {
     alreadyHaveAccount: "Already have an account?",
     newHere: "New here?",
     createOne: "Create one",
+    requested: "Request sent",
+    requestedHint: "Your account is waiting for the administrator to approve it. Come back and sign in with this email and password later.",
+    pendingApproval: "Your account is still waiting for approval",
+    requestAccount: "Request an account",
     closed: "This server is not accepting new accounts",
     closedHint: "If someone invited you to a trip, open their invitation link — you can create your account from there.",
     signingIn: "Signing in…",
@@ -637,6 +657,18 @@ export const en: Messages = {
     signInFirst: "Sign in to track fixed costs",
     signInHint: "They are yours alone and shared with nobody, so they need an account.",
     thisMonth: "Charged this month",
+  },
+
+  admin: {
+    title: "Account requests",
+    subtitle: "People who have asked to join this server.",
+    none: "No pending requests",
+    approve: "Approve",
+    reject: "Reject",
+    approved: "{name} can sign in now",
+    rejected: "Request rejected",
+    requestedOn: "Asked on {date}",
+    badge: "{count} pending",
   },
 
   landing: {

@@ -39,6 +39,7 @@ export default function RecurringPage() {
 
   const [items, setItems] = useState<Recurring[]>([]);
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
@@ -52,6 +53,7 @@ export default function RecurringPage() {
       fetch("/api/recurring").then((r) => (r.ok ? r.json() : { items: [] })).catch(() => ({ items: [] })),
     ]);
     setUser(session.user ?? null);
+    setPendingApprovals(session.pendingApprovals ?? 0);
     setItems(list.items ?? []);
     setLoading(false);
   }, []);
@@ -147,7 +149,7 @@ export default function RecurringPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-16 sm:pt-8">
-      <AppHeader user={user} loading={loading} onSignOut={signOut} />
+      <AppHeader user={user} loading={loading} onSignOut={signOut} pendingApprovals={pendingApprovals} />
       <SectionTabs current="recurring" />
 
       {loading ? (

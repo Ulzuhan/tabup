@@ -7,6 +7,7 @@ import {
   passwordProblem,
   publicUser,
   recordAttempt,
+  registrationMode,
   registrationOpen,
   tooManyAttempts,
 } from "@/lib/auth";
@@ -38,7 +39,10 @@ export async function POST(request: NextRequest) {
    * friend hit after scanning a QR code.
    */
   const invite = typeof body.inviteToken === "string" ? readInvite(body.inviteToken) : null;
-  if (!invite && !registrationOpen()) {
+  const mode = registrationMode();
+  const firstEver = registrationOpen() && mode === "closed";
+
+  if (!invite && mode === "closed" && !firstEver) {
     return NextResponse.json(
       { error: "This server is not accepting new accounts. Use an invitation link." },
       { status: 403 }
@@ -67,9 +71,20 @@ export async function POST(request: NextRequest) {
 
   recordAttempt(throttleKey);
 
-  const user = await createUser(email, name, password);
+  /**
+   * An invitation is an approval: the person who owns the trip is vouching for them.
+   * A plain request in "approval" mode waits for the admin instead.
+   */
+  const approved = Boolean(invite) || mode === "open";
+
+  const user = await createUser(email, name, password, { approved });
   if (!user) {
     return NextResponse.json({ error: "That email is already registered" }, { status: 409 });
+  }
+
+  // No session for an account nobody has let in yet.
+  if (!approved && user.approvedAt == null) {
+    return NextResponse.json({ pending: true, user: null });
   }
 
 

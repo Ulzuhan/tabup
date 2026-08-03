@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Clock, Loader2 } from "lucide-react";
 import { Wordmark } from "@/components/app-header";
 import { useT } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [canRegister, setCanRegister] = useState<boolean | null>(null);
+  const [requested, setRequested] = useState(false);
 
   // Asked before offering the choice: proposing "create one" and then refusing it is
   // the kind of dead end that makes people think the app is broken.
@@ -56,7 +57,16 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || t("common.somethingWrong"));
+        // The server says "pending_approval" rather than a message, so the wording
+        // lives here with the rest of the copy and gets translated.
+        setError(data.error === "pending_approval" ? t("auth.pendingApproval") : data.error || t("common.somethingWrong"));
+        setBusy(false);
+        return;
+      }
+
+      // Registered but waiting: no session was issued, so there is nowhere to go yet.
+      if (data.pending) {
+        setRequested(true);
         setBusy(false);
         return;
       }
@@ -88,6 +98,17 @@ export default function LoginPage() {
         </p>
       </div>
 
+      {requested ? (
+        <Card>
+          <CardContent className="py-2 text-center">
+            <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-2xl bg-primary/10">
+              <Clock className="size-5 text-primary" />
+            </div>
+            <p className="font-medium">{t("auth.requested")}</p>
+            <p className="mt-1.5 text-sm text-muted-foreground">{t("auth.requestedHint")}</p>
+          </CardContent>
+        </Card>
+      ) : (
       <Card>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
@@ -156,8 +177,9 @@ export default function LoginPage() {
           </form>
         </CardContent>
       </Card>
+      )}
 
-      {canRegister === false && !registering ? (
+      {requested ? null : canRegister === false && !registering ? (
         <div className="mt-6 rounded-xl border border-border bg-card p-3 text-center">
           <p className="text-sm font-medium">{t("auth.closed")}</p>
           <p className="mt-1 text-xs text-muted-foreground">{t("auth.closedHint")}</p>

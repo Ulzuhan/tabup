@@ -38,6 +38,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Wrong email or password" }, { status: 401 });
   }
 
+  // Told apart from a wrong password on purpose: somebody waiting on approval needs to
+  // know that is what is happening, not that their password is wrong.
+  if (user.approvedAt == null) {
+    return NextResponse.json({ error: "pending_approval" }, { status: 403 });
+  }
+
   clearAttempts(accountKey);
 
 
