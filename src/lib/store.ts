@@ -742,9 +742,14 @@ export async function redeemInvite(token: string, userId: string): Promise<strin
   const invite = readInvite(token);
   if (!invite) return null;
 
-  // The owner opening their own link should not be demoted to editor.
+  // An invitation only ever adds access, never takes it away. The owner opening their
+  // own link should not be demoted to editor, and now that read-only links can be handed
+  // out, an editor who taps one must not silently lose the ability to add expenses —
+  // they were given it deliberately, and a link forwarded round a group is not a
+  // decision to take it back.
   const current = accessLevel(invite.tripId, userId);
   if (current === "owner") return invite.tripId;
+  if (current === "editor" && invite.role === "viewer") return invite.tripId;
 
   const granted = await grantAccess(invite.tripId, userId, invite.role);
   return granted ? invite.tripId : null;

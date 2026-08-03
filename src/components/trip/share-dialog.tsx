@@ -5,6 +5,7 @@ import qrcode from "qrcode-generator";
 import { Check, Copy, FileText, ImageDown, Loader2, Share2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useT, useIntlLocale } from "@/i18n/provider";
+import { cn } from "@/lib/utils";
 import { renderSummary, canvasToBlob } from "./summary-image";
 import {
   Dialog,
@@ -92,17 +93,38 @@ export function ShareDialog({
    * stranger opening it gets a 404. An invitation link is the only thing worth handing
    * over, and it replaces the URL here as soon as one exists.
    */
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [invite, setInvite] = useState<{
+    url: string;
+    role: "editor" | "viewer";
+    expiresAt: number;
+  } | null>(null);
   const [creatingInvite, setCreatingInvite] = useState(false);
-  const shareUrl = inviteUrl ?? url;
+
+  /**
+   * Chosen before the link exists, not after.
+   *
+   * The role is baked into the token — anyone who opens it joins with it — so there is
+   * no changing it afterwards. Handing out a link and only then discovering it made
+   * everybody an editor is exactly what this avoids.
+   */
+  const [role, setRole] = useState<"editor" | "viewer">("editor");
+  const shareUrl = invite?.url ?? url;
 
   const createInvite = async () => {
     setCreatingInvite(true);
     try {
-      const res = await fetch(`/api/trips/${tripId}/invite`, { method: "POST" });
+      const res = await fetch(`/api/trips/${tripId}/invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
       const data = await res.json();
       if (res.ok) {
-        setInviteUrl(`${window.location.origin}/join/${data.token}`);
+        setInvite({
+          url: `${window.location.origin}/join/${data.token}`,
+          role,
+          expiresAt: data.expiresAt,
+        });
       }
     } catch {
       /* the plain link stays on screen; it still works for anyone already invited */
@@ -160,6 +182,12 @@ export function ShareDialog({
           </Button>
         </div>
 
+        {/* Said out loud, because the QR above looks equally shareable either way and
+            only one of the two links lets a stranger in. */}
+        {!invite && (
+          <p className="-mt-1 px-1 text-xs text-muted-foreground">{t("shareTrip.plainLinkHint")}</p>
+        )}
+
         {typeof navigator !== "undefined" && "share" in navigator && (
           <Button variant="outline" onClick={nativeShare} className="w-full">
             <Share2 className="size-4" />
@@ -214,9 +242,74 @@ export function ShareDialog({
           </div>
         </div>
 
-        {!inviteUrl && (
-          <div className="space-y-2 rounded-xl border border-warning/25 bg-warning/[0.06] p-3">
-            <p className="text-xs text-muted-foreground">{t("join.inviteHint")}</p>
+        {invite ? (
+          <div className="space-y-1.5 rounded-xl border border-primary/25 bg-primary/[0.06] p-3">
+            <div className="flex items-center gap-2">
+              <UserPlus className="size-4 shrink-0 text-primary" />
+              <p className="min-w-0 flex-1 truncate text-sm font-medium">
+                {t("join.inviteActive")}
+              </p>
+              <span className="shrink-0 rounded-md border border-border bg-background px-1.5 py-0.5 text-[11px] font-medium">
+                {invite.role === "viewer" ? t("manage.viewer") : t("manage.editor")}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {t("join.inviteExpires", {
+                date: new Intl.DateTimeFormat(locale, {
+                  day: "numeric",
+                  month: "long",
+                }).format(new Date(invite.expiresAt)),
+              })}
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-full text-muted-foreground"
+              onClick={() => setInvite(null)}
+            >
+              {t("join.inviteAnother")}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-2.5 rounded-xl border border-border p-3">
+            <div>
+              <p className="text-sm font-medium">{t("join.inviteTitle")}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t("join.inviteHint")}</p>
+            </div>
+
+            {/*
+              Two buttons rather than a dropdown: with only two answers, a select hides
+              one of them behind a tap and says nothing about what either means, while
+              this shows both choices and their consequence at once.
+            */}
+            <fieldset>
+              <legend className="sr-only">{t("join.inviteWhatCan")}</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    { value: "editor", label: t("manage.editor"), hint: t("join.editorHint") },
+                    { value: "viewer", label: t("manage.viewer"), hint: t("join.viewerHint") },
+                  ] as const
+                ).map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={role === option.value}
+                    onClick={() => setRole(option.value)}
+                    className={cn(
+                      "rounded-lg border px-2.5 py-2 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      role === option.value
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:bg-secondary/60"
+                    )}
+                  >
+                    <span className="block text-sm font-medium">{option.label}</span>
+                    <span className="block text-xs text-muted-foreground">{option.hint}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
             <Button
               variant="outline"
               size="sm"

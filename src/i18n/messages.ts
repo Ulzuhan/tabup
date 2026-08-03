@@ -177,8 +177,6 @@ export const es = {
     removeWarning: "Quitar a alguien borra también sus gastos y sus pagos.",
     addSomeone: "Añadir a alguien",
     accounts: "Cuentas con acceso",
-    anonymousNote:
-      "Este viaje no pertenece a nadie, así que cualquiera con el enlace puede abrirlo. Reclámalo a una cuenta si quieres elegir quién entra.",
     inviteHint:
       "Tienen que tener cuenta aquí. Los editores pueden añadir y editar gastos; los lectores solo mirar.",
     invite: "Invitar",
@@ -201,8 +199,8 @@ export const es = {
     saveImage: "Guardar imagen",
     shareImage: "Compartir imagen",
     printable: "Ver para imprimir o PDF",
-    anonymousWarning:
-      "Cualquiera con este enlace puede abrir y editar el viaje: no lleva contraseña. Entra y reclámalo si prefieres elegir quién accede.",
+    plainLinkHint:
+      "Este enlace solo funciona para quien ya tiene acceso. Para alguien nuevo, crea una invitación.",
   },
 
   confirm: {
@@ -354,6 +352,13 @@ export const es = {
     createInvite: "Crear invitación",
     creating: "Creando…",
     role: "Puede",
+    inviteTitle: "Invitar con un enlace",
+    inviteWhatCan: "¿Qué podrá hacer quien entre?",
+    editorHint: "Añadir y editar gastos",
+    viewerHint: "Solo mirar",
+    inviteActive: "Invitación activa",
+    inviteExpires: "Caduca el {date}",
+    inviteAnother: "Crear otra con distinto permiso",
   },
 
   language: "Idioma",
@@ -541,8 +546,6 @@ export const en: Messages = {
     removeWarning: "Removing someone deletes their expenses and payments too.",
     addSomeone: "Add someone",
     accounts: "Accounts with access",
-    anonymousNote:
-      "This trip belongs to nobody, so anyone with the link can open it. Claim it to an account first if you want to choose who gets in.",
     inviteHint:
       "They need an account here already. Editors can add and edit expenses; viewers can only look.",
     invite: "Invite",
@@ -565,8 +568,8 @@ export const en: Messages = {
     saveImage: "Save image",
     shareImage: "Share image",
     printable: "Open printable view or PDF",
-    anonymousWarning:
-      "Anyone with this link can open and edit the trip — there is no password on it. Sign in and claim the trip if you would rather choose who gets in.",
+    plainLinkHint:
+      "This link only works for someone who already has access. For anyone new, create an invitation.",
   },
 
   confirm: {
@@ -718,6 +721,13 @@ export const en: Messages = {
     createInvite: "Create invitation",
     creating: "Creating…",
     role: "Can",
+    inviteTitle: "Invite with a link",
+    inviteWhatCan: "What can whoever joins do?",
+    editorHint: "Add and edit expenses",
+    viewerHint: "Look only",
+    inviteActive: "Invitation active",
+    inviteExpires: "Expires on {date}",
+    inviteAnother: "Create another with different access",
   },
 
   language: "Language",

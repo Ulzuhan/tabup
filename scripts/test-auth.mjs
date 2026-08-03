@@ -244,6 +244,66 @@ async function main() {
   const guestInvite = await guest(`/api/trips/${inviteTrip.id}/invite`, { method: "POST" });
   check("an editor cannot invite others", guestInvite.status, 403);
 
+  // ── The role carried by the link ───────────────────────────────────
+  // The owner picks it when creating the link, and it has to survive the whole trip
+  // through registration and into what the person can actually do.
+  console.log("\nInvitation roles");
+  const readOnlyLink = await alice(`/api/trips/${inviteTrip.id}/invite`, {
+    method: "POST",
+    body: JSON.stringify({ role: "viewer" }),
+  });
+  check("owner creates a read-only invitation", readOnlyLink.status, 200);
+
+  const onlooker = client();
+  await onlooker("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify({
+      email: `onlooker-${uniq()}@example.com`,
+      name: "Onlooker",
+      password: "an onlooker password",
+      inviteToken: readOnlyLink.body.token,
+    }),
+  });
+  check("who joins and can read", (await onlooker(`/api/trips/${inviteTrip.id}`)).status, 200);
+
+  const onlookerWrite = await onlooker(`/api/trips/${inviteTrip.id}/expense`, {
+    method: "POST",
+    body: JSON.stringify({
+      description: "Not allowed",
+      amount: 10,
+      currency: "EUR",
+      paidBy: inviteTrip.members[0].id,
+      splitAmong: inviteTrip.members.map((m) => m.id),
+      date: "2026-01-01",
+    }),
+  });
+  check("but cannot add expenses", onlookerWrite.status, 403);
+
+  // A read-only link forwarded round a group must not quietly demote the people who
+  // were already editors — an invitation adds access, it never takes any away.
+  check(
+    "a viewer link does not demote an editor",
+    (
+      await guest("/api/join", {
+        method: "POST",
+        body: JSON.stringify({ token: readOnlyLink.body.token }),
+      })
+    ).status,
+    200
+  );
+  const stillEditor = await guest(`/api/trips/${inviteTrip.id}/expense`, {
+    method: "POST",
+    body: JSON.stringify({
+      description: "Still allowed",
+      amount: 10,
+      currency: "EUR",
+      paidBy: inviteTrip.members[0].id,
+      splitAmong: inviteTrip.members.map((m) => m.id),
+      date: "2026-01-01",
+    }),
+  });
+  check("who can still add expenses", stillEditor.status, 200);
+
   // ── Login and logout ───────────────────────────────────────────────
   console.log("\nLogin and logout");
   await alice("/api/auth/logout", { method: "POST" });
