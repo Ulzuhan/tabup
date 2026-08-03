@@ -36,3 +36,8 @@ next-env.d.ts
 
 # SplitTrip data (never commit user data!)
 .splittrip-data/
+# SQLite database and cached rates
+data/
+*.db
+*.db-wal
+*.db-shm

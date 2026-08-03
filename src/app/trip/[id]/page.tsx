@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { rememberTrip } from "@/lib/local-trips";
 import { CURRENCIES, CATEGORIES } from "@/lib/types";
 import type { Member, Expense, Payment } from "@/lib/types";
 
@@ -12,6 +14,8 @@ interface TripData {
   id: string; name: string; currency: string; createdAt: number; version: number;
   members: Member[]; expenses: Expense[]; payments: Payment[];
   balances: EnrichedBalance[]; settlements: EnrichedSettlement[]; totalExpenses: number;
+  access: "viewer" | "editor" | "owner"; anonymous: boolean;
+  collaborators: { id: string; email: string; name: string; role: string }[];
 }
 
 export default function TripPage() {
@@ -61,15 +65,24 @@ export default function TripPage() {
       if (!res.ok) { setError("Trip not found"); return; }
       const data = await res.json();
       setTrip(data);
-      if (!expCurrency) setExpCurrency(data.currency);
-      if (!paidBy && data.members.length > 0) setPaidBy(data.members[0].id);
-      if (splitAmong.length === 0) setSplitAmong(data.members.map((m: Member) => m.id));
-      if (!settleFrom && data.members.length > 0) setSettleFrom(data.members[0].id);
-      if (!settleTo && data.members.length > 1) setSettleTo(data.members[1].id);
+      // Opening an anonymous trip by link is how someone joins it. Recording the id
+      // here is what puts it on their home screen afterwards.
+      if (data.anonymous) rememberTrip(data.id);
+      // Form defaults are seeded from whichever load happens while the field is still
+      // empty. Functional updates read the current value without making every form
+      // field a dependency of this callback, which would refetch on each keystroke.
+      const members: Member[] = data.members ?? [];
+      setExpCurrency((c) => c || data.currency);
+      setPaidBy((p) => p || members[0]?.id || "");
+      setSplitAmong((s) => (s.length === 0 ? members.map((m) => m.id) : s));
+      setSettleFrom((f) => f || members[0]?.id || "");
+      setSettleTo((t) => t || members[1]?.id || "");
     } catch { setError("Failed to load trip"); }
   }, [id]);
 
-  useEffect(() => { loadTrip(); }, [loadTrip]);
+  // Wrapped in a promise callback so nothing updates state during the render pass:
+  // every setState inside loadTrip runs after the fetch has resolved.
+  useEffect(() => { Promise.resolve().then(loadTrip); }, [loadTrip]);
 
   const addExpense = async () => {
     if (!desc.trim() || !amount || !paidBy || splitAmong.length === 0) return;
@@ -216,6 +229,16 @@ export default function TripPage() {
     setConfirmDelete(null);
   };
 
+  // Every hook has to run before the conditional returns below: skipping one on the
+  // error render would change the hook order between renders and React would throw.
+  const categoryBreakdown = useMemo(() => {
+    if (!trip) return [];
+    const catTotals: Record<string, number> = {};
+    for (const e of trip.expenses) { catTotals[e.category] = (catTotals[e.category] || 0) + e.amountEur; }
+    return Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+  }, [trip]);
+  const categoryBreakdownTotal = useMemo(() => categoryBreakdown.reduce((s, [, v]) => s + v, 0), [categoryBreakdown]);
+
   if (error) {
     return (
       <div className="flex-1 flex items-center justify-center min-h-screen">
@@ -223,24 +246,19 @@ export default function TripPage() {
           <div className="text-5xl">💔</div>
           <h2 className="text-xl font-bold text-foreground">Trip Not Found</h2>
           <p className="text-muted">{error}</p>
-          <a href="/" className="inline-block bg-accent hover:bg-accent-hover text-background font-medium py-2.5 px-6 rounded-xl transition-all">Go Home</a>
+          <Link href="/" className="inline-block bg-accent hover:bg-accent-hover text-background font-medium py-2.5 px-6 rounded-xl transition-all">Go Home</Link>
         </div>
       </div>
     );
   }
 
-  // Hooks must be called before any conditional returns (React rules of hooks)
-  const categoryBreakdown = useMemo(() => {
-    if (!trip) return [];
-    const catTotals: Record<string, number> = {};
-    for (const e of trip.expenses) { catTotals[e.category] = (catTotals[e.category] || 0) + e.amountEur; }
-    return Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
-  }, [trip?.expenses]);
-  const categoryBreakdownTotal = useMemo(() => categoryBreakdown.reduce((s, [, v]) => s + v, 0), [categoryBreakdown]);
-
   if (!trip) {
     return (<div className="flex-1 flex items-center justify-center min-h-screen"><div className="text-4xl animate-pulse">⏳</div></div>);
   }
+
+  // The server refuses writes from a viewer regardless; this only keeps the UI from
+  // offering buttons that would come back 403.
+  const readOnly = trip.access === "viewer";
 
   const currencySymbol = (code: string) => CURRENCIES.find((c) => c.code === code)?.symbol || code;
   const memberById = (mid: string) => trip.members.find((m) => m.id === mid);
@@ -252,16 +270,16 @@ export default function TripPage() {
     <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 py-6 pb-24">
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
-        <a href="/" className="text-muted hover:text-foreground transition-colors text-xl">←</a>
+        <Link href="/" className="text-muted hover:text-foreground transition-colors text-xl">←</Link>
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold text-foreground truncate">{trip.name}</h1>
           <p className="text-muted text-sm flex items-center gap-1 flex-wrap">
             {trip.members.map((m) => `${m.emoji} ${m.name}`).join(" · ")}
-            <button onClick={() => setShowAddMember(true)} className="text-accent hover:text-accent-hover text-xs font-medium ml-1">+ Add</button>
+            {!readOnly && <button onClick={() => setShowAddMember(true)} className="text-accent hover:text-accent-hover text-xs font-medium ml-1">+ Add</button>}
           </p>
         </div>
         <a href={`/api/trips/${id}/export`} className="px-3 py-2 text-sm bg-surface hover:bg-surface-light border border-border rounded-lg text-muted hover:text-foreground transition-all">📥 CSV</a>
-        <button onClick={() => setConfirmDelete({ type: "trip", id })} className="px-3 py-2 text-sm bg-surface hover:bg-red-500/10 text-muted hover:text-danger border border-border rounded-lg transition-all">🗑️</button>
+        {trip.access === "owner" && <button onClick={() => setConfirmDelete({ type: "trip", id })} className="px-3 py-2 text-sm bg-surface hover:bg-red-500/10 text-muted hover:text-danger border border-border rounded-lg transition-all">🗑️</button>}
       </div>
 
       {/* Total */}
@@ -325,10 +343,16 @@ export default function TripPage() {
       {/* EXPENSES TAB */}
       {tab === "expenses" && (
         <div className="space-y-3 tab-content-enter">
-          <button onClick={() => { setShowAdd(true); cancelEdit(); }}
-            className="w-full bg-accent hover:bg-accent-hover text-background font-bold py-3 px-5 rounded-xl transition-all active:scale-95">
-            + Add Expense
-          </button>
+          {readOnly ? (
+            <p className="text-center text-muted text-sm bg-surface border border-border rounded-xl py-3 px-5">
+              👁️ You have read-only access to this trip.
+            </p>
+          ) : (
+            <button onClick={() => { setShowAdd(true); cancelEdit(); }}
+              className="w-full bg-accent hover:bg-accent-hover text-background font-bold py-3 px-5 rounded-xl transition-all active:scale-95">
+              + Add Expense
+            </button>
+          )}
 
           {/* Add Expense Form */}
           {showAdd && (
@@ -435,10 +459,12 @@ export default function TripPage() {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="text-foreground font-bold">{currencySymbol(exp.currency)}{fmt(exp.amount)}</p>
-                      <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 sm-max:opacity-100 transition-opacity">
-                        <button onClick={() => startEdit(exp)} className="text-muted hover:text-warning text-xs">✏️</button>
-                        <button onClick={() => setConfirmDelete({ type: "expense", id: exp.id })} className="text-muted hover:text-danger text-xs">🗑️</button>
-                      </div>
+                      {!readOnly && (
+                        <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 sm-max:opacity-100 transition-opacity">
+                          <button onClick={() => startEdit(exp)} className="text-muted hover:text-warning text-xs">✏️</button>
+                          <button onClick={() => setConfirmDelete({ type: "expense", id: exp.id })} className="text-muted hover:text-danger text-xs">🗑️</button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -475,10 +501,12 @@ export default function TripPage() {
           )}
 
           {/* Record Payment Form */}
-          <button onClick={() => setShowSettle(!showSettle)}
-            className="w-full bg-accent hover:bg-accent-hover text-background font-bold py-3 px-5 rounded-xl transition-all active:scale-95">
-            💰 Record a Payment
-          </button>
+          {!readOnly && (
+            <button onClick={() => setShowSettle(!showSettle)}
+              className="w-full bg-accent hover:bg-accent-hover text-background font-bold py-3 px-5 rounded-xl transition-all active:scale-95">
+              💰 Record a Payment
+            </button>
+          )}
 
           {showSettle && (
             <div className="bg-surface border border-accent/30 rounded-2xl p-5 space-y-4 animate-slide-down">
@@ -515,7 +543,7 @@ export default function TripPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-accent font-bold">{currencySymbol(curr)}{fmt(p.amount)}</p>
-                      <button onClick={() => setConfirmDelete({ type: "payment", id: p.id })} className="text-muted hover:text-danger text-xs opacity-0 group-hover:opacity-100 sm-max:opacity-100 transition-opacity">🗑️</button>
+                      {!readOnly && <button onClick={() => setConfirmDelete({ type: "payment", id: p.id })} className="text-muted hover:text-danger text-xs opacity-0 group-hover:opacity-100 sm-max:opacity-100 transition-opacity">🗑️</button>}
                     </div>
                   </div>
                 </div>

@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createTrip, generateId } from "@/lib/store";
-import type { Trip } from "@/lib/types";
+import { atTripLimit, createTrip, FREE_TRIP_LIMIT, listTrips } from "@/lib/store";
+import { getCurrentUser } from "@/lib/auth";
 import { CURRENCIES, EMOJIS } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
   try {
+    // Signing in is optional. Without an account the trip has no owner and lives on
+    // its link, which is what keeps the first use free of a registration wall.
+    const user = await getCurrentUser();
+    if (user && atTripLimit(user)) {
+      return NextResponse.json(
+        {
+          error: `The free plan covers ${FREE_TRIP_LIMIT} trips. Upgrade to create more.`,
+          code: "trip_limit",
+        },
+        { status: 402 }
+      );
+    }
+
     const body = await request.json();
     const { name, currency = "EUR", members } = body;
 
@@ -29,22 +42,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid currency" }, { status: 400 });
     }
 
-    const trip: Trip = {
-      id: generateId(),
-      name: name.trim(),
+    // Ids are generated inside the data layer, in the same transaction that inserts
+    // the trip and its members.
+    const trip = await createTrip({
+      name: name.trim().slice(0, 100),
       currency,
-      createdAt: Date.now(),
-      version: 1,
       members: members.map((m: { name: string }, i: number) => ({
-        id: generateId(),
         name: m.name.trim(),
         emoji: EMOJIS[i % EMOJIS.length],
       })),
-      expenses: [],
-      payments: [],
-    };
-
-    await createTrip(trip);
+      ownerId: user?.id,
+    });
 
     return NextResponse.json({
       id: trip.id,
@@ -60,17 +68,10 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const { listTrips } = await import("@/lib/store");
-    const trips = await listTrips();
-    const summary = trips.map((t) => ({
-      id: t.id,
-      name: t.name,
-      currency: t.currency,
-      memberCount: t.members.length,
-      expenseCount: t.expenses.length,
-      createdAt: t.createdAt,
-    }));
-    return NextResponse.json({ trips: summary });
+    // Only ever the caller's own trips: there is no endpoint that lists everyone's.
+    const user = await getCurrentUser();
+    const trips = await listTrips(user?.id);
+    return NextResponse.json({ trips });
   } catch (error) {
     console.error("List trips error:", error);
     return NextResponse.json({ error: "Failed to list trips" }, { status: 500 });

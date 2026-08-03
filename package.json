@@ -6,15 +6,21 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:api": "node scripts/test-api.mjs",
+    "migrate:json": "node scripts/migrate-json.mjs",
+    "test:auth": "node scripts/test-auth.mjs"
   },
   "dependencies": {
-    "next": "16.2.6",
+    "better-sqlite3": "^13.0.2",
+    "drizzle-orm": "^0.45.2",
+    "next": "^16.2.12",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -22,5 +28,9 @@
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "sharp": "^0.35.0",
+    "postcss": "^8.5.18"
   }
 }

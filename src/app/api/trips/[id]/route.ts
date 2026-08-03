@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTrip, updateTrip, deleteTrip, calculateBalances, calculateSettlements, generateId } from "@/lib/store";
+import {
+  addMember,
+  calculateBalances,
+  calculateSettlements,
+  deleteTrip,
+  getTrip,
+  isAnonymousTrip,
+  listCollaborators,
+  removeMembers,
+  updateTripMeta,
+} from "@/lib/store";
+import { authorizeTrip } from "@/lib/authorize";
 import { EMOJIS } from "@/lib/types";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-  if (!/^[0-9a-f]{8,32}$/.test(id)) {
-    return NextResponse.json({ error: "Invalid trip ID format" }, { status: 400 });
-  }
+// GET — trip with balances and the minimal set of settlements
+export async function GET(_request: NextRequest, ctx: RouteContext<"/api/trips/[id]">) {
+  const { id } = await ctx.params;
+  const auth = await authorizeTrip(id, "read");
+  if (!auth.ok) return auth.response;
+
   const trip = await getTrip(id);
   if (!trip) {
     return NextResponse.json({ error: "Trip not found" }, { status: 404 });
@@ -18,7 +27,7 @@ export async function GET(
   const balances = calculateBalances(trip);
   const settlements = calculateSettlements(trip);
 
-  // Enrich with member names
+  // Names and emojis are attached here so the UI does not have to cross-reference.
   const enrichedBalances = balances.map((b) => {
     const member = trip.members.find((m) => m.id === b.memberId);
     return { ...b, name: member?.name, emoji: member?.emoji };
@@ -43,17 +52,20 @@ export async function GET(
     balances: enrichedBalances,
     settlements: enrichedSettlements,
     totalExpenses: Math.round(totalExpenses * 100) / 100,
+    // The UI hides the write controls on a read-only trip; the server refuses them
+    // regardless, this only avoids showing buttons that would fail.
+    access: auth.level,
+    // Anonymous trips have no collaborator list — the link is the access control.
+    anonymous: isAnonymousTrip(id),
+    collaborators: listCollaborators(id),
   });
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-  if (!/^[0-9a-f]{8,32}$/.test(id)) {
-    return NextResponse.json({ error: "Invalid trip ID format" }, { status: 400 });
-  }
+export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/trips/[id]">) {
+  const { id } = await ctx.params;
+  const auth = await authorizeTrip(id, "own");
+  if (!auth.ok) return auth.response;
+
   const deleted = await deleteTrip(id);
   if (!deleted) {
     return NextResponse.json({ error: "Trip not found" }, { status: 404 });
@@ -61,21 +73,13 @@ export async function DELETE(
   return NextResponse.json({ success: true });
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-  let trip;
-  try {
-    trip = await getTrip(id);
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes("Invalid trip ID format") || msg.includes("Path traversal")) {
-      return NextResponse.json({ error: msg }, { status: 400 });
-    }
-    return NextResponse.json({ error: "Failed to load trip" }, { status: 500 });
-  }
+// PATCH — rename the trip, add members or remove them
+export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/[id]">) {
+  const { id } = await ctx.params;
+  const auth = await authorizeTrip(id, "write");
+  if (!auth.ok) return auth.response;
+
+  const trip = await getTrip(id);
   if (!trip) {
     return NextResponse.json({ error: "Trip not found" }, { status: 404 });
   }
@@ -83,45 +87,49 @@ export async function PATCH(
   try {
     const body = await request.json();
 
-    // Add members
     if (body.addMembers && Array.isArray(body.addMembers)) {
-      const names = body.addMembers.filter((n: unknown): n is string => typeof n === "string" && n.trim().length > 0 && n.trim().length <= 50);
+      const names = body.addMembers.filter(
+        (n: unknown): n is string =>
+          typeof n === "string" && n.trim().length > 0 && n.trim().length <= 50
+      );
       if (names.length === 0) {
-        return NextResponse.json({ error: "addMembers must contain non-empty strings" }, { status: 400 });
+        return NextResponse.json(
+          { error: "addMembers must contain non-empty strings" },
+          { status: 400 }
+        );
       }
+
       const existingNames = trip.members.map((m) => m.name.toLowerCase());
-      const duplicates = names.filter((n: string) => existingNames.includes(n.trim().toLowerCase()));
+      const duplicates = names.filter((n: string) =>
+        existingNames.includes(n.trim().toLowerCase())
+      );
       if (duplicates.length > 0) {
-        return NextResponse.json({ error: `Duplicate member name(s): ${duplicates.join(", ")}` }, { status: 400 });
+        return NextResponse.json(
+          { error: `Duplicate member name(s): ${duplicates.join(", ")}` },
+          { status: 400 }
+        );
       }
-      const newMembers = names.map((name: string, i: number) => ({
-        id: generateId(),
-        name: name.trim(),
-        emoji: EMOJIS[(trip.members.length + i) % EMOJIS.length],
-      }));
-      trip.members.push(...newMembers);
-      trip.version = (trip.version || 0) + 1;
-      await updateTrip(trip);
+
+      for (let i = 0; i < names.length; i++) {
+        await addMember(
+          id,
+          names[i].trim(),
+          EMOJIS[(trip.members.length + i) % EMOJIS.length]
+        );
+      }
     }
 
-    // Rename trip
     if (body.name && typeof body.name === "string" && body.name.trim().length > 0) {
-      trip.name = body.name.trim();
-      trip.version = (trip.version || 0) + 1;
-      await updateTrip(trip);
+      await updateTripMeta(id, { name: body.name.trim().slice(0, 100) });
     }
 
-    // Remove members (cascade: remove their expenses and payments)
     if (body.removeMembers && Array.isArray(body.removeMembers)) {
-      const removeIds = new Set(body.removeMembers as string[]);
-      trip.members = trip.members.filter((m) => !removeIds.has(m.id));
-      trip.expenses = trip.expenses.filter((e) => !removeIds.has(e.paidBy));
-      trip.payments = (trip.payments || []).filter((p) => !removeIds.has(p.from) && !removeIds.has(p.to));
-      trip.version = (trip.version || 0) + 1;
-      await updateTrip(trip);
+      // Their expenses, payments and share rows go with them (ON DELETE CASCADE).
+      await removeMembers(id, body.removeMembers as string[]);
     }
 
-    return NextResponse.json({ members: trip.members });
+    const updated = await getTrip(id);
+    return NextResponse.json({ members: updated?.members ?? [] });
   } catch (error) {
     console.error("Update trip error:", error);
     return NextResponse.json({ error: "Failed to update trip" }, { status: 500 });

@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTrip } from "@/lib/store";
-import { CURRENCIES } from "@/lib/types";
+import { authorizeTrip } from "@/lib/authorize";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  if (!/^[0-9a-f]{8,32}$/.test(id)) {
-    return NextResponse.json({ error: "Invalid trip ID format" }, { status: 400 });
-  }
+  const auth = await authorizeTrip(id, "read");
+  if (!auth.ok) return auth.response;
+
   const trip = await getTrip(id);
   if (!trip) {
     return NextResponse.json({ error: "Trip not found" }, { status: 404 });
@@ -24,10 +24,6 @@ export async function GET(
     return str;
   };
 
-  const currencySymbol = (code: string) => {
-    const found = (CURRENCIES as readonly { code: string; symbol: string }[]).find((c) => c.code === code);
-    return found?.symbol || code;
-  };
 
   const memberName = (id: string) => trip.members.find((m) => m.id === id)?.name || id;
 

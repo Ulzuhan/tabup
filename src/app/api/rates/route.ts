@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { fetchExchangeRates } from "@/lib/store";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const rates = await fetchExchangeRates();
     if (!rates) {
