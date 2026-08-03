@@ -1,4 +1,12 @@
-import { sqliteTable, text, integer, real, index, primaryKey } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  real,
+  index,
+  uniqueIndex,
+  primaryKey,
+} from "drizzle-orm/sqlite-core";
 
 /**
  * Relational schema replacing the previous one-JSON-file-per-trip storage.
@@ -123,10 +131,24 @@ export const expenses = sqliteTable(
     category: text("category").notNull().default("other"),
     date: integer("date").notNull(),
     exchangeRate: real("exchange_rate"),
+    /**
+     * Idempotency key chosen by the client, unique per trip.
+     *
+     * Without it, an expense sent from a queued offline write could be saved by the
+     * server and have its response lost on the way back — the retry would then create a
+     * second, identical expense. In an app about money, silently duplicating a charge is
+     * the worst thing that can happen, so retries carry this and the server recognises
+     * one it has already applied.
+     */
+    clientId: text("client_id"),
     /** False when no live or cached rate was available at the time. */
     rateAvailable: integer("rate_available", { mode: "boolean" }).notNull().default(true),
   },
-  (t) => [index("expenses_trip_idx").on(t.tripId), index("expenses_date_idx").on(t.date)]
+  (t) => [
+    index("expenses_trip_idx").on(t.tripId),
+    index("expenses_date_idx").on(t.date),
+    uniqueIndex("expenses_client_idx").on(t.tripId, t.clientId),
+  ]
 );
 
 /**
@@ -169,8 +191,13 @@ export const payments = sqliteTable(
     amount: real("amount").notNull(),
     date: integer("date").notNull(),
     note: text("note"),
+    /** Same idempotency guarantee as expenses. */
+    clientId: text("client_id"),
   },
-  (t) => [index("payments_trip_idx").on(t.tripId)]
+  (t) => [
+    index("payments_trip_idx").on(t.tripId),
+    uniqueIndex("payments_client_idx").on(t.tripId, t.clientId),
+  ]
 );
 
 export type UserRow = typeof users.$inferSelect;

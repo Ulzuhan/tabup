@@ -125,8 +125,19 @@ function migrate(sqlite: Database.Database) {
   // Columns added after the first release. CREATE TABLE IF NOT EXISTS above is a no-op
   // on databases that already have the table, so new columns need adding separately.
   addColumn(sqlite, "trips", "owner_id", "TEXT REFERENCES users(id) ON DELETE SET NULL");
+  addColumn(sqlite, "expenses", "client_id", "TEXT");
+  addColumn(sqlite, "payments", "client_id", "TEXT");
   addColumn(sqlite, "members", "user_id", "TEXT REFERENCES users(id) ON DELETE SET NULL");
   sqlite.exec("CREATE INDEX IF NOT EXISTS trips_owner_idx ON trips(owner_id);");
+
+  // Unique per trip, and only where a client id was supplied: SQLite treats NULLs as
+  // distinct, so every row written before this existed still fits.
+  sqlite.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS expenses_client_idx ON expenses(trip_id, client_id) WHERE client_id IS NOT NULL;"
+  );
+  sqlite.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS payments_client_idx ON payments(trip_id, client_id) WHERE client_id IS NOT NULL;"
+  );
 
   // Sessions are cheap to clear and there is no other moment that reliably runs.
   sqlite.prepare("DELETE FROM sessions WHERE expires_at < ?").run(Date.now());

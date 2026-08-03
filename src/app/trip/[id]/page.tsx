@@ -17,6 +17,7 @@ import {
   Plus,
   Receipt,
   Settings,
+  CloudOff,
   Trash2,
   TriangleAlert,
   UserPlus,
@@ -39,6 +40,8 @@ import {
   type ExpenseFilters,
 } from "@/components/trip/expense-filter";
 import { OfflineBanner } from "@/components/offline";
+import { enqueue, newClientId } from "@/lib/write-queue";
+import { usePendingWrites, mergePending } from "@/lib/use-pending";
 import { useT, useIntlLocale, usePlural } from "@/i18n/provider";
 import { LanguageItems } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
@@ -143,6 +146,7 @@ export default function TripPage() {
   const [stale, setStale] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [filters, setFilters] = useState<ExpenseFilters>(NO_FILTERS);
+
   const [confirm, setConfirm] = useState<{
     type: "expense" | "payment" | "trip";
     id: string;
@@ -187,17 +191,35 @@ export default function TripPage() {
     Promise.resolve().then(loadTrip);
   }, [loadTrip]);
 
-  const categoryBreakdown = useMemo(() => {
-    if (!trip) return [];
-    const totals: Record<string, number> = {};
-    for (const e of trip.expenses) totals[e.category] = (totals[e.category] || 0) + e.amountEur;
-    return Object.entries(totals).sort((a, b) => b[1] - a[1]);
-  }, [trip]);
+  const { pending, refresh: refreshPending, flush: flushPending } = usePendingWrites(id, () => {
+    // Something in the queue reached the server, so the trip on screen is now behind.
+    Promise.resolve().then(() => loadTrip());
+  });
+
+
+  /**
+   * What the screen shows: the server's data with the queued writes folded in.
+   *
+   * Balances come out of the merged set, computed with the same functions the server
+   * uses, so typing an expense with no signal moves the figures immediately. Showing
+   * the expense but leaving the balances behind would be worse than useless.
+   */
+  const view = useMemo(
+    () => (trip ? mergePending(trip, pending) : null),
+    [trip, pending]
+  );
 
   const visibleExpenses = useMemo(
-    () => (trip ? filterExpenses(trip.expenses, filters) : []),
-    [trip, filters]
+    () => (view ? filterExpenses(view.expenses, filters) : []),
+    [view, filters]
   );
+
+  const categoryBreakdown = useMemo(() => {
+    if (!view) return [];
+    const totals: Record<string, number> = {};
+    for (const e of view.expenses) totals[e.category] = (totals[e.category] || 0) + e.amountEur;
+    return Object.entries(totals).sort((a, b) => b[1] - a[1]);
+  }, [view]);
 
   const breakdownTotal = useMemo(
     () => categoryBreakdown.reduce((sum, [, v]) => sum + v, 0),
@@ -207,18 +229,20 @@ export default function TripPage() {
   const submitExpense = async () => {
     if (!trip) return;
     setBusy(true);
-    try {
-      // Percentages and exact amounts are both proportions, which is exactly what the
-      // server stores, so neither mode needs converting — only the labelling differs.
-      const shares: Record<string, number> = {};
-      if (expenseDraft.splitMode !== "equal") {
-        for (const mid of expenseDraft.splitAmong) {
-          const value = parseFloat(expenseDraft.splitValues[mid] ?? "");
-          if (value > 0) shares[mid] = value;
-        }
-      }
 
-      const body = {
+    // Percentages and exact amounts are both proportions, which is exactly what the
+    // server stores, so neither mode needs converting — only the labelling differs.
+    const shares: Record<string, number> = {};
+    if (expenseDraft.splitMode !== "equal") {
+      for (const mid of expenseDraft.splitAmong) {
+        const value = parseFloat(expenseDraft.splitValues[mid] ?? "");
+        if (value > 0) shares[mid] = value;
+      }
+    }
+
+    // Built outside the try so the offline path can queue exactly what was going to be
+    // sent, rather than reconstructing it and risking a difference.
+    const body = {
         expenseId: editingId ?? undefined,
         description: expenseDraft.description.trim(),
         amount: parseFloat(expenseDraft.amount),
@@ -231,12 +255,13 @@ export default function TripPage() {
             ? shares
             : undefined,
         date: expenseDraft.date ? new Date(expenseDraft.date).getTime() : Date.now(),
-      };
+    };
 
+    try {
       const res = await fetch(`/api/trips/${id}/expense`, {
         method: editingId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, clientId: editingId ? undefined : newClientId() }),
       });
 
       if (!res.ok) {
@@ -250,7 +275,24 @@ export default function TripPage() {
       await loadTrip();
       toast.success(editingId ? t("expense.updated") : t("expense.added"));
     } catch {
-      toast.error(t("common.serverUnreachable"));
+      // The request never reached the server. A new expense can wait in the queue and
+      // be delivered later; an edit cannot, because by the time it is sent the thing it
+      // edits may have moved on, and guessing there would be worse than refusing.
+      if (editingId) {
+        toast.error(t("common.serverUnreachable"));
+        return;
+      }
+
+      await enqueue({
+        clientId: newClientId(),
+        tripId: id,
+        kind: "expense",
+        body,
+        createdAt: Date.now(),
+      });
+      setExpenseOpen(false);
+      await refreshPending();
+      toast.success(t("offline.queued"));
     } finally {
       setBusy(false);
     }
@@ -258,17 +300,18 @@ export default function TripPage() {
 
   const submitPayment = async () => {
     setBusy(true);
+    const paymentBody = {
+      from: paymentDraft.from,
+      to: paymentDraft.to,
+      amount: parseFloat(paymentDraft.amount),
+      note: paymentDraft.note.trim() || undefined,
+      date: paymentDraft.date ? new Date(paymentDraft.date).getTime() : Date.now(),
+    };
     try {
       const res = await fetch(`/api/trips/${id}/payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: paymentDraft.from,
-          to: paymentDraft.to,
-          amount: parseFloat(paymentDraft.amount),
-          note: paymentDraft.note.trim() || undefined,
-          date: paymentDraft.date ? new Date(paymentDraft.date).getTime() : Date.now(),
-        }),
+        body: JSON.stringify({ ...paymentBody, clientId: newClientId() }),
       });
 
       if (!res.ok) {
@@ -282,7 +325,17 @@ export default function TripPage() {
       await loadTrip();
       toast.success(t("settle.recorded"));
     } catch {
-      toast.error(t("common.serverUnreachable"));
+      await enqueue({
+        clientId: newClientId(),
+        tripId: id,
+        kind: "payment",
+        body: paymentBody,
+        createdAt: Date.now(),
+      });
+      setSettleOpen(false);
+      setPaymentDraft((d) => ({ ...d, amount: "", note: "" }));
+      await refreshPending();
+      toast.success(t("offline.queued"));
     } finally {
       setBusy(false);
     }
@@ -451,17 +504,42 @@ export default function TripPage() {
 
       <OfflineBanner stale={stale} />
 
+      {pending.length > 0 && (
+        <div
+          role="status"
+          className="mb-4 flex items-center gap-2.5 rounded-xl border border-warning/25 bg-warning/10 px-4 py-2.5 text-sm text-warning"
+        >
+          <CloudOff className="size-4 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">
+              {pending.length === 1
+                ? t("offline.pendingOne")
+                : t("offline.pendingMany", { count: pending.length })}
+            </p>
+            <p className="text-xs opacity-80">{t("offline.pendingHint")}</p>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="shrink-0 text-warning hover:text-warning"
+            onClick={() => flushPending()}
+          >
+            {t("offline.sendNow")}
+          </Button>
+        </div>
+      )}
+
       {/* Total */}
       <Card className="edge-light mb-4">
         <CardContent className="py-1 text-center">
           <p className="text-xs tracking-wider text-muted-foreground uppercase">{t("trip.totalSpent")}</p>
           <p className="mt-1.5 text-4xl font-semibold tracking-tight">
-            <Money amount={trip.totalExpenses} currency={trip.currency} />
+            <Money amount={view?.totalExpenses ?? trip.totalExpenses} currency={trip.currency} />
           </p>
           {trip.expenses.length > 0 && (
             <p className="mt-1 text-sm text-muted-foreground tabular">
               {t("trip.expenseCount", {
-                expenses: plural("trip.nExpenses", trip.expenses.length),
+                expenses: plural("trip.nExpenses", view?.expenses.length ?? 0),
                 people: plural("trip.nPeople", trip.members.length),
               })}
             </p>
@@ -477,16 +555,18 @@ export default function TripPage() {
       )}
 
       {/* Balances */}
-      {trip.balances.length > 0 && trip.expenses.length > 0 && (
+      {trip.balances.length > 0 && (view?.expenses.length ?? 0) > 0 && (
         <Card className="mb-4">
           <CardContent className="space-y-2.5">
             <h2 className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
               {t("trip.balances")}
             </h2>
-            {trip.balances.map((b) => (
+            {(view?.balances ?? []).map((b) => {
+              const member = memberById(b.memberId);
+              return (
               <div key={b.memberId} className="flex items-center gap-2.5">
-                <MemberAvatar emoji={b.emoji} name={b.name} size="sm" />
-                <span className="min-w-0 flex-1 truncate text-sm">{b.name}</span>
+                <MemberAvatar emoji={member?.emoji} name={member?.name} size="sm" />
+                <span className="min-w-0 flex-1 truncate text-sm">{member?.name}</span>
                 <Money
                   amount={b.balance}
                   currency={trip.currency}
@@ -494,7 +574,8 @@ export default function TripPage() {
                   className="text-sm font-medium"
                 />
               </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       )}
@@ -597,13 +678,21 @@ export default function TripPage() {
                   return (
                     <li
                       key={expense.id}
-                      className="group flex items-center gap-3 rounded-xl border border-border bg-card p-3"
+                      className={cn(
+                        "group flex items-center gap-3 rounded-xl border bg-card p-3",
+                        "pending" in expense
+                          ? "border-warning/30 bg-warning/[0.04]"
+                          : "border-border"
+                      )}
                     >
                       <CategoryBadge category={expense.category} />
 
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{expense.description}</p>
-                        <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
+                        <p className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-muted-foreground">
+                          {"pending" in expense && (
+                            <CloudOff className="size-3.5 shrink-0 text-warning" />
+                          )}
                           {payer?.emoji} {t("trip.paidBy", { name: payer?.name ?? "" })} ·{" "}
                           {plural("trip.ways", expense.splitAmong.length)}
                           {expense.splitShares && ` · ${t("trip.uneven")}`}
@@ -630,7 +719,7 @@ export default function TripPage() {
                         )}
                       </div>
 
-                      {!readOnly && (
+                      {!readOnly && !("pending" in expense) && (
                         <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-100">
                           <Button
                             variant="ghost"
@@ -664,7 +753,7 @@ export default function TripPage() {
 
         {/* Settle up */}
         <TabsContent value="settle" className="mt-4 space-y-3">
-          {trip.settlements.length === 0 ? (
+          {(view?.settlements.length ?? 0) === 0 ? (
             <div className="rounded-xl border border-primary/25 bg-primary/[0.06] px-6 py-10 text-center">
               <CheckCircle2 className="mx-auto mb-3 size-7 text-primary" />
               <p className="font-medium">{t("trip.allSettled")}</p>
@@ -672,23 +761,27 @@ export default function TripPage() {
             </div>
           ) : (
             <ul className="space-y-1.5">
-              {trip.settlements.map((s, i) => (
+              {(view?.settlements ?? []).map((s, i) => {
+                const from = memberById(s.from);
+                const to = memberById(s.to);
+                return (
                 <li
                   key={`${s.from}-${s.to}-${i}`}
                   className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-3"
                 >
-                  <MemberAvatar emoji={s.fromEmoji} name={s.fromName} size="sm" />
-                  <span className="truncate text-sm font-medium">{s.fromName}</span>
+                  <MemberAvatar emoji={from?.emoji} name={from?.name} size="sm" />
+                  <span className="truncate text-sm font-medium">{from?.name}</span>
                   <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
-                  <MemberAvatar emoji={s.toEmoji} name={s.toName} size="sm" />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{s.toName}</span>
+                  <MemberAvatar emoji={to?.emoji} name={to?.name} size="sm" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{to?.name}</span>
                   <Money
                     amount={s.amount}
                     currency={trip.currency}
                     className="shrink-0 text-sm font-semibold text-primary"
                   />
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
 
@@ -702,7 +795,7 @@ export default function TripPage() {
 
         {/* History */}
         <TabsContent value="history" className="mt-4">
-          {trip.payments.length === 0 ? (
+          {(view?.expenses ? trip.payments : []).length === 0 ? (
             <EmptyPanel
               icon={<Wallet className="size-5 text-muted-foreground" />}
               title={t("trip.noPayments")}

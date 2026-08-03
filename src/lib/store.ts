@@ -20,10 +20,14 @@ import { join } from "path";
 import { eq, asc, and, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { trips, members, expenses, expenseSplits, payments, users, tripAccess } from "@/db/schema";
-import type { Trip, Member, Expense, Payment, Balance, Settlement } from "./types";
+import type { Trip, Member, Expense, Payment } from "./types";
 
 const DATA_DIR = process.env.TABUP_DATA_DIR?.trim() || join(process.cwd(), "data");
 const CACHE_FILE = join(DATA_DIR, ".exchange-rates-cache.json");
+
+// The maths lives in balances.ts because the browser needs it as well; re-exported here
+// so every existing importer keeps working unchanged.
+export { calculateBalances, calculateSettlements } from "./balances";
 
 export function generateId(): string {
   return randomBytes(16).toString("hex");
@@ -357,6 +361,8 @@ export interface AddExpenseInput {
   date?: number;
   exchangeRate?: number;
   rateAvailable?: boolean;
+  /** Idempotency key from the client; see the schema for why. */
+  clientId?: string;
 }
 
 /**
@@ -369,6 +375,15 @@ export interface AddExpenseInput {
  */
 export async function addExpense(tripId: string, input: AddExpenseInput): Promise<Expense | null> {
   if (!isValidId(tripId)) return null;
+
+  // A retry of a write that already landed must return what was stored, not add a
+  // second copy of it. Checked before inserting, and the unique index catches the
+  // narrow race where two retries arrive at once.
+  if (input.clientId) {
+    const existing = await findExpenseByClientId(tripId, input.clientId);
+    if (existing) return existing;
+  }
+
   const expenseId = generateId();
   const date = input.date ?? Date.now();
 
@@ -386,6 +401,7 @@ export async function addExpense(tripId: string, input: AddExpenseInput): Promis
         date,
         exchangeRate: input.exchangeRate ?? null,
         rateAvailable: input.rateAvailable ?? true,
+        clientId: input.clientId ?? null,
       })
       .run();
 
@@ -466,6 +482,8 @@ export async function deleteExpense(tripId: string, expenseId: string): Promise<
 }
 
 export interface AddPaymentInput {
+  /** Idempotency key from the client. */
+  clientId?: string;
   from: string;
   to: string;
   amount: number;
@@ -475,6 +493,25 @@ export interface AddPaymentInput {
 
 export async function addPayment(tripId: string, input: AddPaymentInput): Promise<Payment | null> {
   if (!isValidId(tripId)) return null;
+
+  if (input.clientId) {
+    const existing = db
+      .select()
+      .from(payments)
+      .where(and(eq(payments.tripId, tripId), eq(payments.clientId, input.clientId)))
+      .get();
+    if (existing) {
+      return {
+        id: existing.id,
+        from: existing.fromMember,
+        to: existing.toMember,
+        amount: existing.amount,
+        date: existing.date,
+        note: existing.note ?? undefined,
+      };
+    }
+  }
+
   const id = generateId();
   const date = input.date ?? Date.now();
 
@@ -488,6 +525,7 @@ export async function addPayment(tripId: string, input: AddPaymentInput): Promis
         amount: input.amount,
         date,
         note: input.note ?? null,
+        clientId: input.clientId ?? null,
       })
       .run();
     tx.update(trips).set({ updatedAt: date }).where(eq(trips.id, tripId)).run();
@@ -533,88 +571,9 @@ export async function addMember(tripId: string, name: string, emoji: string): Pr
 }
 
 // ─── Calculations (unchanged behaviour) ──────────────────────────────
-export function calculateBalances(trip: Trip): Balance[] {
-  const balances: Record<string, { paid: number; share: number }> = {};
 
-  for (const member of trip.members) {
-    balances[member.id] = { paid: 0, share: 0 };
-  }
 
-  for (const expense of trip.expenses) {
-    if (balances[expense.paidBy]) {
-      balances[expense.paidBy].paid += expense.amountEur;
-    }
-    const splitCount = expense.splitAmong.length;
-    if (splitCount > 0) {
-      const shares = expense.splitShares;
-      if (shares && Object.keys(shares).length > 0) {
-        const totalWeight = Object.values(shares).reduce((s, w) => s + w, 0);
-        if (totalWeight > 0) {
-          for (const memberId of expense.splitAmong) {
-            if (balances[memberId] && shares[memberId]) {
-              balances[memberId].share += (expense.amountEur * shares[memberId]) / totalWeight;
-            }
-          }
-        }
-      } else {
-        const sharePerPerson = expense.amountEur / splitCount;
-        for (const memberId of expense.splitAmong) {
-          if (balances[memberId]) {
-            balances[memberId].share += sharePerPerson;
-          }
-        }
-      }
-    }
-  }
 
-  // Payments: "from" settles part of their debt, "to" is owed less.
-  for (const payment of trip.payments || []) {
-    if (balances[payment.from]) balances[payment.from].share -= payment.amount;
-    if (balances[payment.to]) balances[payment.to].paid -= payment.amount;
-  }
-
-  return trip.members.map((member) => {
-    const b = balances[member.id] || { paid: 0, share: 0 };
-    return {
-      memberId: member.id,
-      totalPaid: Math.round(b.paid * 100) / 100,
-      totalShare: Math.round(b.share * 100) / 100,
-      balance: Math.round((b.paid - b.share) * 100) / 100,
-    };
-  });
-}
-
-/** Minimal set of transfers that settles everyone up. */
-export function calculateSettlements(trip: Trip): Settlement[] {
-  const balances = calculateBalances(trip);
-  const settlements: Settlement[] = [];
-
-  const creditors = balances.filter((b) => b.balance > 0.01).map((b) => ({ id: b.memberId, amount: b.balance }));
-  const debtors = balances.filter((b) => b.balance < -0.01).map((b) => ({ id: b.memberId, amount: -b.balance }));
-
-  creditors.sort((a, b) => b.amount - a.amount);
-  debtors.sort((a, b) => b.amount - a.amount);
-
-  let i = 0;
-  let j = 0;
-
-  while (i < debtors.length && j < creditors.length) {
-    const amount = Math.min(debtors[i].amount, creditors[j].amount);
-    if (amount > 0.01) {
-      settlements.push({
-        from: debtors[i].id,
-        to: creditors[j].id,
-        amount: Math.round(amount * 100) / 100,
-      });
-    }
-    debtors[i].amount -= amount;
-    creditors[j].amount -= amount;
-    if (debtors[i].amount < 0.01) i++;
-    if (creditors[j].amount < 0.01) j++;
-  }
-
-  return settlements;
-}
 
 // ─── Exchange rates ──────────────────────────────────────────────────
 interface CachedRates {
@@ -686,4 +645,47 @@ export async function convertToEurSafe(
 export function isAnonymousTrip(tripId: string): boolean {
   const row = db.select({ ownerId: trips.ownerId }).from(trips).where(eq(trips.id, tripId)).get();
   return row ? row.ownerId === null : false;
+}
+
+
+/**
+ * Finds an expense already written under a given client id.
+ *
+ * Used to make retries of queued offline writes idempotent: the caller gets back what
+ * was stored the first time instead of creating a duplicate charge.
+ */
+export async function findExpenseByClientId(
+  tripId: string,
+  clientId: string
+): Promise<Expense | null> {
+  const row = db
+    .select()
+    .from(expenses)
+    .where(and(eq(expenses.tripId, tripId), eq(expenses.clientId, clientId)))
+    .get();
+  if (!row) return null;
+
+  const splits = db
+    .select()
+    .from(expenseSplits)
+    .where(eq(expenseSplits.expenseId, row.id))
+    .all();
+  const uneven = splits.some((sp) => sp.share !== splits[0]?.share);
+
+  return {
+    id: row.id,
+    description: row.description,
+    amount: row.amount,
+    currency: row.currency,
+    amountEur: row.amountEur,
+    paidBy: row.paidBy,
+    splitAmong: splits.map((sp) => sp.memberId),
+    splitShares: uneven
+      ? Object.fromEntries(splits.map((sp) => [sp.memberId, sp.share]))
+      : undefined,
+    category: row.category,
+    date: row.date,
+    exchangeRate: row.exchangeRate ?? undefined,
+    rateAvailable: row.rateAvailable,
+  };
 }

@@ -54,6 +54,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       amount: Math.round(parsedAmount * 100) / 100,
       date: body.date ? new Date(body.date).getTime() : Date.now(),
       note: typeof note === "string" && note.trim() ? note.trim().slice(0, 200) : undefined,
+      clientId: typeof body.clientId === "string" ? body.clientId.slice(0, 64) : undefined,
     });
 
     if (!payment) {

@@ -195,6 +195,12 @@ export const es = {
   },
 
   offline: {
+    queued: "Guardado aquí. Se enviará al recuperar la conexión.",
+    pendingOne: "1 gasto sin enviar",
+    pendingMany: "{count} apuntes sin enviar",
+    pendingHint: "Se enviarán solos cuando vuelva la cobertura.",
+    sendNow: "Enviar ahora",
+    pendingBadge: "sin enviar",
     stale: "Estás viendo los últimos datos guardados en este dispositivo.",
     offline:
       "Estás sin conexión. Estas cifras son de la última vez que hubo cobertura, y todavía no se pueden guardar gastos nuevos.",
@@ -424,6 +430,12 @@ export const en: Messages = {
   },
 
   offline: {
+    queued: "Saved here. It will be sent when you are back online.",
+    pendingOne: "1 expense not sent",
+    pendingMany: "{count} entries not sent",
+    pendingHint: "They will go out on their own once you have signal.",
+    sendNow: "Send now",
+    pendingBadge: "not sent",
     stale: "Showing the last data saved on this device.",
     offline:
       "You are offline. These figures are from the last time you had signal, and new expenses cannot be saved yet.",

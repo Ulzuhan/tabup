@@ -156,12 +156,25 @@ The service worker splits its rules deliberately:
   showing nothing, so a cached response is flagged and the page says the numbers are
   from the last time it had signal.
 
-**Writes are never queued or replayed.** An expense that failed offline stays failed
-and the user is told. Silently retrying it later, after the amounts around it have
-moved on, is how you get duplicated or contradictory data in the one place where people
-are counting on the numbers. Offline *writing* is a separate problem — it needs a
-mutation queue and conflict resolution — and pretending to solve it with a retry would
-be worse than not having it.
+### Writing offline
+
+New expenses and payments **do** queue. Typed with no signal, they go into IndexedDB,
+appear in the list straight away, and are sent when the connection returns — with the
+balances recomputed locally in the meantime, using the same functions the server runs,
+because showing the expense but leaving the balances behind would be worse than useless.
+
+Two things make this tractable without a full sync engine:
+
+- **Creating commutes.** Two people adding expenses offline both end up with both
+  expenses, in any order, with no conflict to resolve.
+- **Every queued write carries a client id**, and the server treats a repeat as the same
+  write. Without that, a request that arrived but whose response was lost would be
+  duplicated by the retry — and duplicating a charge is worse than dropping one.
+
+**Editing and deleting do not queue**, deliberately. They need the server's current
+state to mean anything: editing an expense someone else already changed, or deleting one
+they already deleted, are conflicts with no good silent answer. Offline they fail and
+say so.
 
 Icons are generated from one vector definition:
 
