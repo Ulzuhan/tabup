@@ -195,7 +195,7 @@ export default function Home() {
       {/* Hero */}
       <div className="text-center mb-10">
         <h1 className="text-4xl sm:text-5xl font-bold mb-2">
-          <span className="text-accent">Split</span>Trip
+          Tab<span className="text-accent">Up</span>
         </h1>
         <p className="text-muted text-sm sm:text-base">
           Track shared expenses. See who owes whom. No account needed. 💸

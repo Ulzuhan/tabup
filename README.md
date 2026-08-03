@@ -1,4 +1,4 @@
-# SplitTrip
+# TabUp
 
 Shared expense tracking for trips: who paid what, in which currency, and who owes whom
 at the end. Multi-currency, uneven splits, settle-up payments and CSV export.
@@ -24,9 +24,13 @@ npm run start
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `SPLITTRIP_DB` | `data/splittrip.db` | SQLite database file |
-| `SPLITTRIP_DATA_DIR` | `data/` | Where the exchange-rate cache is kept |
+| `TABUP_DB` | `data/tabup.db` | SQLite database file |
+| `TABUP_DATA_DIR` | `data/` | Where the exchange-rate cache is kept |
 | `PORT` | `3000` | Port to listen on |
+
+The older `SPLITTRIP_DB` and `SPLITTRIP_DATA_DIR` still work, and an existing
+`data/splittrip.db` is picked up automatically, so a deployment from before the rename
+keeps its data.
 
 The database file and its directory are created on first start. There is no separate
 migration step: the schema is applied on boot, and it is safe to run against a database
@@ -106,7 +110,7 @@ delete, and an editor cannot delete or reshare a trip they do not own.
 Point them at a scratch database so they do not touch your real one:
 
 ```bash
-SPLITTRIP_DB=/tmp/test.db PORT=3999 npm run start &
+TABUP_DB=/tmp/test.db PORT=3999 npm run start &
 BASE=http://127.0.0.1:3999 npm run test:api
 BASE=http://127.0.0.1:3999 npm run test:auth
 ```

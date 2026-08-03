@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { join } from "path";
-import { mkdirSync } from "fs";
+import { mkdirSync, existsSync } from "fs";
 import * as schema from "./schema";
 
 /**
@@ -9,11 +9,25 @@ import * as schema from "./schema";
  *
  * Kept on globalThis because Next reloads modules in development: without this each
  * reload would open another handle to the same file and they would fight over locks.
+ *
+ * `SPLITTRIP_DB` is still honoured: the app was called SplitTrip before, and a running
+ * deployment should not lose its database because the name on the box changed. Same
+ * reason the old default filename wins when it is the one that actually exists.
  */
-const DB_PATH = process.env.SPLITTRIP_DB?.trim() || join(process.cwd(), "data", "splittrip.db");
+const DB_PATH =
+  process.env.TABUP_DB?.trim() ||
+  process.env.SPLITTRIP_DB?.trim() ||
+  defaultDbPath();
+
+function defaultDbPath(): string {
+  const dir = join(process.cwd(), "data");
+  const preferred = join(dir, "tabup.db");
+  const legacy = join(dir, "splittrip.db");
+  return !existsSync(preferred) && existsSync(legacy) ? legacy : preferred;
+}
 
 declare global {
-  var __splittrip_db__: ReturnType<typeof create> | undefined;
+  var __tabup_db__: ReturnType<typeof create> | undefined;
 }
 
 function create() {
@@ -139,8 +153,8 @@ function addColumn(sqlite: Database.Database, table: string, column: string, def
   sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 
-export const db = globalThis.__splittrip_db__ ?? create();
-if (process.env.NODE_ENV !== "production") globalThis.__splittrip_db__ = db;
+export const db = globalThis.__tabup_db__ ?? create();
+if (process.env.NODE_ENV !== "production") globalThis.__tabup_db__ = db;
 
 export { DB_PATH };
 export * from "./schema";

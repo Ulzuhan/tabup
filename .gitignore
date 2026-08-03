@@ -34,7 +34,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# SplitTrip data (never commit user data!)
+# TabUp data (never commit user data!)
 .splittrip-data/
 # SQLite database and cached rates
 data/

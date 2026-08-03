@@ -31,7 +31,7 @@ const SCRYPT_R = 8;
 const SCRYPT_P = 1;
 const KEY_LENGTH = 64;
 
-export const SESSION_COOKIE = "splittrip_session";
+export const SESSION_COOKIE = "tabup_session";
 const SESSION_DAYS = 30;
 
 // ── Passwords ────────────────────────────────────────────────────────────

@@ -8,19 +8,39 @@
  * up for claiming when someone finally registers.
  */
 
-const KEY = "splittrip_trips";
+const KEY = "tabup_trips";
+/** The key used while the app was called SplitTrip. Read once, then migrated across. */
+const LEGACY_KEY = "splittrip_trips";
 const MAX = 50;
 
-export function localTripIds(): string[] {
-  if (typeof window === "undefined") return [];
+function read(key: string): string[] {
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = window.localStorage.getItem(key);
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
   } catch {
     // Corrupt or unavailable storage is not worth crashing the page over.
     return [];
   }
+}
+
+export function localTripIds(): string[] {
+  if (typeof window === "undefined") return [];
+
+  const current = read(KEY);
+  const legacy = read(LEGACY_KEY);
+  if (legacy.length === 0) return current;
+
+  // Anonymous trips exist nowhere but here, so dropping the old key on rename would
+  // lose them for good. Merge once and retire it.
+  const merged = [...new Set([...current, ...legacy])].slice(0, MAX);
+  try {
+    window.localStorage.setItem(KEY, JSON.stringify(merged));
+    window.localStorage.removeItem(LEGACY_KEY);
+  } catch {
+    /* storage unavailable; the merged list is still correct for this page load */
+  }
+  return merged;
 }
 
 export function rememberTrip(id: string): void {

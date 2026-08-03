@@ -66,7 +66,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Link href="/" className="text-3xl font-bold">
-            <span className="text-accent">Split</span>Trip
+            Tab<span className="text-accent">Up</span>
           </Link>
           <p className="text-muted text-sm mt-2">
             {mode === "register"

@@ -1,4 +1,4 @@
-// Shared types for SplitTrip
+// Shared types for TabUp
 
 export interface Trip {
   id: string;

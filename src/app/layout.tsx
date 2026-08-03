@@ -13,10 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SplitTrip — Shared Expense Tracker",
+  title: "TabUp — Shared Expense Tracker",
   description: "Split expenses with friends. No account needed.",
   openGraph: {
-    title: "SplitTrip — Shared Expense Tracker",
+    title: "TabUp — Shared Expense Tracker",
     description: "Split expenses with friends. See who owes whom. No account needed. 💸",
     type: "website",
     locale: "es_ES",
