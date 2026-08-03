@@ -16,6 +16,7 @@ import {
   Share2,
   Plus,
   Receipt,
+  Settings,
   Trash2,
   TriangleAlert,
   UserPlus,
@@ -31,12 +32,11 @@ import { Money, currencySymbol, formatAmount } from "@/components/money";
 import { ExpenseDialog, type ExpenseDraft } from "@/components/trip/expense-dialog";
 import { SettleDialog, type PaymentDraft } from "@/components/trip/settle-dialog";
 import { ShareDialog } from "@/components/trip/share-dialog";
+import { ManageDialog } from "@/components/trip/manage-dialog";
 import { OfflineBanner } from "@/components/offline";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -130,8 +130,7 @@ export default function TripPage() {
 
   const [shareOpen, setShareOpen] = useState(false);
   const [stale, setStale] = useState(false);
-  const [memberOpen, setMemberOpen] = useState(false);
-  const [newMemberName, setNewMemberName] = useState("");
+  const [manageOpen, setManageOpen] = useState(false);
   const [confirm, setConfirm] = useState<{
     type: "expense" | "payment" | "trip";
     id: string;
@@ -272,31 +271,6 @@ export default function TripPage() {
     }
   };
 
-  const addMember = async () => {
-    if (!newMemberName.trim()) return;
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/trips/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ addMembers: [newMemberName.trim()] }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Could not add the member");
-        return;
-      }
-      setNewMemberName("");
-      setMemberOpen(false);
-      await loadTrip();
-      toast.success("Member added");
-    } catch {
-      toast.error("Could not reach the server");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const runDelete = async () => {
     if (!confirm) return;
     setDeleting(true);
@@ -402,10 +376,10 @@ export default function TripPage() {
                 variant="ghost"
                 size="sm"
                 className="h-6 px-1.5 text-xs text-muted-foreground"
-                onClick={() => setMemberOpen(true)}
+                onClick={() => setManageOpen(true)}
               >
                 <UserPlus className="size-3.5" />
-                Add
+                Manage
               </Button>
             )}
           </div>
@@ -430,6 +404,10 @@ export default function TripPage() {
             }
           />
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setManageOpen(true)}>
+              <Settings className="size-4" />
+              Trip settings
+            </DropdownMenuItem>
             <DropdownMenuItem render={<a href={`/api/trips/${id}/export`} download />}>
               <Download className="size-4" />
               Export CSV
@@ -562,9 +540,18 @@ export default function TripPage() {
               hint={readOnly ? undefined : "Add the first one and balances appear here."}
             />
           ) : (
-            <ul className="space-y-1.5">
-              {[...trip.expenses]
-                .sort((a, b) => b.date - a.date)
+            <div className="space-y-4">
+              {groupByDay(trip.expenses).map(([day, dayExpenses]) => (
+                <section key={day}>
+                  <div className="mb-1.5 flex items-baseline justify-between px-1">
+                    <h3 className="text-xs font-medium text-muted-foreground">{formatDay(day)}</h3>
+                    <span className="text-xs text-muted-foreground tabular">
+                      {currencySymbol(trip.currency)}
+                      {formatAmount(dayExpenses.reduce((sum, e) => sum + e.amountEur, 0))}
+                    </span>
+                  </div>
+                  <ul className="space-y-1.5">
+              {dayExpenses
                 .map((expense) => {
                   const payer = memberById(expense.paidBy);
                   const foreign = expense.currency !== trip.currency;
@@ -628,7 +615,10 @@ export default function TripPage() {
                     </li>
                   );
                 })}
-            </ul>
+                  </ul>
+                </section>
+              ))}
+            </div>
           )}
         </TabsContent>
 
@@ -759,47 +749,17 @@ export default function TripPage() {
         onSubmit={submitPayment}
       />
 
-      {/* Add member */}
-      <Dialog open={memberOpen} onOpenChange={setMemberOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Add member</DialogTitle>
-            <DialogDescription>
-              They join from now on; existing expenses are untouched.
-            </DialogDescription>
-          </DialogHeader>
-          <form
-            id="member-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              addMember();
-            }}
-            className="space-y-2"
-          >
-            <Label htmlFor="member-name">Name</Label>
-            <Input
-              id="member-name"
-              autoFocus
-              value={newMemberName}
-              onChange={(e) => setNewMemberName(e.target.value)}
-              placeholder="Cris"
-              className="h-11"
-            />
-          </form>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMemberOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              form="member-form"
-              disabled={!newMemberName.trim() || busy}
-            >
-              {busy ? <Loader2 className="size-4 animate-spin" /> : "Add"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ManageDialog
+        open={manageOpen}
+        onOpenChange={setManageOpen}
+        tripId={id}
+        tripName={trip.name}
+        members={trip.members}
+        collaborators={trip.collaborators}
+        access={trip.access}
+        anonymous={trip.anonymous}
+        onChanged={loadTrip}
+      />
 
       {/* Delete confirmation */}
       <Dialog open={Boolean(confirm)} onOpenChange={(open) => !open && setConfirm(null)}>
@@ -895,4 +855,51 @@ function normaliseToPercent(shares?: Record<string, number>): Record<string, str
   }
 
   return Object.fromEntries(percents.map(([id, p]) => [id, String(p)]));
+}
+
+/**
+ * Groups expenses into days, newest first.
+ *
+ * A date on every row would repeat itself half a dozen times per day and add nothing;
+ * a heading per day says the same thing once and gives the list a shape you can scan.
+ * The day total is there because "what did Tuesday cost us" is a question people
+ * actually ask on a trip.
+ */
+function groupByDay(expenses: Expense[]): [string, Expense[]][] {
+  const days = new Map<string, Expense[]>();
+
+  for (const expense of [...expenses].sort((a, b) => b.date - a.date)) {
+    // Local date, not ISO: an expense at 01:00 in Madrid belongs to that day, and
+    // toISOString would file it under the previous one.
+    const date = new Date(expense.date);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+      date.getDate()
+    ).padStart(2, "0")}`;
+    const list = days.get(key);
+    if (list) list.push(expense);
+    else days.set(key, [expense]);
+  }
+
+  return [...days.entries()];
+}
+
+/** "Today", "Yesterday", or a written date — relative labels only where they help. */
+function formatDay(key: string): string {
+  const [year, month, day] = key.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+
+  const midnight = new Date();
+  midnight.setHours(0, 0, 0, 0);
+  const daysAgo = Math.round((midnight.getTime() - date.getTime()) / 86_400_000);
+
+  if (daysAgo === 0) return "Today";
+  if (daysAgo === 1) return "Yesterday";
+
+  return date.toLocaleDateString("es-ES", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    // The year only matters once it is not this one.
+    year: date.getFullYear() === midnight.getFullYear() ? undefined : "numeric",
+  });
 }
