@@ -22,11 +22,7 @@ import { db } from "@/db";
 import { trips, members, expenses, expenseSplits, payments, users, tripAccess } from "@/db/schema";
 import type { Trip, Member, Expense, Payment, Balance, Settlement } from "./types";
 
-// SPLITTRIP_DATA_DIR sigue valiendo por compatibilidad con despliegues anteriores.
-const DATA_DIR =
-  process.env.TABUP_DATA_DIR?.trim() ||
-  process.env.SPLITTRIP_DATA_DIR?.trim() ||
-  join(process.cwd(), "data");
+const DATA_DIR = process.env.TABUP_DATA_DIR?.trim() || join(process.cwd(), "data");
 const CACHE_FILE = join(DATA_DIR, ".exchange-rates-cache.json");
 
 export function generateId(): string {

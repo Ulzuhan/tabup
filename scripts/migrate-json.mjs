@@ -15,7 +15,7 @@ import { randomBytes } from "node:crypto";
 
 const SOURCE = process.argv[2] || ".splittrip-data";
 const DB_PATH =
-  process.env.TABUP_DB || process.env.SPLITTRIP_DB || join(process.cwd(), "data", "tabup.db");
+  process.env.TABUP_DB || join(process.cwd(), "data", "tabup.db");
 
 if (!existsSync(SOURCE)) {
   console.log(`Nothing to migrate: ${SOURCE} does not exist.`);

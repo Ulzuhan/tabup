@@ -35,6 +35,7 @@ yarn-error.log*
 next-env.d.ts
 
 # TabUp data (never commit user data!)
+# .splittrip-data is the pre-SQLite layout that scripts/migrate-json.mjs imports from.
 .splittrip-data/
 # SQLite database and cached rates
 data/

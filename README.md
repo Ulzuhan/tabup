@@ -28,10 +28,6 @@ npm run start
 | `TABUP_DATA_DIR` | `data/` | Where the exchange-rate cache is kept |
 | `PORT` | `3000` | Port to listen on |
 
-The older `SPLITTRIP_DB` and `SPLITTRIP_DATA_DIR` still work, and an existing
-`data/splittrip.db` is picked up automatically, so a deployment from before the rename
-keeps its data.
-
 The database file and its directory are created on first start. There is no separate
 migration step: the schema is applied on boot, and it is safe to run against a database
 from an earlier version.
