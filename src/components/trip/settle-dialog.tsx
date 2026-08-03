@@ -4,6 +4,7 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import type { Member } from "@/lib/types";
 import { MemberAvatar } from "@/components/member-avatar";
 import { currencySymbol } from "@/components/money";
+import { useT } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,6 +52,7 @@ export function SettleDialog({
   busy: boolean;
   onSubmit: () => void;
 }) {
+  const t = useT();
   const sameMember = draft.from === draft.to;
   const valid = draft.from && draft.to && !sameMember && parseFloat(draft.amount) > 0;
 
@@ -70,9 +72,9 @@ export function SettleDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Record a payment</DialogTitle>
+          <DialogTitle>{t("settle.title")}</DialogTitle>
           <DialogDescription>
-            Money that changed hands outside the app, in {currency}.
+            {t("settle.subtitle", { currency })}
           </DialogDescription>
         </DialogHeader>
 
@@ -86,10 +88,10 @@ export function SettleDialog({
         >
           <div className="flex items-end gap-2">
             <div className="min-w-0 flex-1 space-y-2">
-              <Label htmlFor="from">From</Label>
+              <Label htmlFor="from">{t("settle.from")}</Label>
               <Select value={draft.from} onValueChange={(v) => setDraft({ from: String(v) })}>
                 <SelectTrigger id="from" className="h-11 w-full">
-                  <SelectValue placeholder="Who paid" />
+                  <SelectValue placeholder={t("settle.whoPaid")} />
                 </SelectTrigger>
                 <SelectContent>{memberOptions(draft.to)}</SelectContent>
               </Select>
@@ -98,10 +100,10 @@ export function SettleDialog({
             <ArrowRight className="mb-3.5 size-4 shrink-0 text-muted-foreground" />
 
             <div className="min-w-0 flex-1 space-y-2">
-              <Label htmlFor="to">To</Label>
+              <Label htmlFor="to">{t("settle.to")}</Label>
               <Select value={draft.to} onValueChange={(v) => setDraft({ to: String(v) })}>
                 <SelectTrigger id="to" className="h-11 w-full">
-                  <SelectValue placeholder="Who received" />
+                  <SelectValue placeholder={t("settle.whoReceived")} />
                 </SelectTrigger>
                 <SelectContent>{memberOptions(draft.from)}</SelectContent>
               </Select>
@@ -109,7 +111,7 @@ export function SettleDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="settle-amount">Amount</Label>
+            <Label htmlFor="settle-amount">{t("settle.amount")}</Label>
             <div className="relative">
               <span className="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground">
                 {currencySymbol(currency)}
@@ -129,7 +131,7 @@ export function SettleDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="settle-date">Date</Label>
+            <Label htmlFor="settle-date">{t("expense.date")}</Label>
             <Input
               id="settle-date"
               type="date"
@@ -141,13 +143,13 @@ export function SettleDialog({
 
           <div className="space-y-2">
             <Label htmlFor="note">
-              Note <span className="font-normal text-muted-foreground">(optional)</span>
+              {t("settle.note")} <span className="font-normal text-muted-foreground">({t("settle.optional")})</span>
             </Label>
             <Input
               id="note"
               value={draft.note}
               onChange={(e) => setDraft({ note: e.target.value })}
-              placeholder="Bizum"
+              placeholder={t("settle.notePlaceholder")}
               className="h-11"
             />
           </div>
@@ -155,10 +157,10 @@ export function SettleDialog({
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button type="submit" form="settle-form" disabled={!valid || busy}>
-            {busy ? <Loader2 className="size-4 animate-spin" /> : "Record payment"}
+            {busy ? <Loader2 className="size-4 animate-spin" /> : t("settle.record")}
           </Button>
         </DialogFooter>
       </DialogContent>

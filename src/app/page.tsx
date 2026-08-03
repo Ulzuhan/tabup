@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { CURRENCIES, EMOJIS } from "@/lib/types";
 import { forgetTrips, localTripIds, rememberTrip } from "@/lib/local-trips";
+import { useT } from "@/i18n/provider";
 import { AppHeader, Wordmark, type SessionUser } from "@/components/app-header";
 import { MemberAvatar } from "@/components/member-avatar";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ interface TripSummary {
 }
 
 export default function Home() {
+  const t = useT();
   const [trips, setTrips] = useState<TripSummary[]>([]);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [usage, setUsage] = useState<{ trips: number; tripLimit: number | null } | null>(null);
@@ -167,7 +169,7 @@ export default function Home() {
       const data = await res.json();
 
       if (!res.ok) {
-        setCreateError(data.error || "Could not create the trip");
+        setCreateError(data.error || t("createTrip.failed"));
         setCreating(false);
         return;
       }
@@ -177,7 +179,7 @@ export default function Home() {
       if (!user) rememberTrip(data.id);
       window.location.href = `/trip/${data.id}`;
     } catch {
-      setCreateError("Could not reach the server");
+      setCreateError(t("common.serverUnreachable"));
       setCreating(false);
     }
   };
@@ -212,14 +214,13 @@ export default function Home() {
               <Wordmark />
             </h1>
             <p className="mx-auto mt-3 max-w-sm text-[15px] leading-relaxed text-muted-foreground">
-              Track what everyone paid, in any currency, and see who owes whom. No account
-              needed.
+              {t("home.tagline")}
             </p>
           </section>
 
           <Button size="lg" className="h-12 w-full text-base" onClick={() => setShowCreate(true)}>
             <Plus className="size-5" />
-            New trip
+            {t("home.newTrip")}
           </Button>
 
           <section className="mt-8">
@@ -232,7 +233,7 @@ export default function Home() {
               <>
                 <div className="mb-3 flex items-center justify-between px-1">
                   <h2 className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                    Your trips
+                    {t("home.yourTrips")}
                   </h2>
                   {usage?.tripLimit != null && (
                     <span className="text-xs text-muted-foreground tabular">
@@ -245,10 +246,10 @@ export default function Home() {
                   <Card className="mb-3 flex-row items-center gap-3 border-primary/25 bg-primary/[0.06] p-3">
                     <Sparkles className="size-4 shrink-0 text-primary" />
                     <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-                      Some trips live only in this browser.
+                      {t("home.localOnly")}
                     </p>
                     <Button size="sm" variant="ghost" onClick={claimAnonymous} disabled={claiming}>
-                      {claiming ? <Loader2 className="size-4 animate-spin" /> : "Save to account"}
+                      {claiming ? <Loader2 className="size-4 animate-spin" /> : t("home.saveToAccount")}
                     </Button>
                   </Card>
                 )}
@@ -272,6 +273,7 @@ export default function Home() {
 }
 
 function TripRow({ trip }: { trip: TripSummary }) {
+  const t = useT();
   return (
     <Link
       href={`/trip/${trip.id}`}
@@ -294,12 +296,12 @@ function TripRow({ trip }: { trip: TripSummary }) {
           </span>
           {trip.anonymous && (
             <Badge variant="outline" className="h-5 px-1.5 text-[11px] font-normal">
-              this device
+              {t("home.thisDevice")}
             </Badge>
           )}
           {trip.owned === false && !trip.anonymous && (
             <Badge variant="outline" className="h-5 px-1.5 text-[11px] font-normal">
-              shared
+              {t("home.shared")}
             </Badge>
           )}
         </p>
@@ -311,21 +313,22 @@ function TripRow({ trip }: { trip: TripSummary }) {
 }
 
 function EmptyState({ signedIn }: { signedIn: boolean }) {
+  const t = useT();
   return (
     <div className="rounded-2xl border border-dashed border-border px-6 py-14 text-center">
       <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-secondary">
         <Compass className="size-6 text-muted-foreground" />
       </div>
-      <p className="font-medium">No trips yet</p>
+      <p className="font-medium">{t("home.noTrips")}</p>
       <p className="mx-auto mt-1.5 max-w-[15rem] text-sm text-muted-foreground">
-        Start one and share the link — whoever opens it can add expenses.
+        {t("home.noTripsHint")}
       </p>
       {!signedIn && (
         <p className="mt-5 text-sm text-muted-foreground">
           <Link href="/login" className="text-primary underline-offset-4 hover:underline">
-            Sign in
+            {t("auth.signIn")}
           </Link>{" "}
-          to keep them across devices.
+          {t("home.signInToKeep")}
         </p>
       )}
     </div>
@@ -361,6 +364,8 @@ function CreateTripForm({
   onCancel: () => void;
   onSubmit: () => void;
 }) {
+  const t = useT();
+
   return (
     <form
       onSubmit={(e) => {
@@ -370,26 +375,26 @@ function CreateTripForm({
       className="space-y-6"
     >
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">New trip</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("createTrip.title")}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Add everyone who is sharing costs. You can add more later.
+          {t("createTrip.subtitle")}
         </p>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="trip-name">Trip name</Label>
+        <Label htmlFor="trip-name">{t("createTrip.name")}</Label>
         <Input
           id="trip-name"
           autoFocus
           value={tripName}
           onChange={(e) => setTripName(e.target.value)}
-          placeholder="Weekend in Barcelona"
+          placeholder={t("createTrip.namePlaceholder")}
           className="h-11"
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="currency">Default currency</Label>
+        <Label htmlFor="currency">{t("createTrip.currency")}</Label>
         <Select value={currency} onValueChange={(v) => setCurrency(String(v))}>
           <SelectTrigger id="currency" className="h-11 w-full">
             {/* SelectValue renders the raw value, so the symbol and name are spelled
@@ -415,8 +420,8 @@ function CreateTripForm({
 
       <div className="space-y-2">
         <div className="flex items-baseline justify-between">
-          <Label>Members</Label>
-          <span className="text-xs text-muted-foreground">at least 2</span>
+          <Label>{t("createTrip.people")}</Label>
+          <span className="text-xs text-muted-foreground">{t("createTrip.atLeastTwo")}</span>
         </div>
 
         <div className="space-y-2">
@@ -426,7 +431,7 @@ function CreateTripForm({
               <Input
                 value={member}
                 onChange={(e) => updateMember(i, e.target.value)}
-                placeholder={`Person ${i + 1}`}
+                placeholder={t("createTrip.person", { n: i + 1 })}
                 className="h-11 flex-1"
               />
               <Button
@@ -435,7 +440,7 @@ function CreateTripForm({
                 size="icon"
                 onClick={() => removeMember(i)}
                 disabled={members.length <= 2}
-                aria-label={`Remove person ${i + 1}`}
+                aria-label={t("createTrip.person", { n: i + 1 })}
                 className="shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-30"
               >
                 <X className="size-4" />
@@ -447,7 +452,7 @@ function CreateTripForm({
         {members.length < 10 && (
           <Button type="button" variant="ghost" size="sm" onClick={addMember} className="mt-1">
             <Plus className="size-4" />
-            Add member
+            {t("createTrip.addMember")}
           </Button>
         )}
       </div>
@@ -463,10 +468,10 @@ function CreateTripForm({
 
       <div className="flex gap-3 pt-1">
         <Button type="button" variant="outline" className="h-11 flex-1" onClick={onCancel}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button type="submit" className="h-11 flex-1" disabled={!canCreate || creating}>
-          {creating ? <Loader2 className="size-4 animate-spin" /> : "Create trip"}
+          {creating ? <Loader2 className="size-4 animate-spin" /> : t("createTrip.create")}
         </Button>
       </div>
     </form>

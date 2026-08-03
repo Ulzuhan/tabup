@@ -127,6 +127,22 @@ BASE=http://127.0.0.1:3999 npm run test:auth
 
 ---
 
+## Languages
+
+Spanish and English, chosen from the header. The choice lives in a cookie; without one
+the browser's `Accept-Language` decides, falling back to Spanish.
+
+Deliberately **not** the sub-path routing Next's own guide recommends (`/es/trip/abc`).
+A trip link is the credential for an anonymous trip, people have those links saved and
+pasted into group chats, and prefixing every route would break every one of them — for
+a two-language app that is a bad trade.
+
+Spanish is the source of truth in `src/i18n/messages.ts` and its shape defines the
+type, so a key missing from English is a compile error rather than an untranslated
+string appearing in front of someone. Plurals go through `Intl.PluralRules` (`key_one`
+/ `key_other`), because "1 gastos" is exactly the kind of detail that makes an app feel
+unfinished.
+
 ## Offline and installing
 
 The app is a PWA: installable from the browser, and a trip stays readable with no

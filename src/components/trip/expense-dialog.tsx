@@ -3,7 +3,7 @@
 import { Check, Loader2 } from "lucide-react";
 import { CATEGORIES, CURRENCIES } from "@/lib/types";
 import type { Member } from "@/lib/types";
-import { CategoryIcon } from "@/components/category-icon";
+import { CategoryIcon, useCategoryName } from "@/components/category-icon";
 import { MemberAvatar } from "@/components/member-avatar";
 import { currencySymbol, formatAmount } from "@/components/money";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/provider";
 
 export type SplitMode = "equal" | "percent" | "amount";
 
@@ -67,6 +68,8 @@ export function ExpenseDialog({
   busy: boolean;
   onSubmit: () => void;
 }) {
+  const t = useT();
+  const categoryName = useCategoryName();
   const valid =
     draft.description.trim().length > 0 &&
     parseFloat(draft.amount) > 0 &&
@@ -92,9 +95,9 @@ export function ExpenseDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit expense" : "New expense"}</DialogTitle>
+          <DialogTitle>{editing ? t("expense.editTitle") : t("expense.newTitle")}</DialogTitle>
           <DialogDescription>
-            {editing ? "Change any field and save." : "Who paid, how much, and for whom."}
+            {editing ? t("expense.editSubtitle") : t("expense.newSubtitle")}
           </DialogDescription>
         </DialogHeader>
 
@@ -107,19 +110,19 @@ export function ExpenseDialog({
           className="space-y-5"
         >
           <div className="space-y-2">
-            <Label htmlFor="desc">Description</Label>
+            <Label htmlFor="desc">{t("expense.description")}</Label>
             <Input
               id="desc"
               autoFocus
               value={draft.description}
               onChange={(e) => setDraft({ description: e.target.value })}
-              placeholder="Dinner at the port"
+              placeholder={t("expense.descriptionPlaceholder")}
               className="h-11"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount</Label>
+            <Label htmlFor="amount">{t("expense.amount")}</Label>
             <div className="flex gap-2">
               <Input
                 id="amount"
@@ -151,7 +154,7 @@ export function ExpenseDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Category</Label>
+            <Label>{t("expense.category")}</Label>
             <div className="flex flex-wrap gap-1.5">
               {CATEGORIES.map((cat) => (
                 <button
@@ -167,14 +170,14 @@ export function ExpenseDialog({
                   )}
                 >
                   <CategoryIcon category={cat.id} className="size-3.5" />
-                  {cat.name}
+                  {categoryName(cat.id)}
                 </button>
               ))}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="date">Date</Label>
+            <Label htmlFor="date">{t("expense.date")}</Label>
             <Input
               id="date"
               type="date"
@@ -185,7 +188,7 @@ export function ExpenseDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Paid by</Label>
+            <Label>{t("expense.paidBy")}</Label>
             <div className="flex flex-wrap gap-1.5">
               {members.map((m) => (
                 <button
@@ -219,10 +222,10 @@ export function ExpenseDialog({
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button type="submit" form="expense-form" disabled={!valid || busy}>
-            {busy ? <Loader2 className="size-4 animate-spin" /> : editing ? "Save" : "Add expense"}
+            {busy ? <Loader2 className="size-4 animate-spin" /> : editing ? t("common.save") : t("trip.addExpense")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -278,6 +281,7 @@ function SplitEditor({
   currency: string;
   toggleSplit: (id: string) => void;
 }) {
+  const t = useT();
   const included = members.filter((m) => draft.splitAmong.includes(m.id));
 
   const valueOf = (id: string) => parseFloat(draft.splitValues[id] ?? "") || 0;
@@ -327,10 +331,10 @@ function SplitEditor({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label>Split among</Label>
+        <Label>{t("expense.splitAmong")}</Label>
         <div className="flex gap-0.5 rounded-lg bg-secondary p-0.5">
           {([
-            ["equal", "Equal"],
+            ["equal", t("expense.equal")],
             ["percent", "%"],
             ["amount", currencySymbol(currency)],
           ] as const).map(([mode, label]) => (
@@ -381,8 +385,8 @@ function SplitEditor({
                     step={draft.splitMode === "amount" ? "0.01" : "1"}
                     aria-label={
                       draft.splitMode === "amount"
-                        ? `Amount for ${m.name}`
-                        : `Percentage for ${m.name}`
+                        ? `${t("expense.amount")}: ${m.name}`
+                        : `%: ${m.name}`
                     }
                     value={draft.splitValues[m.id] ?? ""}
                     onChange={(e) =>
@@ -411,14 +415,17 @@ function SplitEditor({
         <div className="flex items-center justify-between gap-2 px-1.5 text-xs">
           <span className={cn("tabular", balanced ? "text-muted-foreground" : "text-warning")}>
             {draft.splitMode === "percent"
-              ? `${round2(sum)}% of 100%`
-              : `${currencySymbol(currency)}${formatAmount(sum)} of ${currencySymbol(currency)}${formatAmount(total)}`}
+              ? t("expense.ofHundred", { sum: round2(sum) })
+              : t("expense.ofTotal", {
+                  sum: `${currencySymbol(currency)}${formatAmount(sum)}`,
+                  total: `${currencySymbol(currency)}${formatAmount(total)}`,
+                })}
           </span>
 
           {balanced ? (
             <span className="flex items-center gap-1 text-primary">
               <Check className="size-3.5" />
-              adds up
+              {t("expense.addsUp")}
             </span>
           ) : (
             <button
@@ -427,11 +434,13 @@ function SplitEditor({
               disabled={included.length === 0}
               className="rounded text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {off > 0 ? "over by" : "short by"}{" "}
-              {draft.splitMode === "percent"
-                ? `${Math.abs(off)}%`
-                : `${currencySymbol(currency)}${formatAmount(Math.abs(off))}`}
-              {" — fix"}
+              {t(off > 0 ? "expense.overBy" : "expense.shortBy", {
+                amount:
+                  draft.splitMode === "percent"
+                    ? `${Math.abs(off)}%`
+                    : `${currencySymbol(currency)}${formatAmount(Math.abs(off))}`,
+              })}
+              {` — ${t("expense.fix")}`}
             </button>
           )}
         </div>

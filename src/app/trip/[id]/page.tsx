@@ -22,18 +22,25 @@ import {
   UserPlus,
   Wallet,
 } from "lucide-react";
-import { CATEGORIES } from "@/lib/types";
 import type { Member, Expense, Payment } from "@/lib/types";
 import { rememberTrip } from "@/lib/local-trips";
 import { cn } from "@/lib/utils";
-import { CategoryBadge, CategoryIcon, categoryTint } from "@/components/category-icon";
+import { CategoryBadge, CategoryIcon, categoryTint, useCategoryName } from "@/components/category-icon";
 import { MemberAvatar, MemberStack } from "@/components/member-avatar";
 import { Money, currencySymbol, formatAmount } from "@/components/money";
 import { ExpenseDialog, type ExpenseDraft } from "@/components/trip/expense-dialog";
 import { SettleDialog, type PaymentDraft } from "@/components/trip/settle-dialog";
 import { ShareDialog } from "@/components/trip/share-dialog";
 import { ManageDialog } from "@/components/trip/manage-dialog";
+import {
+  ExpenseFilterBar,
+  NO_FILTERS,
+  filterExpenses,
+  type ExpenseFilters,
+} from "@/components/trip/expense-filter";
 import { OfflineBanner } from "@/components/offline";
+import { useT, useIntlLocale, usePlural } from "@/i18n/provider";
+import { LanguageItems } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -107,6 +114,10 @@ const emptyExpense = (currency: string, members: Member[]): ExpenseDraft => ({
 });
 
 export default function TripPage() {
+  const t = useT();
+  const plural = usePlural();
+  const categoryName = useCategoryName();
+  const intlLocale = useIntlLocale();
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -131,6 +142,7 @@ export default function TripPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [stale, setStale] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [filters, setFilters] = useState<ExpenseFilters>(NO_FILTERS);
   const [confirm, setConfirm] = useState<{
     type: "expense" | "payment" | "trip";
     id: string;
@@ -146,7 +158,7 @@ export default function TripPage() {
     try {
       const res = await fetch(`/api/trips/${id}`);
       if (!res.ok) {
-        setError("Trip not found");
+        setError(t("trip.notFound"));
         return;
       }
       const data: TripData = await res.json();
@@ -165,9 +177,9 @@ export default function TripPage() {
         to: d.to || data.members[1]?.id || "",
       }));
     } catch {
-      setError("Failed to load trip");
+      setError(t("trip.notFound"));
     }
-  }, [id]);
+  }, [id, t]);
 
   // Wrapped in a promise callback so nothing updates state during the render pass:
   // every setState inside loadTrip runs after the fetch has resolved.
@@ -181,6 +193,11 @@ export default function TripPage() {
     for (const e of trip.expenses) totals[e.category] = (totals[e.category] || 0) + e.amountEur;
     return Object.entries(totals).sort((a, b) => b[1] - a[1]);
   }, [trip]);
+
+  const visibleExpenses = useMemo(
+    () => (trip ? filterExpenses(trip.expenses, filters) : []),
+    [trip, filters]
+  );
 
   const breakdownTotal = useMemo(
     () => categoryBreakdown.reduce((sum, [, v]) => sum + v, 0),
@@ -224,16 +241,16 @@ export default function TripPage() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Could not save the expense");
+        toast.error(err.error || t("expense.saveFailed"));
         return;
       }
 
       setExpenseOpen(false);
       setEditingId(null);
       await loadTrip();
-      toast.success(editingId ? "Expense updated" : "Expense added");
+      toast.success(editingId ? t("expense.updated") : t("expense.added"));
     } catch {
-      toast.error("Could not reach the server");
+      toast.error(t("common.serverUnreachable"));
     } finally {
       setBusy(false);
     }
@@ -256,16 +273,16 @@ export default function TripPage() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Could not record the payment");
+        toast.error(err.error || t("settle.failed"));
         return;
       }
 
       setSettleOpen(false);
       setPaymentDraft((d) => ({ ...d, amount: "", note: "" }));
       await loadTrip();
-      toast.success("Payment recorded");
+      toast.success(t("settle.recorded"));
     } catch {
-      toast.error("Could not reach the server");
+      toast.error(t("common.serverUnreachable"));
     } finally {
       setBusy(false);
     }
@@ -281,7 +298,7 @@ export default function TripPage() {
           router.push("/");
           return;
         }
-        toast.error("Could not delete the trip");
+        toast.error(t("trip.deleteTrip"));
       } else {
         const endpoint = confirm.type === "expense" ? "expense" : "payment";
         const key = confirm.type === "expense" ? "expenseId" : "paymentId";
@@ -291,14 +308,14 @@ export default function TripPage() {
           body: JSON.stringify({ [key]: confirm.id }),
         });
         if (!res.ok) {
-          toast.error(`Could not delete the ${confirm.type}`);
+          toast.error(t("common.somethingWrong"));
         } else {
           await loadTrip();
-          toast.success(confirm.type === "expense" ? "Expense deleted" : "Payment deleted");
+          toast.success(confirm.type === "expense" ? t("expense.deleted") : t("settle.deleted"));
         }
       }
     } catch {
-      toast.error("Could not reach the server");
+      toast.error(t("common.serverUnreachable"));
     } finally {
       setDeleting(false);
       setConfirm(null);
@@ -337,11 +354,11 @@ export default function TripPage() {
           <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-secondary">
             <TriangleAlert className="size-6 text-muted-foreground" />
           </div>
-          <h1 className="text-lg font-medium">Trip not found</h1>
+          <h1 className="text-lg font-medium">{t("trip.notFound")}</h1>
           <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">
-            The link may be wrong, or this trip now belongs to an account.
+            {t("trip.notFoundHint")}
           </p>
-          <Button variant="outline" className="mt-6" render={<Link href="/">Go home</Link>} />
+          <Button variant="outline" className="mt-6" render={<Link href="/">{t("trip.goHome")}</Link>} />
         </div>
       </div>
     );
@@ -361,7 +378,7 @@ export default function TripPage() {
           size="icon"
           className="-ml-2 shrink-0 text-muted-foreground"
           render={
-            <Link href="/" aria-label="Back to trips">
+            <Link href="/" aria-label={t("common.back")}>
               <ArrowLeft className="size-5" />
             </Link>
           }
@@ -379,7 +396,7 @@ export default function TripPage() {
                 onClick={() => setManageOpen(true)}
               >
                 <UserPlus className="size-3.5" />
-                Manage
+                {t("trip.manage")}
               </Button>
             )}
           </div>
@@ -390,7 +407,7 @@ export default function TripPage() {
           size="icon"
           className="shrink-0"
           onClick={() => setShareOpen(true)}
-          aria-label="Share trip"
+          aria-label={t("common.share")}
         >
           <Share2 className="size-4" />
         </Button>
@@ -398,7 +415,7 @@ export default function TripPage() {
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button variant="ghost" size="icon" className="shrink-0" aria-label="Trip options">
+              <Button variant="ghost" size="icon" className="shrink-0" aria-label={t("trip.settings")}>
                 <MoreVertical className="size-4" />
               </Button>
             }
@@ -406,12 +423,16 @@ export default function TripPage() {
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => setManageOpen(true)}>
               <Settings className="size-4" />
-              Trip settings
+              {t("trip.settings")}
             </DropdownMenuItem>
             <DropdownMenuItem render={<a href={`/api/trips/${id}/export`} download />}>
               <Download className="size-4" />
-              Export CSV
+              {t("trip.exportCsv")}
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {/* The trip screen has its own header, so without this the language picker
+                would only exist on the home screen. */}
+            <LanguageItems />
             {trip.access === "owner" && (
               <>
                 <DropdownMenuSeparator />
@@ -420,7 +441,7 @@ export default function TripPage() {
                   onClick={() => setConfirm({ type: "trip", id })}
                 >
                   <Trash2 className="size-4" />
-                  Delete trip
+                  {t("trip.deleteTrip")}
                 </DropdownMenuItem>
               </>
             )}
@@ -433,14 +454,16 @@ export default function TripPage() {
       {/* Total */}
       <Card className="edge-light mb-4">
         <CardContent className="py-1 text-center">
-          <p className="text-xs tracking-wider text-muted-foreground uppercase">Total spent</p>
+          <p className="text-xs tracking-wider text-muted-foreground uppercase">{t("trip.totalSpent")}</p>
           <p className="mt-1.5 text-4xl font-semibold tracking-tight">
             <Money amount={trip.totalExpenses} currency={trip.currency} />
           </p>
           {trip.expenses.length > 0 && (
             <p className="mt-1 text-sm text-muted-foreground tabular">
-              {trip.expenses.length} {trip.expenses.length === 1 ? "expense" : "expenses"} ·{" "}
-              {trip.members.length} people
+              {t("trip.expenseCount", {
+                expenses: plural("trip.nExpenses", trip.expenses.length),
+                people: plural("trip.nPeople", trip.members.length),
+              })}
             </p>
           )}
         </CardContent>
@@ -449,7 +472,7 @@ export default function TripPage() {
       {readOnly && (
         <div className="mb-4 flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-muted-foreground">
           <Eye className="size-4 shrink-0" />
-          You have read-only access to this trip.
+          {t("trip.readOnly")}
         </div>
       )}
 
@@ -458,7 +481,7 @@ export default function TripPage() {
         <Card className="mb-4">
           <CardContent className="space-y-2.5">
             <h2 className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-              Balances
+              {t("trip.balances")}
             </h2>
             {trip.balances.map((b) => (
               <div key={b.memberId} className="flex items-center gap-2.5">
@@ -481,16 +504,15 @@ export default function TripPage() {
         <Card className="mb-4">
           <CardContent className="space-y-3">
             <h2 className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-              By category
+              {t("trip.byCategory")}
             </h2>
             {categoryBreakdown.map(([catId, amount]) => {
-              const cat = CATEGORIES.find((c) => c.id === catId);
               const pct = breakdownTotal > 0 ? (amount / breakdownTotal) * 100 : 0;
               return (
                 <div key={catId} className="space-y-1.5">
                   <div className="flex items-center gap-2 text-sm">
                     <CategoryIcon category={catId} className={cn("size-4", categoryTint(catId))} />
-                    <span className="min-w-0 flex-1 truncate">{cat?.name ?? catId}</span>
+                    <span className="min-w-0 flex-1 truncate">{categoryName(catId)}</span>
                     <span className="text-muted-foreground tabular">{pct.toFixed(0)}%</span>
                     <span className="w-20 text-right tabular">
                       {currencySymbol(trip.currency)}
@@ -514,13 +536,13 @@ export default function TripPage() {
       <Tabs defaultValue="expenses" className="flex-1">
         <TabsList className="w-full">
           <TabsTrigger value="expenses" className="flex-1">
-            Expenses
+            {t("trip.expenses")}
           </TabsTrigger>
           <TabsTrigger value="settle" className="flex-1">
-            Settle up
+            {t("trip.settleUp")}
           </TabsTrigger>
           <TabsTrigger value="history" className="flex-1">
-            History
+            {t("trip.history")}
           </TabsTrigger>
         </TabsList>
 
@@ -529,22 +551,39 @@ export default function TripPage() {
           {!readOnly && (
             <Button className="h-11 w-full" onClick={openNewExpense}>
               <Plus className="size-4" />
-              Add expense
+              {t("trip.addExpense")}
             </Button>
+          )}
+
+          {/* The bar only earns its space once there is enough to sift through. */}
+          {trip.expenses.length > 5 && (
+            <ExpenseFilterBar
+              members={trip.members}
+              filters={filters}
+              onChange={setFilters}
+              shown={visibleExpenses.length}
+              total={trip.expenses.length}
+            />
           )}
 
           {trip.expenses.length === 0 ? (
             <EmptyPanel
               icon={<Receipt className="size-5 text-muted-foreground" />}
-              title="No expenses yet"
-              hint={readOnly ? undefined : "Add the first one and balances appear here."}
+              title={t("trip.noExpenses")}
+              hint={readOnly ? undefined : t("trip.noExpensesHint")}
+            />
+          ) : visibleExpenses.length === 0 ? (
+            <EmptyPanel
+              icon={<Receipt className="size-5 text-muted-foreground" />}
+              title={t("search.noResults")}
+              hint={t("search.noResultsHint")}
             />
           ) : (
             <div className="space-y-4">
-              {groupByDay(trip.expenses).map(([day, dayExpenses]) => (
+              {groupByDay(visibleExpenses).map(([day, dayExpenses]) => (
                 <section key={day}>
                   <div className="mb-1.5 flex items-baseline justify-between px-1">
-                    <h3 className="text-xs font-medium text-muted-foreground">{formatDay(day)}</h3>
+                    <h3 className="text-xs font-medium text-muted-foreground">{formatDay(day, t, intlLocale)}</h3>
                     <span className="text-xs text-muted-foreground tabular">
                       {currencySymbol(trip.currency)}
                       {formatAmount(dayExpenses.reduce((sum, e) => sum + e.amountEur, 0))}
@@ -565,8 +604,9 @@ export default function TripPage() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{expense.description}</p>
                         <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
-                          {payer?.emoji} {payer?.name} paid · {expense.splitAmong.length} way
-                          {expense.splitShares && " · uneven"}
+                          {payer?.emoji} {t("trip.paidBy", { name: payer?.name ?? "" })} ·{" "}
+                          {plural("trip.ways", expense.splitAmong.length)}
+                          {expense.splitShares && ` · ${t("trip.uneven")}`}
                         </p>
                       </div>
 
@@ -585,7 +625,7 @@ export default function TripPage() {
                             className="mt-0.5 h-4 gap-1 border-warning/30 px-1 text-[10px] text-warning"
                           >
                             <TriangleAlert className="size-2.5" />
-                            rate
+                            {t("trip.rateWarning")}
                           </Badge>
                         )}
                       </div>
@@ -597,7 +637,7 @@ export default function TripPage() {
                             size="icon"
                             className="size-8 text-muted-foreground"
                             onClick={() => openEditExpense(expense)}
-                            aria-label={`Edit ${expense.description}`}
+                            aria-label={`${t("common.edit")}: ${expense.description}`}
                           >
                             <Pencil className="size-3.5" />
                           </Button>
@@ -606,7 +646,7 @@ export default function TripPage() {
                             size="icon"
                             className="size-8 text-muted-foreground hover:text-destructive"
                             onClick={() => setConfirm({ type: "expense", id: expense.id })}
-                            aria-label={`Delete ${expense.description}`}
+                            aria-label={`${t("common.delete")}: ${expense.description}`}
                           >
                             <Trash2 className="size-3.5" />
                           </Button>
@@ -627,8 +667,8 @@ export default function TripPage() {
           {trip.settlements.length === 0 ? (
             <div className="rounded-xl border border-primary/25 bg-primary/[0.06] px-6 py-10 text-center">
               <CheckCircle2 className="mx-auto mb-3 size-7 text-primary" />
-              <p className="font-medium">All settled up</p>
-              <p className="mt-1 text-sm text-muted-foreground">Nobody owes anybody.</p>
+              <p className="font-medium">{t("trip.allSettled")}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{t("trip.allSettledHint")}</p>
             </div>
           ) : (
             <ul className="space-y-1.5">
@@ -655,7 +695,7 @@ export default function TripPage() {
           {!readOnly && (
             <Button variant="outline" className="h-11 w-full" onClick={() => setSettleOpen(true)}>
               <Wallet className="size-4" />
-              Record a payment
+              {t("trip.recordPayment")}
             </Button>
           )}
         </TabsContent>
@@ -665,8 +705,8 @@ export default function TripPage() {
           {trip.payments.length === 0 ? (
             <EmptyPanel
               icon={<Wallet className="size-5 text-muted-foreground" />}
-              title="No payments recorded"
-              hint="Payments between members show up here."
+              title={t("trip.noPayments")}
+              hint={t("trip.noPaymentsHint")}
             />
           ) : (
             <ul className="space-y-1.5">
@@ -686,10 +726,10 @@ export default function TripPage() {
 
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm">
-                          {from?.name} paid {to?.name}
+                          {t("trip.paidTo", { from: from?.name ?? "", to: to?.name ?? "" })}
                         </p>
                         <p className="truncate text-xs text-muted-foreground">
-                          {new Date(payment.date).toLocaleDateString("es-ES")}
+                          {new Date(payment.date).toLocaleDateString(intlLocale)}
                           {payment.note && ` · ${payment.note}`}
                         </p>
                       </div>
@@ -706,7 +746,7 @@ export default function TripPage() {
                           size="icon"
                           className="size-8 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-destructive max-sm:opacity-100"
                           onClick={() => setConfirm({ type: "payment", id: payment.id })}
-                          aria-label="Delete payment"
+                          aria-label={t("common.delete")}
                         >
                           <Trash2 className="size-3.5" />
                         </Button>
@@ -766,20 +806,22 @@ export default function TripPage() {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>
-              {confirm?.type === "trip" ? "Delete this trip?" : `Delete this ${confirm?.type}?`}
+              {confirm?.type === "trip"
+                ? t("confirm.deleteTrip")
+                : confirm?.type === "expense"
+                  ? t("confirm.deleteExpense")
+                  : t("confirm.deletePayment")}
             </DialogTitle>
             <DialogDescription>
-              {confirm?.type === "trip"
-                ? "Every expense, payment and member goes with it. This cannot be undone."
-                : "This cannot be undone. Balances update immediately."}
+              {confirm?.type === "trip" ? t("confirm.deleteTripHint") : t("confirm.deleteHint")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirm(null)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="destructive" onClick={runDelete} disabled={deleting}>
-              {deleting ? <Loader2 className="size-4 animate-spin" /> : "Delete"}
+              {deleting ? <Loader2 className="size-4 animate-spin" /> : t("common.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -883,8 +925,13 @@ function groupByDay(expenses: Expense[]): [string, Expense[]][] {
   return [...days.entries()];
 }
 
-/** "Today", "Yesterday", or a written date — relative labels only where they help. */
-function formatDay(key: string): string {
+/**
+ * "Today", "Yesterday", or a written date — relative labels only where they help.
+ *
+ * Takes its wording and its locale as arguments rather than reaching for the hook,
+ * because it is called from inside a render loop and a plain function keeps it cheap.
+ */
+function formatDay(key: string, t: (k: "trip.today" | "trip.yesterday") => string, locale: string): string {
   const [year, month, day] = key.split("-").map(Number);
   const date = new Date(year, month - 1, day);
 
@@ -892,10 +939,10 @@ function formatDay(key: string): string {
   midnight.setHours(0, 0, 0, 0);
   const daysAgo = Math.round((midnight.getTime() - date.getTime()) / 86_400_000);
 
-  if (daysAgo === 0) return "Today";
-  if (daysAgo === 1) return "Yesterday";
+  if (daysAgo === 0) return t("trip.today");
+  if (daysAgo === 1) return t("trip.yesterday");
 
-  return date.toLocaleDateString("es-ES", {
+  return date.toLocaleDateString(locale, {
     weekday: "short",
     day: "numeric",
     month: "short",

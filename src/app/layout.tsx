@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ServiceWorkerRegistrar } from "@/components/offline";
+import { cookies, headers } from "next/headers";
+import { I18nProvider } from "@/i18n/provider";
+import { LOCALE_COOKIE, isLocale, localeFromHeader } from "@/i18n/config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -39,20 +42,35 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({
+/**
+ * Resolves the language on the server so the first paint is already translated and
+ * `lang` is correct — an explicit choice in the cookie wins, otherwise the browser's
+ * Accept-Language decides.
+ */
+async function resolveLocale() {
+  const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
+  if (isLocale(stored)) return stored;
+  return localeFromHeader((await headers()).get("accept-language"));
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await resolveLocale();
+
   return (
     <html
-      lang="es"
+      lang={locale}
       className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="brand-glow flex min-h-full flex-col bg-background text-foreground">
-        {children}
-        <Toaster position="top-center" />
-        <ServiceWorkerRegistrar />
+        <I18nProvider locale={locale}>
+          {children}
+          <Toaster position="top-center" />
+          <ServiceWorkerRegistrar />
+        </I18nProvider>
       </body>
     </html>
   );

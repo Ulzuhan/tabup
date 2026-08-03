@@ -1,0 +1,456 @@
+import type { Locale } from "./config";
+
+/**
+ * Translations.
+ *
+ * Spanish is the source of truth and its shape defines the type, so English is checked
+ * against it — a missing key is a compile error rather than a string that quietly shows
+ * up untranslated in front of someone.
+ *
+ * Placeholders are `{name}` and get substituted by `t()`.
+ */
+export const es = {
+  common: {
+    cancel: "Cancelar",
+    save: "Guardar",
+    delete: "Borrar",
+    add: "Añadir",
+    edit: "Editar",
+    back: "Volver",
+    close: "Cerrar",
+    copy: "Copiar",
+    copied: "Copiado",
+    share: "Compartir",
+    loading: "Cargando…",
+    saving: "Guardando…",
+    serverUnreachable: "No se ha podido conectar con el servidor",
+    somethingWrong: "Algo ha ido mal",
+  },
+
+  home: {
+    tagline: "Apunta lo que paga cada uno, en cualquier moneda, y mira quién debe a quién. Sin cuenta.",
+    newTrip: "Nuevo viaje",
+    yourTrips: "Tus viajes",
+    noTrips: "Todavía no hay viajes",
+    noTripsHint: "Crea uno y comparte el enlace: quien lo abra puede apuntar gastos.",
+    signInToKeep: "para conservarlos en todos tus dispositivos.",
+    thisDevice: "solo aquí",
+    shared: "compartido",
+    localOnly: "Algunos viajes solo existen en este navegador.",
+    saveToAccount: "Guardar en mi cuenta",
+    members: "{count} personas",
+    expenses: "{count} gastos",
+  },
+
+  createTrip: {
+    title: "Nuevo viaje",
+    subtitle: "Añade a todos los que comparten gastos. Puedes añadir más luego.",
+    name: "Nombre del viaje",
+    namePlaceholder: "Fin de semana en Barcelona",
+    currency: "Moneda por defecto",
+    people: "Personas",
+    atLeastTwo: "mínimo 2",
+    person: "Persona {n}",
+    addMember: "Añadir persona",
+    create: "Crear viaje",
+    failed: "No se ha podido crear el viaje",
+  },
+
+  auth: {
+    signIn: "Entrar",
+    signOut: "Salir",
+    createAccount: "Crear cuenta",
+    welcomeBack: "Bienvenido de nuevo.",
+    keepAcrossDevices: "Ten tus viajes en todos tus dispositivos.",
+    name: "Nombre",
+    email: "Correo",
+    password: "Contraseña",
+    passwordHint: "Mínimo 8 caracteres",
+    alreadyHaveAccount: "¿Ya tienes cuenta?",
+    newHere: "¿Es tu primera vez?",
+    createOne: "Crea una",
+    noAccountNeeded: "No hace falta cuenta para repartir una cuenta.",
+    startWithout: "Empieza un viaje sin ella",
+    signingIn: "Entrando…",
+    creating: "Creando cuenta…",
+  },
+
+  trip: {
+    notFound: "No se encuentra el viaje",
+    notFoundHint: "Puede que el enlace esté mal, o que el viaje ya pertenezca a una cuenta.",
+    goHome: "Ir al inicio",
+    totalSpent: "Total gastado",
+    expenseCount: "{expenses} · {people}",
+    nExpenses_one: "{count} gasto",
+    nExpenses_other: "{count} gastos",
+    nPeople_one: "{count} persona",
+    nPeople_other: "{count} personas",
+    balances: "Balances",
+    byCategory: "Por categoría",
+    expenses: "Gastos",
+    settleUp: "Saldar",
+    history: "Historial",
+    manage: "Gestionar",
+    settings: "Ajustes del viaje",
+    exportCsv: "Exportar CSV",
+    deleteTrip: "Borrar viaje",
+    readOnly: "Solo puedes consultar este viaje.",
+    addExpense: "Añadir gasto",
+    noExpenses: "Todavía no hay gastos",
+    noExpensesHint: "Añade el primero y aparecerán los balances.",
+    paidBy: "{name} pagó",
+    ways_one: "entre {count}",
+    ways_other: "entre {count}",
+    uneven: "desigual",
+    allSettled: "Todo saldado",
+    allSettledHint: "Nadie debe nada a nadie.",
+    recordPayment: "Apuntar un pago",
+    noPayments: "No hay pagos apuntados",
+    noPaymentsHint: "Aquí aparecen los pagos entre personas.",
+    paidTo: "{from} pagó a {to}",
+    today: "Hoy",
+    yesterday: "Ayer",
+    rateWarning: "cambio",
+  },
+
+  expense: {
+    newTitle: "Nuevo gasto",
+    editTitle: "Editar gasto",
+    newSubtitle: "Quién pagó, cuánto y para quién.",
+    editSubtitle: "Cambia lo que quieras y guarda.",
+    description: "Descripción",
+    descriptionPlaceholder: "Cena en el puerto",
+    amount: "Importe",
+    category: "Categoría",
+    date: "Fecha",
+    paidBy: "Pagado por",
+    splitAmong: "Repartir entre",
+    equal: "Igual",
+    ofHundred: "{sum}% de 100%",
+    ofTotal: "{sum} de {total}",
+    addsUp: "cuadra",
+    overBy: "sobra {amount}",
+    shortBy: "falta {amount}",
+    fix: "ajustar",
+    saveFailed: "No se ha podido guardar el gasto",
+    added: "Gasto añadido",
+    updated: "Gasto actualizado",
+    deleted: "Gasto borrado",
+  },
+
+  settle: {
+    title: "Apuntar un pago",
+    subtitle: "Dinero que ha cambiado de manos fuera de la app, en {currency}.",
+    from: "De",
+    to: "Para",
+    whoPaid: "Quién pagó",
+    whoReceived: "Quién recibió",
+    amount: "Importe",
+    note: "Nota",
+    optional: "opcional",
+    notePlaceholder: "Bizum",
+    record: "Apuntar pago",
+    recorded: "Pago apuntado",
+    deleted: "Pago borrado",
+    failed: "No se ha podido apuntar el pago",
+  },
+
+  manage: {
+    title: "Ajustes del viaje",
+    subtitle: "Nombre, quién está y quién puede abrirlo.",
+    name: "Nombre",
+    people: "Personas en este viaje",
+    removeWarning: "Quitar a alguien borra también sus gastos y sus pagos.",
+    addSomeone: "Añadir a alguien",
+    accounts: "Cuentas con acceso",
+    anonymousNote:
+      "Este viaje no pertenece a nadie, así que cualquiera con el enlace puede abrirlo. Reclámalo a una cuenta si quieres elegir quién entra.",
+    inviteHint:
+      "Tienen que tener cuenta aquí. Los editores pueden añadir y editar gastos; los lectores solo mirar.",
+    invite: "Invitar",
+    editor: "Editor",
+    viewer: "Lector",
+    owner: "Dueño",
+    renamed: "Viaje renombrado",
+    memberAdded: "Persona añadida",
+    memberRemoved: "{name} fuera del viaje",
+    accessGranted: "Acceso concedido",
+    accessRevoked: "Acceso retirado",
+    failed: "No ha funcionado",
+  },
+
+  shareTrip: {
+    title: "Compartir este viaje",
+    subtitle: "Apunta con la cámara al código, o envía el enlace.",
+    anonymousWarning:
+      "Cualquiera con este enlace puede abrir y editar el viaje: no lleva contraseña. Entra y reclámalo si prefieres elegir quién accede.",
+  },
+
+  confirm: {
+    deleteTrip: "¿Borrar este viaje?",
+    deleteTripHint: "Se van con él todos los gastos, pagos y personas. No tiene vuelta atrás.",
+    deleteExpense: "¿Borrar este gasto?",
+    deletePayment: "¿Borrar este pago?",
+    deleteHint: "No tiene vuelta atrás. Los balances se actualizan al momento.",
+  },
+
+  offline: {
+    stale: "Estás viendo los últimos datos guardados en este dispositivo.",
+    offline:
+      "Estás sin conexión. Estas cifras son de la última vez que hubo cobertura, y todavía no se pueden guardar gastos nuevos.",
+  },
+
+  search: {
+    placeholder: "Buscar gastos",
+    noResults: "Ningún gasto coincide",
+    noResultsHint: "Prueba con otra palabra o quita los filtros.",
+    filters: "Filtros",
+    clear: "Quitar filtros",
+    anyone: "Cualquiera",
+    anyCategory: "Cualquier categoría",
+    results: "{count} de {total}",
+  },
+
+  category: {
+    food: "Comida y bebida",
+    transport: "Transporte",
+    accommodation: "Alojamiento",
+    activity: "Actividades",
+    shopping: "Compras",
+    health: "Salud y farmacia",
+    other: "Otros",
+  },
+
+  language: "Idioma",
+} as const;
+
+/**
+ * The Spanish shape with its values widened to `string`.
+ *
+ * `as const` above pins each value to its own literal type, which is what makes the
+ * key paths in provider.tsx type-safe — but it would also demand that English say
+ * "Cancelar". Widening the values keeps the keys strict and lets the translations
+ * differ, which is the entire point.
+ */
+type Messages = {
+  [S in keyof typeof es]: (typeof es)[S] extends string
+    ? string
+    : { [K in keyof (typeof es)[S]]: string };
+};
+
+export const en: Messages = {
+  common: {
+    cancel: "Cancel",
+    save: "Save",
+    delete: "Delete",
+    add: "Add",
+    edit: "Edit",
+    back: "Back",
+    close: "Close",
+    copy: "Copy",
+    copied: "Copied",
+    share: "Share",
+    loading: "Loading…",
+    saving: "Saving…",
+    serverUnreachable: "Could not reach the server",
+    somethingWrong: "Something went wrong",
+  },
+
+  home: {
+    tagline: "Track what everyone paid, in any currency, and see who owes whom. No account needed.",
+    newTrip: "New trip",
+    yourTrips: "Your trips",
+    noTrips: "No trips yet",
+    noTripsHint: "Start one and share the link — whoever opens it can add expenses.",
+    signInToKeep: "to keep them across devices.",
+    thisDevice: "this device",
+    shared: "shared",
+    localOnly: "Some trips live only in this browser.",
+    saveToAccount: "Save to account",
+    members: "{count} people",
+    expenses: "{count} expenses",
+  },
+
+  createTrip: {
+    title: "New trip",
+    subtitle: "Add everyone who is sharing costs. You can add more later.",
+    name: "Trip name",
+    namePlaceholder: "Weekend in Barcelona",
+    currency: "Default currency",
+    people: "People",
+    atLeastTwo: "at least 2",
+    person: "Person {n}",
+    addMember: "Add person",
+    create: "Create trip",
+    failed: "Could not create the trip",
+  },
+
+  auth: {
+    signIn: "Sign in",
+    signOut: "Sign out",
+    createAccount: "Create account",
+    welcomeBack: "Welcome back.",
+    keepAcrossDevices: "Keep your trips on every device.",
+    name: "Name",
+    email: "Email",
+    password: "Password",
+    passwordHint: "At least 8 characters",
+    alreadyHaveAccount: "Already have an account?",
+    newHere: "New here?",
+    createOne: "Create one",
+    noAccountNeeded: "You do not need an account to split a bill.",
+    startWithout: "Start a trip without one",
+    signingIn: "Signing in…",
+    creating: "Creating account…",
+  },
+
+  trip: {
+    notFound: "Trip not found",
+    notFoundHint: "The link may be wrong, or this trip now belongs to an account.",
+    goHome: "Go home",
+    totalSpent: "Total spent",
+    expenseCount: "{expenses} · {people}",
+    nExpenses_one: "{count} expense",
+    nExpenses_other: "{count} expenses",
+    nPeople_one: "{count} person",
+    nPeople_other: "{count} people",
+    balances: "Balances",
+    byCategory: "By category",
+    expenses: "Expenses",
+    settleUp: "Settle up",
+    history: "History",
+    manage: "Manage",
+    settings: "Trip settings",
+    exportCsv: "Export CSV",
+    deleteTrip: "Delete trip",
+    readOnly: "You have read-only access to this trip.",
+    addExpense: "Add expense",
+    noExpenses: "No expenses yet",
+    noExpensesHint: "Add the first one and balances appear here.",
+    paidBy: "{name} paid",
+    ways_one: "{count} way",
+    ways_other: "{count} ways",
+    uneven: "uneven",
+    allSettled: "All settled up",
+    allSettledHint: "Nobody owes anybody.",
+    recordPayment: "Record a payment",
+    noPayments: "No payments recorded",
+    noPaymentsHint: "Payments between members show up here.",
+    paidTo: "{from} paid {to}",
+    today: "Today",
+    yesterday: "Yesterday",
+    rateWarning: "rate",
+  },
+
+  expense: {
+    newTitle: "New expense",
+    editTitle: "Edit expense",
+    newSubtitle: "Who paid, how much, and for whom.",
+    editSubtitle: "Change any field and save.",
+    description: "Description",
+    descriptionPlaceholder: "Dinner at the port",
+    amount: "Amount",
+    category: "Category",
+    date: "Date",
+    paidBy: "Paid by",
+    splitAmong: "Split among",
+    equal: "Equal",
+    ofHundred: "{sum}% of 100%",
+    ofTotal: "{sum} of {total}",
+    addsUp: "adds up",
+    overBy: "over by {amount}",
+    shortBy: "short by {amount}",
+    fix: "fix",
+    saveFailed: "Could not save the expense",
+    added: "Expense added",
+    updated: "Expense updated",
+    deleted: "Expense deleted",
+  },
+
+  settle: {
+    title: "Record a payment",
+    subtitle: "Money that changed hands outside the app, in {currency}.",
+    from: "From",
+    to: "To",
+    whoPaid: "Who paid",
+    whoReceived: "Who received",
+    amount: "Amount",
+    note: "Note",
+    optional: "optional",
+    notePlaceholder: "Bank transfer",
+    record: "Record payment",
+    recorded: "Payment recorded",
+    deleted: "Payment deleted",
+    failed: "Could not record the payment",
+  },
+
+  manage: {
+    title: "Trip settings",
+    subtitle: "Name, who is in it, and who can open it.",
+    name: "Name",
+    people: "People in this trip",
+    removeWarning: "Removing someone deletes their expenses and payments too.",
+    addSomeone: "Add someone",
+    accounts: "Accounts with access",
+    anonymousNote:
+      "This trip belongs to nobody, so anyone with the link can open it. Claim it to an account first if you want to choose who gets in.",
+    inviteHint:
+      "They need an account here already. Editors can add and edit expenses; viewers can only look.",
+    invite: "Invite",
+    editor: "Editor",
+    viewer: "Viewer",
+    owner: "Owner",
+    renamed: "Trip renamed",
+    memberAdded: "Member added",
+    memberRemoved: "{name} removed",
+    accessGranted: "Access granted",
+    accessRevoked: "Access revoked",
+    failed: "That did not work",
+  },
+
+  shareTrip: {
+    title: "Share this trip",
+    subtitle: "Point a camera at the code, or send the link.",
+    anonymousWarning:
+      "Anyone with this link can open and edit the trip — there is no password on it. Sign in and claim the trip if you would rather choose who gets in.",
+  },
+
+  confirm: {
+    deleteTrip: "Delete this trip?",
+    deleteTripHint: "Every expense, payment and member goes with it. This cannot be undone.",
+    deleteExpense: "Delete this expense?",
+    deletePayment: "Delete this payment?",
+    deleteHint: "This cannot be undone. Balances update immediately.",
+  },
+
+  offline: {
+    stale: "Showing the last data saved on this device.",
+    offline:
+      "You are offline. These figures are from the last time you had signal, and new expenses cannot be saved yet.",
+  },
+
+  search: {
+    placeholder: "Search expenses",
+    noResults: "No expenses match",
+    noResultsHint: "Try another word or clear the filters.",
+    filters: "Filters",
+    clear: "Clear filters",
+    anyone: "Anyone",
+    anyCategory: "Any category",
+    results: "{count} of {total}",
+  },
+
+  category: {
+    food: "Food & drinks",
+    transport: "Transport",
+    accommodation: "Accommodation",
+    activity: "Activities",
+    shopping: "Shopping",
+    health: "Health & pharmacy",
+    other: "Other",
+  },
+
+  language: "Language",
+};
+
+export const MESSAGES: Record<Locale, Messages> = { es, en };

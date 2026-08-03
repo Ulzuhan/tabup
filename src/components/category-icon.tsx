@@ -9,6 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/provider";
 
 /**
  * Category iconography.
@@ -60,4 +61,11 @@ export function CategoryBadge({ category }: { category: string }) {
       <CategoryIcon category={category} className={cn("size-[18px]", categoryTint(category))} />
     </div>
   );
+}
+
+/** The translated name of a category, falling back to its id if it is unknown. */
+export function useCategoryName() {
+  const t = useT();
+  return (category: string) =>
+    t(`category.${category}` as Parameters<typeof t>[0]) || category;
 }

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { forgetTrips, localTripIds } from "@/lib/local-trips";
 import { Wordmark } from "@/components/app-header";
+import { useT } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ import { Label } from "@/components/ui/label";
  * for a week" into an account without losing anything.
  */
 export default function LoginPage() {
+  const t = useT();
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -48,7 +50,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Something went wrong");
+        setError(data.error || t("common.somethingWrong"));
         setBusy(false);
         return;
       }
@@ -60,7 +62,7 @@ export default function LoginPage() {
       router.push("/");
       router.refresh();
     } catch {
-      setError("Could not reach the server");
+      setError(t("common.serverUnreachable"));
       setBusy(false);
     }
   };
@@ -72,7 +74,7 @@ export default function LoginPage() {
         className="mb-8 inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
-        Back
+        {t("common.back")}
       </Link>
 
       <div className="mb-7 text-center">
@@ -80,7 +82,7 @@ export default function LoginPage() {
           <Wordmark />
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          {registering ? "Keep your trips on every device." : "Welcome back."}
+          {registering ? t("auth.keepAcrossDevices") : t("auth.welcomeBack")}
         </p>
       </div>
 
@@ -89,7 +91,7 @@ export default function LoginPage() {
           <form onSubmit={submit} className="space-y-4">
             {registering && (
               <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">{t("auth.name")}</Label>
                 <Input
                   id="name"
                   required
@@ -103,7 +105,7 @@ export default function LoginPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("auth.email")}</Label>
               <Input
                 id="email"
                 type="email"
@@ -117,7 +119,7 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("auth.password")}</Label>
               <Input
                 id="password"
                 type="password"
@@ -126,7 +128,7 @@ export default function LoginPage() {
                 autoComplete={registering ? "new-password" : "current-password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={registering ? "At least 8 characters" : "••••••••"}
+                placeholder={registering ? t("auth.passwordHint") : "••••••••"}
                 className="h-11"
               />
             </div>
@@ -144,9 +146,9 @@ export default function LoginPage() {
               {busy ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : registering ? (
-                "Create account"
+                t("auth.createAccount")
               ) : (
-                "Sign in"
+                t("auth.signIn")
               )}
             </Button>
           </form>
@@ -154,7 +156,7 @@ export default function LoginPage() {
       </Card>
 
       <p className="mt-5 text-center text-sm text-muted-foreground">
-        {registering ? "Already have an account?" : "New here?"}{" "}
+        {registering ? t("auth.alreadyHaveAccount") : t("auth.newHere")}{" "}
         <button
           type="button"
           onClick={() => {
@@ -163,14 +165,14 @@ export default function LoginPage() {
           }}
           className="rounded font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {registering ? "Sign in" : "Create one"}
+          {registering ? t("auth.signIn") : t("auth.createOne")}
         </button>
       </p>
 
       <p className="mt-8 text-center text-xs text-muted-foreground">
-        You do not need an account to split a bill.{" "}
+        {t("auth.noAccountNeeded")}{" "}
         <Link href="/" className="text-primary underline-offset-4 hover:underline">
-          Start a trip without one
+          {t("auth.startWithout")}
         </Link>
         .
       </p>

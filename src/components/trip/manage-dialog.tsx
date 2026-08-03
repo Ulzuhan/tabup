@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Loader2, Mail, Trash2, UserPlus, X } from "lucide-react";
 import type { Member } from "@/lib/types";
 import { MemberAvatar } from "@/components/member-avatar";
+import { useT } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,6 +61,7 @@ export function ManageDialog({
   anonymous: boolean;
   onChanged: () => Promise<void>;
 }) {
+  const t = useT();
   const [name, setName] = useState(tripName);
   const [newMember, setNewMember] = useState("");
   const [email, setEmail] = useState("");
@@ -77,14 +79,14 @@ export function ManageDialog({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(data.error || "That did not work");
+        toast.error(data.error || t("manage.failed"));
         return false;
       }
       await onChanged();
       toast.success(success);
       return true;
     } catch {
-      toast.error("Could not reach the server");
+      toast.error(t("common.serverUnreachable"));
       return false;
     } finally {
       setBusy(null);
@@ -97,7 +99,7 @@ export function ManageDialog({
     await call("rename", `/api/trips/${tripId}`, {
       method: "PATCH",
       body: JSON.stringify({ name: trimmed }),
-    }, "Trip renamed");
+    }, t("manage.renamed"));
   };
 
   const addMember = async () => {
@@ -106,7 +108,7 @@ export function ManageDialog({
     const ok = await call("add", `/api/trips/${tripId}`, {
       method: "PATCH",
       body: JSON.stringify({ addMembers: [trimmed] }),
-    }, "Member added");
+    }, t("manage.memberAdded"));
     if (ok) setNewMember("");
   };
 
@@ -114,7 +116,7 @@ export function ManageDialog({
     await call(`rm-${id}`, `/api/trips/${tripId}`, {
       method: "PATCH",
       body: JSON.stringify({ removeMembers: [id] }),
-    }, `${memberName} removed`);
+    }, t("manage.memberRemoved", { name: memberName }));
   };
 
   const invite = async () => {
@@ -123,7 +125,7 @@ export function ManageDialog({
     const ok = await call("invite", `/api/trips/${tripId}/share`, {
       method: "POST",
       body: JSON.stringify({ email: trimmed, role }),
-    }, "Access granted");
+    }, t("manage.accessGranted"));
     if (ok) setEmail("");
   };
 
@@ -131,19 +133,19 @@ export function ManageDialog({
     await call(`revoke-${userId}`, `/api/trips/${tripId}/share`, {
       method: "DELETE",
       body: JSON.stringify({ userId }),
-    }, "Access revoked");
+    }, t("manage.accessRevoked"));
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Trip settings</DialogTitle>
-          <DialogDescription>Name, who is in it, and who can open it.</DialogDescription>
+          <DialogTitle>{t("manage.title")}</DialogTitle>
+          <DialogDescription>{t("manage.subtitle")}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2">
-          <Label htmlFor="trip-rename">Name</Label>
+          <Label htmlFor="trip-rename">{t("manage.name")}</Label>
           <div className="flex gap-2">
             <Input
               id="trip-rename"
@@ -157,7 +159,7 @@ export function ManageDialog({
               onClick={rename}
               disabled={busy !== null || !name.trim() || name.trim() === tripName}
             >
-              {busy === "rename" ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+              {busy === "rename" ? <Loader2 className="size-4 animate-spin" /> : t("common.save")}
             </Button>
           </div>
         </div>
@@ -165,7 +167,7 @@ export function ManageDialog({
         <Separator />
 
         <div className="space-y-2">
-          <Label>People in this trip</Label>
+          <Label>{t("manage.people")}</Label>
           <ul className="space-y-1">
             {members.map((m) => (
               <li key={m.id} className="flex items-center gap-2 rounded-lg bg-secondary/40 p-1.5">
@@ -177,7 +179,7 @@ export function ManageDialog({
                   className="size-7 text-muted-foreground hover:text-destructive disabled:opacity-30"
                   onClick={() => removeMember(m.id, m.name)}
                   disabled={busy !== null || members.length <= 2}
-                  aria-label={`Remove ${m.name}`}
+                  aria-label={`${t("common.delete")}: ${m.name}`}
                 >
                   {busy === `rm-${m.id}` ? (
                     <Loader2 className="size-3.5 animate-spin" />
@@ -192,7 +194,7 @@ export function ManageDialog({
           {/* Removing someone takes their expenses with them, which is not obvious and
               is not undoable. */}
           <p className="text-xs text-muted-foreground">
-            Removing someone deletes their expenses and payments too.
+            {t("manage.removeWarning")}
           </p>
 
           <div className="flex gap-2 pt-1">
@@ -200,7 +202,7 @@ export function ManageDialog({
               value={newMember}
               onChange={(e) => setNewMember(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addMember()}
-              placeholder="Add someone"
+              placeholder={t("manage.addSomeone")}
               className="h-10"
             />
             <Button variant="outline" onClick={addMember} disabled={busy !== null || !newMember.trim()}>
@@ -213,12 +215,11 @@ export function ManageDialog({
           <>
             <Separator />
             <div className="space-y-2">
-              <Label>Accounts with access</Label>
+              <Label>{t("manage.accounts")}</Label>
 
               {anonymous ? (
                 <p className="rounded-lg border border-border bg-secondary/40 p-2.5 text-xs text-muted-foreground">
-                  This trip belongs to nobody, so anyone with the link can open it. Claim it
-                  to an account first if you want to choose who gets in.
+                  {t("manage.anonymousNote")}
                 </p>
               ) : (
                 <>
@@ -243,7 +244,7 @@ export function ManageDialog({
                             className="size-7 text-muted-foreground hover:text-destructive"
                             onClick={() => revoke(c.id)}
                             disabled={busy !== null}
-                            aria-label={`Revoke access for ${c.email}`}
+                            aria-label={`${t("manage.accessRevoked")}: ${c.email}`}
                           >
                             {busy === `revoke-${c.id}` ? (
                               <Loader2 className="size-3.5 animate-spin" />
@@ -270,8 +271,8 @@ export function ManageDialog({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="editor">Editor</SelectItem>
-                        <SelectItem value="viewer">Viewer</SelectItem>
+                        <SelectItem value="editor">{t("manage.editor")}</SelectItem>
+                        <SelectItem value="viewer">{t("manage.viewer")}</SelectItem>
                       </SelectContent>
                     </Select>
                     <Button
@@ -280,13 +281,12 @@ export function ManageDialog({
                       disabled={busy !== null || !email.trim()}
                       className="shrink-0"
                     >
-                      {busy === "invite" ? <Loader2 className="size-4 animate-spin" /> : "Invite"}
+                      {busy === "invite" ? <Loader2 className="size-4 animate-spin" /> : t("manage.invite")}
                     </Button>
                   </div>
 
                   <p className="text-xs text-muted-foreground">
-                    They need an account here already. Editors can add and edit expenses;
-                    viewers can only look.
+                    {t("manage.inviteHint")}
                   </p>
                 </>
               )}

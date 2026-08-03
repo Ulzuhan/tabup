@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, User as UserIcon } from "lucide-react";
+import { Check, Globe, LogOut, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,6 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useT, useLocale, setLocale } from "@/i18n/provider";
+import { LOCALES, LOCALE_NAMES } from "@/i18n/config";
 
 export interface SessionUser {
   id: string;
@@ -48,6 +50,8 @@ export function AppHeader({
   onSignOut: () => void;
   showWordmark?: boolean;
 }) {
+  const t = useT();
+
   return (
     <header className="mb-8 flex h-9 w-full items-center justify-between">
       {showWordmark ? (
@@ -81,24 +85,63 @@ export function AppHeader({
               <p className="truncate text-xs text-muted-foreground">{user.email}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <LanguageItems />
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onSignOut}>
               <LogOut className="size-4" />
-              Sign out
+              {t("auth.signOut")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ) : (
-        <Button
-          variant="ghost"
-          size="sm"
-          render={
-            <Link href="/login">
-              <UserIcon className="size-4" />
-              Sign in
-            </Link>
-          }
-        />
+        <div className="flex items-center gap-1">
+          {/* Without an account there is no user menu, so the language picker needs its
+              own way in — otherwise it would only be reachable by signing in. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="ghost" size="icon" aria-label={t("language")}>
+                  <Globe className="size-4" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end">
+              <LanguageItems />
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            render={
+              <Link href="/login">
+                <UserIcon className="size-4" />
+                {t("auth.signIn")}
+              </Link>
+            }
+          />
+        </div>
       )}
     </header>
+  );
+}
+
+/** The language choices, shared by every menu that offers them. */
+export function LanguageItems() {
+  const current = useLocale();
+
+  return (
+    <>
+      {LOCALES.map((code) => (
+        <DropdownMenuItem key={code} onClick={() => setLocale(code)}>
+          {code === current ? (
+            <Check className="size-4 text-primary" />
+          ) : (
+            <span className="size-4" />
+          )}
+          {LOCALE_NAMES[code]}
+        </DropdownMenuItem>
+      ))}
+    </>
   );
 }

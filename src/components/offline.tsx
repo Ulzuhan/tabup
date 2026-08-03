@@ -2,6 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import { CloudOff } from "lucide-react";
+import { useT } from "@/i18n/provider";
 
 /**
  * Registers the service worker and reports connection state.
@@ -55,6 +56,7 @@ export function useOnline(): boolean {
  */
 export function OfflineBanner({ stale }: { stale?: boolean }) {
   const online = useOnline();
+  const t = useT();
   if (online && !stale) return null;
 
   return (
@@ -64,9 +66,7 @@ export function OfflineBanner({ stale }: { stale?: boolean }) {
     >
       <CloudOff className="size-4 shrink-0" />
       <span>
-        {online
-          ? "Showing the last data saved on this device."
-          : "You are offline. These figures are from the last time you had signal, and new expenses cannot be saved yet."}
+        {online ? t("offline.stale") : t("offline.offline")}
       </span>
     </div>
   );
