@@ -164,7 +164,14 @@ export function ExpenseDialog({
                 onValueChange={(v) => setDraft({ currency: String(v) })}
               >
                 <SelectTrigger className="h-11 w-28">
-                  <SelectValue />
+                  {/* SelectValue renders the raw value; without this the trigger shows
+                      "EUR" while the list shows "€ EUR". */}
+                  <SelectValue>
+                    {(value) => {
+                      const c = CURRENCIES.find((x) => x.code === value);
+                      return c ? `${c.symbol} ${c.code}` : String(value ?? "");
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {CURRENCIES.map((c) => (

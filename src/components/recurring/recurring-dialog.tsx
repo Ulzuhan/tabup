@@ -3,7 +3,7 @@
 import { Loader2 } from "lucide-react";
 import { CATEGORIES, CURRENCIES } from "@/lib/types";
 import { PERIODS } from "@/lib/recurring";
-import { useT } from "@/i18n/provider";
+import { useT, useIntlLocale } from "@/i18n/provider";
 import { CategoryIcon, useCategoryName } from "@/components/category-icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,10 +69,13 @@ export function RecurringDialog({
   onSubmit: () => void;
 }) {
   const t = useT();
+  const locale = useIntlLocale();
   const categoryName = useCategoryName();
 
   const valid = draft.name.trim().length > 0 && parseFloat(draft.amount) > 0;
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const monthName = (m: number) =>
+    new Date(2026, m - 1, 1).toLocaleDateString(locale, { month: "long" });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -118,7 +121,12 @@ export function RecurringDialog({
               />
               <Select value={draft.currency} onValueChange={(v) => setDraft({ currency: String(v) })}>
                 <SelectTrigger className="h-11 w-28">
-                  <SelectValue />
+                  <SelectValue>
+                    {(value) => {
+                      const c = CURRENCIES.find((x) => x.code === value);
+                      return c ? `${c.symbol} ${c.code}` : String(value ?? "");
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {CURRENCIES.map((c) => (
@@ -177,12 +185,15 @@ export function RecurringDialog({
                     onValueChange={(v) => setDraft({ chargeMonth: String(v) })}
                   >
                     <SelectTrigger id="rec-month" className="h-11 w-full">
-                      <SelectValue />
+                      {/* Otherwise this reads "3" instead of "marzo". */}
+                      <SelectValue>
+                        {(value) => monthName(Number(value) || 1)}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {months.map((m) => (
                         <SelectItem key={m} value={String(m)}>
-                          {new Date(2026, m - 1, 1).toLocaleDateString(undefined, { month: "long" })}
+                          {monthName(m)}
                         </SelectItem>
                       ))}
                     </SelectContent>

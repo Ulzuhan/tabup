@@ -311,7 +311,11 @@ export function ManageDialog({
                     />
                     <Select value={role} onValueChange={(v) => setRole(v as "editor" | "viewer")}>
                       <SelectTrigger className="h-10 w-24 shrink-0">
-                        <SelectValue />
+                        <SelectValue>
+                          {(value) =>
+                            value === "viewer" ? t("manage.viewer") : t("manage.editor")
+                          }
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="editor">{t("manage.editor")}</SelectItem>
