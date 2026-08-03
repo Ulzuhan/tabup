@@ -20,7 +20,7 @@ export async function POST(_request: NextRequest, ctx: RouteContext<"/api/trips/
   }
   if (atTripLimit(user)) {
     return NextResponse.json(
-      { error: `The free plan covers ${FREE_TRIP_LIMIT} trips.`, code: "trip_limit" },
+      { error: `This account is capped at ${FREE_TRIP_LIMIT} trips.`, code: "trip_limit" },
       { status: 402 }
     );
   }

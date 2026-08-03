@@ -269,11 +269,25 @@ export function ownedTripCount(userId: string): number {
   return db.select().from(trips).where(eq(trips.ownerId, userId)).all().length;
 }
 
-/** Free accounts get a handful of trips; anonymous use stays unlimited. */
-export const FREE_TRIP_LIMIT = 3;
+/**
+ * How many trips a free account may own. Unlimited unless `TABUP_FREE_TRIP_LIMIT`
+ * says otherwise.
+ *
+ * There used to be a hard cap of three. It saved no storage worth the name and it is
+ * precisely the sort of invented scarcity that people resent in Splitwise, whose free
+ * tier stops at a few expenses a day. If this ever becomes a paid product, the thing
+ * worth charging for is what costs money to run, not permission to keep using it.
+ */
+export const FREE_TRIP_LIMIT: number | null = (() => {
+  const raw = process.env.TABUP_FREE_TRIP_LIMIT?.trim();
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+})();
 
 export function atTripLimit(user: { id: string; plan: string }): boolean {
-  return user.plan === "free" && ownedTripCount(user.id) >= FREE_TRIP_LIMIT;
+  if (FREE_TRIP_LIMIT === null || user.plan !== "free") return false;
+  return ownedTripCount(user.id) >= FREE_TRIP_LIMIT;
 }
 
 // ─── Writes ──────────────────────────────────────────────────────────

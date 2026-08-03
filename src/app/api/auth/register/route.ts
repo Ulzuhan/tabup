@@ -7,6 +7,7 @@ import {
   passwordProblem,
   publicUser,
   recordAttempt,
+  registrationOpen,
   tooManyAttempts,
 } from "@/lib/auth";
 import { claimTrip, isValidId } from "@/lib/store";
@@ -19,6 +20,17 @@ import { claimTrip, isValidId } from "@/lib/store";
  * become theirs. Trips already owned by someone else are silently left alone.
  */
 export async function POST(request: NextRequest) {
+  // Closed by default once the instance has an owner. This is reachable from the
+  // internet, and an open registration endpoint on a personal instance means anyone
+  // who finds the URL can create accounts on it. The first account is always allowed
+  // so a fresh install can be set up; after that, opening it up is a deliberate act.
+  if (!registrationOpen()) {
+    return NextResponse.json(
+      { error: "Registration is closed on this instance" },
+      { status: 403 }
+    );
+  }
+
   const throttleKey = clientKey(request, "register");
   if (tooManyAttempts(throttleKey)) {
     return NextResponse.json({ error: "Too many attempts, try again later" }, { status: 429 });

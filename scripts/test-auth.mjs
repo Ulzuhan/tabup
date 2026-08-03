@@ -2,8 +2,11 @@
 /**
  * Integration tests for accounts, ownership and sharing.
  *
- *   npm run start &
+ *   TABUP_ALLOW_REGISTRATION=true npm run start &
  *   npm run test:auth
+ *
+ * Registration is closed by default once an instance has its first account, so the
+ * suite needs it opened explicitly — it creates several accounts on purpose.
  *
  * The point of these is the isolation boundary: an owned trip must be invisible and
  * unwritable to everyone who was not given access, including someone who knows its id.
@@ -241,8 +244,11 @@ async function main() {
   check("email is case-insensitive", back.body.user.email, aliceEmail.toLowerCase());
   check("trips are back", (await alice(`/api/trips/${aliceTrip.id}`)).status, 200);
 
-  // ── Free plan limit ────────────────────────────────────────────────
-  console.log("\nFree plan limit");
+  // ── No cap on owning trips ─────────────────────────────────────────
+  // There used to be a hard limit of three. It saved nothing worth saving and was the
+  // same invented scarcity people resent elsewhere, so it is off unless
+  // TABUP_FREE_TRIP_LIMIT asks for it.
+  console.log("\nNo trip cap");
   const carol = client();
   await carol("/api/auth/register", {
     method: "POST",
@@ -253,13 +259,14 @@ async function main() {
     }),
   });
   const statuses = [];
-  for (let i = 0; i < 4; i++) statuses.push((await newTrip(carol, `Trip ${i}`)).status);
-  check("first three are allowed", statuses.slice(0, 3), [200, 200, 200]);
-  check("the fourth is refused", statuses[3], 402);
+  for (let i = 0; i < 5; i++) statuses.push((await newTrip(carol, `Trip ${i}`)).status);
+  check("owning trips is not capped", statuses, [200, 200, 200, 200, 200]);
 
-  // Anonymous creation is not capped: the limit is on owning, not on using.
+  const { body: usage } = await carol("/api/auth/me");
+  check("and no limit is advertised", usage.usage.tripLimit, null);
+
   const anonAgain = await newTrip(client(), "Still free");
-  check("anonymous creation is uncapped", anonAgain.status, 200);
+  check("anonymous creation works too", anonAgain.status, 200);
 
   // ── Cleanup ────────────────────────────────────────────────────────
   await alice(`/api/trips/${aliceTrip.id}`, { method: "DELETE" });

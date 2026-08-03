@@ -2,7 +2,7 @@ import { randomBytes, scrypt, timingSafeEqual, createHash } from "crypto";
 import type { BinaryLike, ScryptOptions } from "crypto";
 import { promisify } from "util";
 import { cookies } from "next/headers";
-import { eq, lt } from "drizzle-orm";
+import { eq, lt, sql } from "drizzle-orm";
 import { db, users, sessions } from "@/db";
 import type { UserRow } from "@/db";
 
@@ -248,4 +248,20 @@ export function clearAttempts(key: string): void {
 export function clientKey(request: Request, suffix = ""): string {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   return `${forwarded || "local"}:${suffix}`;
+}
+
+// ── Registration policy ──────────────────────────────────────────────────
+
+/**
+ * Whether new accounts may be created.
+ *
+ * `TABUP_ALLOW_REGISTRATION=true` opens it. Otherwise only the very first account is
+ * allowed, so a fresh instance can be set up and then stops accepting strangers —
+ * which matters because this is reachable from the internet, and people who are handed
+ * a trip link do not need an account at all to use it.
+ */
+export function registrationOpen(): boolean {
+  if (process.env.TABUP_ALLOW_REGISTRATION?.trim().toLowerCase() === "true") return true;
+  const [{ count }] = db.select({ count: sql<number>`count(*)` }).from(users).all();
+  return count === 0;
 }

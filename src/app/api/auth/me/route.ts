@@ -11,6 +11,7 @@ export async function GET() {
     user: publicUser(user),
     usage: {
       trips: ownedTripCount(user.id),
+      // null means no cap, which is the default.
       tripLimit: user.plan === "free" ? FREE_TRIP_LIMIT : null,
     },
   });

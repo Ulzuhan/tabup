@@ -27,6 +27,11 @@ npm run start
 | `TABUP_DB` | `data/tabup.db` | SQLite database file |
 | `TABUP_DATA_DIR` | `data/` | Where the exchange-rate cache is kept |
 | `PORT` | `3000` | Port to listen on |
+| `TABUP_ALLOW_REGISTRATION` | unset | `true` opens sign-ups; otherwise only the first account is allowed |
+| `TABUP_FREE_TRIP_LIMIT` | unset | Caps how many trips an account may own; no cap by default |
+| `TABUP_BACKUP_DIR` | `~/backups/tabup` | Where `backup-db.mjs` writes snapshots |
+| `TABUP_BACKUP_KEEP` | `14` | Snapshots to keep |
+| `TABUP_BACKUP_REMOTE` | unset | rsync target for offsite copies |
 
 The database file and its directory are created on first start. There is no separate
 migration step: the schema is applied on boot, and it is safe to run against a database
@@ -56,10 +61,19 @@ everyone who still has the old link.
 Signing in sends the trip ids this browser remembers, and any that still have no owner
 become yours. Nothing is lost by having used the app anonymously first.
 
-### What the free plan caps
+### Registration
 
-Owning **3 trips**. Anonymous use is not capped: the limit is on keeping trips on an
-account, not on splitting a bill.
+Once an instance has its first account, sign-ups are refused unless
+`TABUP_ALLOW_REGISTRATION=true`. Anything reachable from the internet with an open
+registration endpoint collects accounts that are not yours. Nobody needs an account to
+use a trip — the link is enough — so opening it is rarely the right answer.
+
+### No cap on trips
+
+There was one, of three. It saved no storage worth the name and it is exactly the sort
+of invented scarcity people resent in Splitwise, whose free tier stops at a handful of
+expenses a day. `TABUP_FREE_TRIP_LIMIT` can reinstate a cap if this ever becomes a paid
+product; what is worth charging for is what costs money to run.
 
 ---
 
@@ -112,6 +126,30 @@ BASE=http://127.0.0.1:3999 npm run test:auth
 ```
 
 ---
+
+## Operations
+
+```bash
+node scripts/backup-db.mjs                        # snapshot the database
+node scripts/reset-password.mjs --list            # which accounts exist
+node scripts/reset-password.mjs ana@example.com   # set a new password, print it
+```
+
+**Backups** use SQLite's backup API rather than copying the file. In WAL mode the `.db`
+file alone is not the current state — recent commits live in `-wal` until a checkpoint —
+so `cp` under a running server yields a snapshot missing writes, or a corrupt one if a
+checkpoint lands mid-copy. Each snapshot is integrity checked *before* older ones are
+rotated out, so a bad backup can never destroy the good ones.
+
+Restore by stopping the server, gunzipping a snapshot over the database file, and
+starting it again.
+
+**Password resets** happen from the machine that holds the database. There is no
+reset-by-email flow: for a handful of accounts, an email provider plus tokens and their
+expiry is more machinery than the problem deserves. What this does close is the real
+hole — forgetting a password used to mean losing the trips behind it for good. The
+script signs out every existing session and verifies the stored hash before reporting
+success.
 
 ## Security notes
 

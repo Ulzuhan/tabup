@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     if (user && atTripLimit(user)) {
       return NextResponse.json(
         {
-          error: `The free plan covers ${FREE_TRIP_LIMIT} trips. Upgrade to create more.`,
+          error: `This account is capped at ${FREE_TRIP_LIMIT} trips.`,
           code: "trip_limit",
         },
         { status: 402 }
