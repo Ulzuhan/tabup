@@ -127,6 +127,32 @@ BASE=http://127.0.0.1:3999 npm run test:auth
 
 ---
 
+## Offline and installing
+
+The app is a PWA: installable from the browser, and a trip stays readable with no
+connection — on a plane, on a mountain, or on roaming you would rather not pay for.
+
+The service worker splits its rules deliberately:
+
+- **Shell and static assets** — cache first. They only change when a new build ships.
+- **API reads** — network first, cache only as a fallback. Balances are the reason this
+  app exists, and showing a stale figure as if it were current would be worse than
+  showing nothing, so a cached response is flagged and the page says the numbers are
+  from the last time it had signal.
+
+**Writes are never queued or replayed.** An expense that failed offline stays failed
+and the user is told. Silently retrying it later, after the amounts around it have
+moved on, is how you get duplicated or contradictory data in the one place where people
+are counting on the numbers. Offline *writing* is a separate problem — it needs a
+mutation queue and conflict resolution — and pretending to solve it with a retry would
+be worse than not having it.
+
+Icons are generated from one vector definition:
+
+```bash
+node scripts/generate-icons.mjs
+```
+
 ## Operations
 
 ```bash

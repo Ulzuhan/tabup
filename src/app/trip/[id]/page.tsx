@@ -13,6 +13,7 @@ import {
   Loader2,
   MoreVertical,
   Pencil,
+  Share2,
   Plus,
   Receipt,
   Trash2,
@@ -29,6 +30,8 @@ import { MemberAvatar, MemberStack } from "@/components/member-avatar";
 import { Money, currencySymbol, formatAmount } from "@/components/money";
 import { ExpenseDialog, type ExpenseDraft } from "@/components/trip/expense-dialog";
 import { SettleDialog, type PaymentDraft } from "@/components/trip/settle-dialog";
+import { ShareDialog } from "@/components/trip/share-dialog";
+import { OfflineBanner } from "@/components/offline";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -125,6 +128,8 @@ export default function TripPage() {
     date: today(),
   });
 
+  const [shareOpen, setShareOpen] = useState(false);
+  const [stale, setStale] = useState(false);
   const [memberOpen, setMemberOpen] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
   const [confirm, setConfirm] = useState<{
@@ -147,6 +152,9 @@ export default function TripPage() {
       }
       const data: TripData = await res.json();
       setTrip(data);
+      // The service worker sets this when it served a cached copy because the network
+      // was unreachable, so the page can say the figures are not current.
+      setStale(res.headers.get("X-TabUp-Offline") === "1");
 
       // Opening an anonymous trip by link is how someone joins it. Recording the id
       // here is what puts it on their home screen afterwards.
@@ -401,6 +409,16 @@ export default function TripPage() {
           </div>
         </div>
 
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0"
+          onClick={() => setShareOpen(true)}
+          aria-label="Share trip"
+        >
+          <Share2 className="size-4" />
+        </Button>
+
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
@@ -429,6 +447,8 @@ export default function TripPage() {
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
+
+      <OfflineBanner stale={stale} />
 
       {/* Total */}
       <Card className="edge-light mb-4">
@@ -706,6 +726,14 @@ export default function TripPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        url={typeof window === "undefined" ? "" : window.location.href}
+        tripName={trip.name}
+        anonymous={trip.anonymous}
+      />
 
       <ExpenseDialog
         open={expenseOpen}

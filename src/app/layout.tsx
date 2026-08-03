@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { ServiceWorkerRegistrar } from "@/components/offline";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,6 +17,8 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "TabUp — Shared Expense Tracker",
   description: "Split expenses with friends. See who owes whom. No account needed.",
+  appleWebApp: { capable: true, title: "TabUp", statusBarStyle: "black-translucent" },
+  icons: { icon: "/icon-192.png", apple: "/apple-icon.png" },
   openGraph: {
     title: "TabUp — Shared Expense Tracker",
     description: "Split expenses with friends. See who owes whom. No account needed.",
@@ -49,6 +52,7 @@ export default function RootLayout({
       <body className="brand-glow flex min-h-full flex-col bg-background text-foreground">
         {children}
         <Toaster position="top-center" />
+        <ServiceWorkerRegistrar />
       </body>
     </html>
   );
