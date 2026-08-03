@@ -2,8 +2,33 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import {
+  ArrowRight,
+  Compass,
+  Loader2,
+  Plus,
+  Receipt,
+  Sparkles,
+  Users,
+  X,
+} from "lucide-react";
 import { CURRENCIES, EMOJIS } from "@/lib/types";
 import { forgetTrips, localTripIds, rememberTrip } from "@/lib/local-trips";
+import { AppHeader, Wordmark, type SessionUser } from "@/components/app-header";
+import { MemberAvatar } from "@/components/member-avatar";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface TripSummary {
   id: string;
@@ -14,13 +39,6 @@ interface TripSummary {
   createdAt: number;
   owned?: boolean;
   anonymous?: boolean;
-}
-
-interface SessionUser {
-  id: string;
-  email: string;
-  name: string;
-  plan: string;
 }
 
 export default function Home() {
@@ -39,7 +57,7 @@ export default function Home() {
   /**
    * The list is two sources merged: trips the account owns or was given, and trips this
    * browser remembers from before there was an account. Anonymous trips live only in
-   * localStorage, so without the second half they would vanish on this screen even
+   * localStorage, so without the second half they would vanish from this screen even
    * though their links still work.
    */
   useEffect(() => {
@@ -93,7 +111,6 @@ export default function Home() {
   /**
    * Attaches the browser's leftover anonymous trips to the account.
    *
-   * These are the ones created before signing in, or on this device while signed out.
    * Anything the server refuses — already owned, over the plan limit — is left alone
    * and stays in the local list.
    */
@@ -121,19 +138,20 @@ export default function Home() {
   };
 
   const removeMember = (index: number) => {
-    if (members.length > 2) {
-      setMembers(members.filter((_, i) => i !== index));
-    }
+    if (members.length > 2) setMembers(members.filter((_, i) => i !== index));
   };
 
   const updateMember = (index: number, value: string) => {
-    const newMembers = [...members];
-    newMembers[index] = value;
-    setMembers(newMembers);
+    const next = [...members];
+    next[index] = value;
+    setMembers(next);
   };
 
+  const namedMembers = members.filter((m) => m.trim());
+  const canCreate = tripName.trim().length > 0 && namedMembers.length >= 2;
+
   const createTrip = async () => {
-    if (!tripName.trim() || members.filter((m) => m.trim()).length < 2) return;
+    if (!canCreate) return;
     setCreating(true);
     setCreateError(null);
     try {
@@ -143,7 +161,7 @@ export default function Home() {
         body: JSON.stringify({
           name: tripName.trim(),
           currency,
-          members: members.filter((m) => m.trim()).map((m) => ({ name: m.trim() })),
+          members: namedMembers.map((m) => ({ name: m.trim() })),
         }),
       });
       const data = await res.json();
@@ -165,225 +183,292 @@ export default function Home() {
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center px-4 py-6 sm:py-10 max-w-2xl mx-auto w-full">
-      {/* Session bar */}
-      <div className="w-full flex items-center justify-end gap-3 mb-6 min-h-8 text-sm">
-        {loading ? null : user ? (
-          <>
-            <span className="text-muted truncate">
-              {user.name}
-              {usage?.tripLimit != null && (
-                <span className="ml-2 text-xs">
-                  {usage.trips}/{usage.tripLimit} trips
-                </span>
-              )}
-            </span>
-            <button
-              onClick={signOut}
-              className="text-muted hover:text-foreground transition-colors"
-            >
-              Sign out
-            </button>
-          </>
-        ) : (
-          <Link href="/login" className="text-accent hover:text-accent-hover font-medium">
-            Sign in
-          </Link>
-        )}
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-16 sm:pt-8">
+      <AppHeader user={user} loading={loading} onSignOut={signOut} showWordmark={false} />
+
+      {showCreate ? (
+        <CreateTripForm
+          tripName={tripName}
+          setTripName={setTripName}
+          currency={currency}
+          setCurrency={setCurrency}
+          members={members}
+          addMember={addMember}
+          removeMember={removeMember}
+          updateMember={updateMember}
+          canCreate={canCreate}
+          creating={creating}
+          error={createError}
+          onCancel={() => {
+            setShowCreate(false);
+            setCreateError(null);
+          }}
+          onSubmit={createTrip}
+        />
+      ) : (
+        <>
+          <section className="mb-9 text-center">
+            <h1 className="text-4xl font-semibold tracking-tight sm:text-[2.75rem]">
+              <Wordmark />
+            </h1>
+            <p className="mx-auto mt-3 max-w-sm text-[15px] leading-relaxed text-muted-foreground">
+              Track what everyone paid, in any currency, and see who owes whom. No account
+              needed.
+            </p>
+          </section>
+
+          <Button size="lg" className="h-12 w-full text-base" onClick={() => setShowCreate(true)}>
+            <Plus className="size-5" />
+            New trip
+          </Button>
+
+          <section className="mt-8">
+            {loading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-[68px] w-full rounded-xl" />
+                <Skeleton className="h-[68px] w-full rounded-xl" />
+              </div>
+            ) : trips.length > 0 ? (
+              <>
+                <div className="mb-3 flex items-center justify-between px-1">
+                  <h2 className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                    Your trips
+                  </h2>
+                  {usage?.tripLimit != null && (
+                    <span className="text-xs text-muted-foreground tabular">
+                      {usage.trips}/{usage.tripLimit}
+                    </span>
+                  )}
+                </div>
+
+                {user && trips.some((t) => t.anonymous) && (
+                  <Card className="mb-3 flex-row items-center gap-3 border-primary/25 bg-primary/[0.06] p-3">
+                    <Sparkles className="size-4 shrink-0 text-primary" />
+                    <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+                      Some trips live only in this browser.
+                    </p>
+                    <Button size="sm" variant="ghost" onClick={claimAnonymous} disabled={claiming}>
+                      {claiming ? <Loader2 className="size-4 animate-spin" /> : "Save to account"}
+                    </Button>
+                  </Card>
+                )}
+
+                <ul className="space-y-2">
+                  {trips.map((trip) => (
+                    <li key={trip.id}>
+                      <TripRow trip={trip} />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <EmptyState signedIn={Boolean(user)} />
+            )}
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TripRow({ trip }: { trip: TripSummary }) {
+  return (
+    <Link
+      href={`/trip/${trip.id}`}
+      className="group flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 transition-colors outline-none hover:border-primary/30 hover:bg-secondary/60 focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary">
+        <Compass className="size-[18px] text-muted-foreground transition-colors group-hover:text-primary" />
       </div>
 
-      {/* Hero */}
-      <div className="text-center mb-10">
-        <h1 className="text-4xl sm:text-5xl font-bold mb-2">
-          Tab<span className="text-accent">Up</span>
-        </h1>
-        <p className="text-muted text-sm sm:text-base">
-          Track shared expenses. See who owes whom. No account needed. 💸
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium">{trip.name}</p>
+        <p className="mt-0.5 flex items-center gap-3 text-[13px] text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <Users className="size-3.5" />
+            <span className="tabular">{trip.memberCount}</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <Receipt className="size-3.5" />
+            <span className="tabular">{trip.expenseCount}</span>
+          </span>
+          {trip.anonymous && (
+            <Badge variant="outline" className="h-5 px-1.5 text-[11px] font-normal">
+              this device
+            </Badge>
+          )}
+          {trip.owned === false && !trip.anonymous && (
+            <Badge variant="outline" className="h-5 px-1.5 text-[11px] font-normal">
+              shared
+            </Badge>
+          )}
         </p>
       </div>
 
-      {/* Create Button */}
-      {!showCreate && (
-        <div className="w-full space-y-4">
-          <button
-            onClick={() => setShowCreate(true)}
-            className="w-full bg-accent hover:bg-accent-hover text-background font-bold py-4 px-6 rounded-xl transition-all active:scale-95 text-lg"
-          >
-            ✈️ New Trip
-          </button>
+      <ArrowRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+    </Link>
+  );
+}
 
-          {/* Existing Trips */}
-          {loading ? (
-            <div className="text-center text-muted py-8">Loading trips...</div>
-          ) : trips.length > 0 ? (
-            <div className="space-y-2">
-              <h2 className="text-sm font-medium text-muted uppercase tracking-wider mb-3">
-                Your Trips
-              </h2>
-
-              {/* Only shows when there is actually something to move onto the account. */}
-              {user && trips.some((t) => t.anonymous) && (
-                <div className="flex items-center gap-3 flex-wrap p-3 mb-3 bg-accent/5 border border-accent/20 rounded-xl text-sm">
-                  <span className="flex-1 min-w-0 text-muted">
-                    Some trips are still tied to this browser only.
-                  </span>
-                  <button
-                    onClick={claimAnonymous}
-                    disabled={claiming}
-                    className="text-accent hover:text-accent-hover font-medium disabled:opacity-50"
-                  >
-                    {claiming ? "Saving…" : "Save to my account"}
-                  </button>
-                </div>
-              )}
-              {trips.map((trip) => (
-                <a
-                  key={trip.id}
-                  href={`/trip/${trip.id}`}
-                  className="flex items-center gap-4 p-4 bg-surface hover:bg-surface-light border border-border hover:border-accent/30 rounded-xl transition-all group"
-                >
-                  <div className="text-2xl">✈️</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-foreground font-medium truncate group-hover:text-accent transition-colors">
-                      {trip.name}
-                    </p>
-                    <p className="text-muted text-sm flex items-center gap-2 flex-wrap">
-                      <span>
-                        {trip.memberCount} members · {trip.expenseCount} expenses
-                      </span>
-                      {/* Says out loud that this one only exists as a link in this browser. */}
-                      {trip.anonymous && (
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-surface-light border border-border">
-                          this device only
-                        </span>
-                      )}
-                      {trip.owned === false && !trip.anonymous && (
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-surface-light border border-border">
-                          shared with you
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  <span className="text-muted text-xs">
-                    {new Date(trip.createdAt).toLocaleDateString()}
-                  </span>
-                </a>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center text-muted py-12 bg-surface rounded-2xl border border-border">
-              <div className="text-4xl mb-3">🌍</div>
-              <p>No trips yet</p>
-              <p className="text-sm mt-1">Create one to get started!</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Create Form */}
-      {showCreate && (
-        <div className="w-full space-y-5">
-          {/* Trip Name */}
-          <div>
-            <label className="block text-sm font-medium text-muted mb-2">Trip Name</label>
-            <input
-              type="text"
-              value={tripName}
-              onChange={(e) => setTripName(e.target.value)}
-              placeholder="e.g. Weekend in Barcelona"
-              className="w-full bg-surface-light border border-border rounded-xl px-4 py-3 text-foreground placeholder-muted focus:outline-none focus:border-accent transition-colors"
-              autoFocus
-            />
-          </div>
-
-          {/* Currency */}
-          <div>
-            <label className="block text-sm font-medium text-muted mb-2">Default Currency</label>
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="w-full bg-surface-light border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-accent transition-colors"
-            >
-              {CURRENCIES.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.symbol} {c.code} — {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Members */}
-          <div>
-            <label className="block text-sm font-medium text-muted mb-2">
-              Members ({members.filter((m) => m.trim()).length} minimum)
-            </label>
-            <div className="space-y-2">
-              {members.map((member, i) => (
-                <div key={i} className="flex gap-2">
-                  <span className="flex items-center justify-center w-10 h-12 bg-surface-light rounded-lg text-lg">
-                    {EMOJIS[i % EMOJIS.length]}
-                  </span>
-                  <input
-                    type="text"
-                    value={member}
-                    onChange={(e) => updateMember(i, e.target.value)}
-                    placeholder={`Person ${i + 1}`}
-                    className="flex-1 bg-surface-light border border-border rounded-xl px-4 py-3 text-foreground placeholder-muted focus:outline-none focus:border-accent transition-colors"
-                  />
-                  {members.length > 2 && (
-                    <button
-                      onClick={() => removeMember(i)}
-                      className="px-3 text-muted hover:text-danger transition-colors"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-            {members.length < 10 && (
-              <button
-                onClick={addMember}
-                className="mt-2 text-accent hover:text-accent-hover text-sm font-medium transition-colors"
-              >
-                + Add member
-              </button>
-            )}
-          </div>
-
-          {createError && (
-            <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5">
-              {createError}
-              {createError.includes("free plan") && (
-                <>
-                  {" "}
-                  <Link href="/login" className="underline">
-                    Sign in with another account
-                  </Link>
-                  , or create it without one by signing out.
-                </>
-              )}
-            </p>
-          )}
-
-          {/* Actions */}
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowCreate(false)}
-              className="flex-1 bg-surface hover:bg-surface-light text-muted hover:text-foreground font-medium py-3 px-5 rounded-xl transition-all border border-border"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={createTrip}
-              disabled={!tripName.trim() || members.filter((m) => m.trim()).length < 2 || creating}
-              className="flex-1 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-background font-bold py-3 px-5 rounded-xl transition-all active:scale-95"
-            >
-              {creating ? "Creating..." : "🚀 Create Trip"}
-            </button>
-          </div>
-        </div>
+function EmptyState({ signedIn }: { signedIn: boolean }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-border px-6 py-14 text-center">
+      <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-secondary">
+        <Compass className="size-6 text-muted-foreground" />
+      </div>
+      <p className="font-medium">No trips yet</p>
+      <p className="mx-auto mt-1.5 max-w-[15rem] text-sm text-muted-foreground">
+        Start one and share the link — whoever opens it can add expenses.
+      </p>
+      {!signedIn && (
+        <p className="mt-5 text-sm text-muted-foreground">
+          <Link href="/login" className="text-primary underline-offset-4 hover:underline">
+            Sign in
+          </Link>{" "}
+          to keep them across devices.
+        </p>
       )}
     </div>
+  );
+}
+
+function CreateTripForm({
+  tripName,
+  setTripName,
+  currency,
+  setCurrency,
+  members,
+  addMember,
+  removeMember,
+  updateMember,
+  canCreate,
+  creating,
+  error,
+  onCancel,
+  onSubmit,
+}: {
+  tripName: string;
+  setTripName: (v: string) => void;
+  currency: string;
+  setCurrency: (v: string) => void;
+  members: string[];
+  addMember: () => void;
+  removeMember: (i: number) => void;
+  updateMember: (i: number, v: string) => void;
+  canCreate: boolean;
+  creating: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit();
+      }}
+      className="space-y-6"
+    >
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">New trip</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Add everyone who is sharing costs. You can add more later.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="trip-name">Trip name</Label>
+        <Input
+          id="trip-name"
+          autoFocus
+          value={tripName}
+          onChange={(e) => setTripName(e.target.value)}
+          placeholder="Weekend in Barcelona"
+          className="h-11"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="currency">Default currency</Label>
+        <Select value={currency} onValueChange={(v) => setCurrency(String(v))}>
+          <SelectTrigger id="currency" className="h-11 w-full">
+            {/* SelectValue renders the raw value, so the symbol and name are spelled
+                out here rather than being silently dropped from the trigger. */}
+            <SelectValue>
+              {(value) => {
+                const c = CURRENCIES.find((x) => x.code === value);
+                return c ? `${c.symbol}  ${c.code} — ${c.name}` : String(value ?? "");
+              }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {CURRENCIES.map((c) => (
+              <SelectItem key={c.code} value={c.code}>
+                <span className="tabular text-muted-foreground">{c.symbol}</span>{" "}
+                <span className="font-medium">{c.code}</span>{" "}
+                <span className="text-muted-foreground">— {c.name}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-baseline justify-between">
+          <Label>Members</Label>
+          <span className="text-xs text-muted-foreground">at least 2</span>
+        </div>
+
+        <div className="space-y-2">
+          {members.map((member, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <MemberAvatar emoji={EMOJIS[i % EMOJIS.length]} size="lg" />
+              <Input
+                value={member}
+                onChange={(e) => updateMember(i, e.target.value)}
+                placeholder={`Person ${i + 1}`}
+                className="h-11 flex-1"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => removeMember(i)}
+                disabled={members.length <= 2}
+                aria-label={`Remove person ${i + 1}`}
+                className="shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-30"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+
+        {members.length < 10 && (
+          <Button type="button" variant="ghost" size="sm" onClick={addMember} className="mt-1">
+            <Plus className="size-4" />
+            Add member
+          </Button>
+        )}
+      </div>
+
+      {error && (
+        <p
+          role="alert"
+          className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-2.5 text-sm text-destructive"
+        >
+          {error}
+        </p>
+      )}
+
+      <div className="flex gap-3 pt-1">
+        <Button type="button" variant="outline" className="h-11 flex-1" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" className="h-11 flex-1" disabled={!canCreate || creating}>
+          {creating ? <Loader2 className="size-4 animate-spin" /> : "Create trip"}
+        </Button>
+      </div>
+    </form>
   );
 }

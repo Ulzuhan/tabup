@@ -1,81 +1,195 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
+@custom-variant dark (&:is(.dark *));
+
+/**
+ * TabUp design tokens.
+ *
+ * One dark theme rather than a light/dark pair: the app is a single focused surface,
+ * and committing to one palette is what lets the elevation steps below stay consistent
+ * instead of being tuned twice and going flat in one of them.
+ *
+ * Hue 265 runs through every neutral so the greys read as a deliberate cool slate
+ * rather than as dead greys, and the emerald primary sits against them at high chroma
+ * without vibrating.
+ */
 :root {
-  --background: #0a0a0f;
-  --foreground: #e4e4e7;
-  --accent: #10b981;
-  --accent-hover: #34d399;
-  --surface: #15151e;
-  --surface-light: #1e1e2e;
-  --border: #2a2a3a;
-  --danger: #ef4444;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --muted: #71717a;
+  --background: oklch(0.155 0.012 265);
+  --foreground: oklch(0.96 0.004 265);
+
+  /* Raised surfaces. Each step is a real elevation, used consistently. */
+  --card: oklch(0.196 0.014 265);
+  --card-foreground: oklch(0.96 0.004 265);
+  --popover: oklch(0.216 0.015 265);
+  --popover-foreground: oklch(0.96 0.004 265);
+
+  /* Emerald: money, settled, positive. The one saturated colour in the palette. */
+  --primary: oklch(0.735 0.163 158);
+  --primary-foreground: oklch(0.17 0.03 158);
+
+  --secondary: oklch(0.248 0.016 265);
+  --secondary-foreground: oklch(0.96 0.004 265);
+
+  --muted: oklch(0.248 0.016 265);
+  --muted-foreground: oklch(0.665 0.018 265);
+
+  /* shadcn uses --accent for subtle hover fills, NOT for the brand colour. */
+  --accent: oklch(0.268 0.018 265);
+  --accent-foreground: oklch(0.96 0.004 265);
+
+  --destructive: oklch(0.637 0.208 25);
+  --destructive-foreground: oklch(0.97 0.01 25);
+  --success: oklch(0.735 0.163 158);
+  --warning: oklch(0.795 0.144 82);
+
+  --border: oklch(0.288 0.017 265);
+  --input: oklch(0.288 0.017 265);
+  --ring: oklch(0.735 0.163 158);
+
+  /* Category bars, ordered so neighbouring slices stay distinguishable. */
+  --chart-1: oklch(0.735 0.163 158);
+  --chart-2: oklch(0.7 0.145 220);
+  --chart-3: oklch(0.755 0.145 82);
+  --chart-4: oklch(0.68 0.175 300);
+  --chart-5: oklch(0.7 0.16 25);
+
+  --radius: 0.75rem;
+
+  --sidebar: oklch(0.196 0.014 265);
+  --sidebar-foreground: oklch(0.96 0.004 265);
+  --sidebar-primary: oklch(0.735 0.163 158);
+  --sidebar-primary-foreground: oklch(0.17 0.03 158);
+  --sidebar-accent: oklch(0.268 0.018 265);
+  --sidebar-accent-foreground: oklch(0.96 0.004 265);
+  --sidebar-border: oklch(0.288 0.017 265);
+  --sidebar-ring: oklch(0.735 0.163 158);
+}
+
+/* The palette above is already dark; .dark exists so shadcn's variant resolves. */
+.dark {
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-surface: var(--surface);
-  --color-surface-light: var(--surface-light);
-  --color-border: var(--border);
-  --color-danger: var(--danger);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
   --color-warning: var(--warning);
-  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-geist-sans);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-}
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
 
-@media (max-width: 639px) {
-  .sm-max\:opacity-100 {
-    opacity: 1 !important;
+  html {
+    @apply font-sans;
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Money should line up in columns and never shift width while a value changes. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
   }
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: var(--background);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+@layer utilities {
+  /**
+   * The one piece of decoration in the app: a soft emerald wash behind the header.
+   * Fixed and non-interactive, so it never affects layout or hit targets.
+   */
+  .brand-glow::before {
+    content: "";
+    position: fixed;
+    inset-inline: 0;
+    top: 0;
+    height: 22rem;
+    pointer-events: none;
+    z-index: -1;
+    background: radial-gradient(
+      60% 100% at 50% 0%,
+      color-mix(in oklch, var(--primary) 14%, transparent),
+      transparent 70%
+    );
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  /* Hairline highlight along the top edge of a raised card. */
+  .edge-light {
+    box-shadow:
+      inset 0 1px 0 0 color-mix(in oklch, white 6%, transparent),
+      0 1px 2px 0 oklch(0 0 0 / 0.4);
   }
 }
 
-@keyframes slideDown {
-  from { opacity: 0; max-height: 0; }
-  to { opacity: 1; max-height: 600px; }
-}
-
-.animate-slide-down {
-  animation: slideDown 0.25s ease-out forwards;
-  overflow: hidden;
-}
-
-.tab-content-enter {
-  animation: fadeInUp 0.2s ease-out;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
