@@ -39,6 +39,24 @@ from an earlier version.
 
 ---
 
+## Two sections
+
+**Trips** are shared, temporary and about who owes whom. **Fixed costs** —
+subscriptions, insurance, rent — are personal, permanent and about where the money
+goes. They are deliberately separate: merging them into one list would make both worse.
+
+A fixed cost is stored as a *rule*, not a ledger: amount, period, when it started and
+when it was cancelled. Any month, past or future, is computed from that — nothing is
+generated, nothing breaks because the app went unopened for a while, and cancelling
+something keeps the history of the months it was active.
+
+A week is 52 charges a year, not 48, so weekly items convert at ×52/12. A charge on the
+31st lands on the 28th in February rather than rolling into March. Both are covered by
+`npm run test:recurring`.
+
+Fixed costs require an account and are never shared: there is no link that grants access
+to them, and every query is scoped by user id.
+
 ## Access model
 
 Three states, and the whole authorisation story fits in them:

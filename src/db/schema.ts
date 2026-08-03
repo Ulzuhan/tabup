@@ -233,6 +233,46 @@ export const invites = sqliteTable(
   (t) => [index("invites_trip_idx").on(t.tripId)]
 );
 
+/**
+ * Recurring expenses: subscriptions, insurance, rent.
+ *
+ * A rule, not a ledger. Storing the norm plus when it started and stopped means any
+ * month — past or future — can be computed, with nothing to generate and nothing that
+ * breaks because the app went unopened for a while.
+ *
+ * Tied to a user rather than a trip: these are one person's fixed costs, they have no
+ * one to split with, and they outlive any trip.
+ */
+export const recurring = sqliteTable(
+  "recurring",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** As charged, in `currency`. */
+    amount: real("amount").notNull(),
+    currency: text("currency").notNull(),
+    /** Converted once, so totals do not shift with every rate refresh. */
+    amountBase: real("amount_base").notNull(),
+    /** weekly | monthly | quarterly | yearly */
+    period: text("period").notNull().default("monthly"),
+    /** Day of the month it is charged; clamped to the length of short months. */
+    chargeDay: integer("charge_day").notNull().default(1),
+    /** Which month, for yearly charges. 1-12. */
+    chargeMonth: integer("charge_month"),
+    category: text("category").notNull().default("other"),
+    startedAt: integer("started_at").notNull(),
+    /** Null while it is still being paid. */
+    endedAt: integer("ended_at"),
+    note: text("note"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("recurring_user_idx").on(t.userId)]
+);
+
+export type RecurringRow = typeof recurring.$inferSelect;
 export type UserRow = typeof users.$inferSelect;
 export type TripRow = typeof trips.$inferSelect;
 export type MemberRow = typeof members.$inferSelect;

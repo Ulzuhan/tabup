@@ -16,6 +16,7 @@ import { CURRENCIES, EMOJIS } from "@/lib/types";
 import { forgetTrips, localTripIds, rememberTrip } from "@/lib/local-trips";
 import { useT } from "@/i18n/provider";
 import { AppHeader, Wordmark, type SessionUser } from "@/components/app-header";
+import { SectionTabs } from "@/components/section-tabs";
 import { MemberAvatar } from "@/components/member-avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -187,6 +188,7 @@ export default function Home() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-16 sm:pt-8">
       <AppHeader user={user} loading={loading} onSignOut={signOut} showWordmark={false} />
+      <SectionTabs current="trips" />
 
       {showCreate ? (
         <CreateTripForm

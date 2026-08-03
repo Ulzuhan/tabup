@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test:api": "node scripts/test-api.mjs",
     "migrate:json": "node scripts/migrate-json.mjs",
-    "test:auth": "node scripts/test-auth.mjs"
+    "test:auth": "node scripts/test-auth.mjs",
+    "test:recurring": "tsx scripts/test-recurring.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -37,6 +38,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
+    "tsx": "^4.23.5",
     "typescript": "^5"
   },
   "overrides": {

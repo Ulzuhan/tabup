@@ -129,6 +129,24 @@ function migrate(sqlite: Database.Database) {
       expires_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS invites_trip_idx ON invites(trip_id);
+
+    CREATE TABLE IF NOT EXISTS recurring (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      amount REAL NOT NULL,
+      currency TEXT NOT NULL,
+      amount_base REAL NOT NULL,
+      period TEXT NOT NULL DEFAULT 'monthly',
+      charge_day INTEGER NOT NULL DEFAULT 1,
+      charge_month INTEGER,
+      category TEXT NOT NULL DEFAULT 'other',
+      started_at INTEGER NOT NULL,
+      ended_at INTEGER,
+      note TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS recurring_user_idx ON recurring(user_id);
   `);
 
   // Columns added after the first release. CREATE TABLE IF NOT EXISTS above is a no-op

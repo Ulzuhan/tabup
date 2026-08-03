@@ -28,6 +28,7 @@ import {
   users,
   tripAccess,
   invites,
+  recurring,
 } from "@/db/schema";
 import type { Trip, Member, Expense, Payment } from "./types";
 
@@ -777,4 +778,111 @@ export async function redeemInvite(token: string, userId: string): Promise<strin
 
   const granted = await grantAccess(invite.tripId, userId, invite.role);
   return granted ? invite.tripId : null;
+}
+
+// ─── Recurring expenses ──────────────────────────────────────────────
+
+/**
+ * Subscriptions, insurance, rent.
+ *
+ * Always scoped to a user: unlike a trip, these have nobody to share with and no link
+ * that grants access. Every query below filters by userId rather than trusting the id.
+ */
+export async function listRecurring(userId: string): Promise<RecurringItem[]> {
+  return db
+    .select()
+    .from(recurring)
+    .where(eq(recurring.userId, userId))
+    .all()
+    .map(toRecurring)
+    // Active first, then by what they cost per month.
+    .sort((a, b) => {
+      const activeA = a.endedAt == null ? 0 : 1;
+      const activeB = b.endedAt == null ? 0 : 1;
+      return activeA - activeB || b.amountBase - a.amountBase;
+    });
+}
+
+export interface RecurringInput {
+  name: string;
+  amount: number;
+  currency: string;
+  amountBase: number;
+  period: string;
+  chargeDay: number;
+  chargeMonth?: number | null;
+  category: string;
+  startedAt: number;
+  endedAt?: number | null;
+  note?: string | null;
+}
+
+export async function addRecurring(
+  userId: string,
+  input: RecurringInput
+): Promise<RecurringItem | null> {
+  const id = generateId();
+  db.insert(recurring)
+    .values({ id, userId, ...input, createdAt: Date.now() })
+    .run();
+
+  const row = db.select().from(recurring).where(eq(recurring.id, id)).get();
+  return row ? toRecurring(row) : null;
+}
+
+export async function updateRecurring(
+  userId: string,
+  id: string,
+  patch: Partial<RecurringInput>
+): Promise<boolean> {
+  const result = db
+    .update(recurring)
+    .set(patch)
+    .where(and(eq(recurring.id, id), eq(recurring.userId, userId)))
+    .run();
+  return result.changes > 0;
+}
+
+export async function deleteRecurring(userId: string, id: string): Promise<boolean> {
+  const result = db
+    .delete(recurring)
+    .where(and(eq(recurring.id, id), eq(recurring.userId, userId)))
+    .run();
+  return result.changes > 0;
+}
+
+type RecurringItem = {
+  id: string;
+  name: string;
+  amount: number;
+  currency: string;
+  amountBase: number;
+  period: "weekly" | "monthly" | "quarterly" | "yearly";
+  chargeDay: number;
+  chargeMonth?: number | null;
+  category: string;
+  startedAt: number;
+  endedAt?: number | null;
+  note?: string | null;
+};
+
+function toRecurring(row: typeof recurring.$inferSelect): RecurringItem {
+  return {
+    id: row.id,
+    name: row.name,
+    amount: row.amount,
+    currency: row.currency,
+    amountBase: row.amountBase,
+    period: (["weekly", "monthly", "quarterly", "yearly"] as const).includes(
+      row.period as "monthly"
+    )
+      ? (row.period as RecurringItem["period"])
+      : "monthly",
+    chargeDay: row.chargeDay,
+    chargeMonth: row.chargeMonth,
+    category: row.category,
+    startedAt: row.startedAt,
+    endedAt: row.endedAt,
+    note: row.note,
+  };
 }
