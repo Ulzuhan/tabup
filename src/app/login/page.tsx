@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Wordmark } from "@/components/app-header";
@@ -15,7 +15,10 @@ import { Label } from "@/components/ui/label";
 export default function LoginPage() {
   const t = useT();
   const router = useRouter();
-  const [mode, setMode] = useState<"login" | "register">("login");
+  // The landing links here with ?new=1 for "create account", so the form opens on the
+  // step the person actually chose instead of making them switch again.
+  const wantsNew = useSearchParams().get("new") === "1";
+  const [mode, setMode] = useState<"login" | "register">(wantsNew ? "register" : "login");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");

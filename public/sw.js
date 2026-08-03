@@ -4,10 +4,14 @@
  * Its whole job is that a trip stays readable without a connection — on a plane, on a
  * mountain, or on roaming you would rather not pay for.
  *
- * Two rules, and the split between them matters:
+ * Three rules, and the split between them matters:
  *
- *   Navigation and static assets → cache first, refresh in the background. They change
- *   only when a new build ships, so serving them instantly is free.
+ *   Static assets → cache first. Build output is content-hashed, so serving it
+ *   instantly is free and always correct.
+ *
+ *   Pages → network first. What a page contains depends on who is asking: the front
+ *   door is a landing for a stranger and the trip list for somebody signed in, so a
+ *   shared cached copy would show one person another's view.
  *
  *   API reads → network first, cache only as a fallback. Balances are the reason this
  *   app exists; showing a stale figure as if it were current would be worse than
@@ -19,7 +23,7 @@
  * where people are counting on the numbers.
  */
 
-const VERSION = "tabup-v1";
+const VERSION = "tabup-v2";
 const SHELL = `${VERSION}-shell`;
 const DATA = `${VERSION}-data`;
 
@@ -73,7 +77,18 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (isStatic(url) || request.mode === "navigate") {
+  if (request.mode === "navigate") {
+    // Network first for pages, not cache first.
+    //
+    // What the page contains now depends on who is asking: the front door is a landing
+    // for a stranger and the trip list for somebody signed in. Serving a cached copy
+    // meant signing in and still being shown the landing, because the shell that was
+    // stored belonged to a different session. The cache stays as the offline fallback.
+    event.respondWith(networkFirstPage(request));
+    return;
+  }
+
+  if (isStatic(url)) {
     event.respondWith(cacheFirst(request));
   }
 });
@@ -103,6 +118,31 @@ async function networkFirst(request) {
       status: 503,
       headers: { "Content-Type": "application/json", "X-TabUp-Offline": "1" },
     });
+  }
+}
+
+/**
+ * Pages: the network decides, the cache catches a fall.
+ *
+ * Only successful responses are stored, so an error page never becomes the thing shown
+ * offline forever.
+ */
+async function networkFirstPage(request) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(SHELL);
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+
+    const root = await caches.match("/");
+    if (root) return root;
+
+    return new Response("Offline", { status: 503, headers: { "Content-Type": "text/plain" } });
   }
 }
 
