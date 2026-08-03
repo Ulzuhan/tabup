@@ -1,10 +1,11 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { CATEGORIES, CURRENCIES } from "@/lib/types";
 import type { Member } from "@/lib/types";
 import { CategoryIcon } from "@/components/category-icon";
 import { MemberAvatar } from "@/components/member-avatar";
+import { currencySymbol, formatAmount } from "@/components/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +26,8 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
+export type SplitMode = "equal" | "percent" | "amount";
+
 export interface ExpenseDraft {
   description: string;
   amount: string;
@@ -32,8 +35,9 @@ export interface ExpenseDraft {
   paidBy: string;
   splitAmong: string[];
   category: string;
-  splitMode: "equal" | "custom";
-  customShares: Record<string, string>;
+  splitMode: SplitMode;
+  /** Per-member figure, meaning percent or currency depending on splitMode. */
+  splitValues: Record<string, string>;
   date: string;
 }
 
@@ -67,7 +71,10 @@ export function ExpenseDialog({
     draft.description.trim().length > 0 &&
     parseFloat(draft.amount) > 0 &&
     draft.paidBy.length > 0 &&
-    draft.splitAmong.length > 0;
+    draft.splitAmong.length > 0 &&
+    // An uneven split that does not add up would be scaled to fit by the server,
+    // quietly changing what everyone owes. Better to refuse than to guess.
+    splitBalanced(draft, parseFloat(draft.amount) || 0);
 
   const toggleSplit = (memberId: string) => {
     const inSplit = draft.splitAmong.includes(memberId);
@@ -200,82 +207,14 @@ export function ExpenseDialog({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Split among</Label>
-              <div className="flex gap-0.5 rounded-lg bg-secondary p-0.5">
-                {(["equal", "custom"] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() =>
-                      setDraft(
-                        mode === "equal"
-                          ? { splitMode: "equal", customShares: {} }
-                          : { splitMode: "custom" }
-                      )
-                    }
-                    className={cn(
-                      "rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors",
-                      draft.splitMode === mode
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {mode}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              {members.map((m) => {
-                const included = draft.splitAmong.includes(m.id);
-                return (
-                  <div
-                    key={m.id}
-                    className={cn(
-                      "flex items-center gap-2 rounded-lg border p-1.5 transition-colors",
-                      included ? "border-border bg-secondary/40" : "border-transparent opacity-45"
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleSplit(m.id)}
-                      aria-pressed={included}
-                      className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <MemberAvatar emoji={m.emoji} size="sm" />
-                      <span className="truncate text-sm">{m.name}</span>
-                    </button>
-
-                    {draft.splitMode === "custom" && included && (
-                      <Input
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        step="0.5"
-                        aria-label={`Share for ${m.name}`}
-                        value={draft.customShares[m.id] ?? "1"}
-                        onChange={(e) =>
-                          setDraft({
-                            customShares: { ...draft.customShares, [m.id]: e.target.value },
-                          })
-                        }
-                        className="tabular h-8 w-16 text-center"
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {draft.splitMode === "custom" && (
-              <p className="text-xs text-muted-foreground">
-                Weights, not amounts: 3 and 1 means one pays three quarters.
-              </p>
-            )}
-          </div>
+          <SplitEditor
+            members={members}
+            draft={draft}
+            setDraft={setDraft}
+            total={parseFloat(draft.amount) || 0}
+            currency={draft.currency}
+            toggleSplit={toggleSplit}
+          />
         </form>
 
         <DialogFooter>
@@ -288,5 +227,215 @@ export function ExpenseDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Rounds to cents without the floating point drift of toFixed on sums. */
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Whether an uneven split adds up: percentages to 100, amounts to the expense total.
+ *
+ * Shared by the submit button and the running total under the member list so the form
+ * cannot disagree with itself about whether it is ready.
+ */
+export function splitBalanced(draft: ExpenseDraft, total: number): boolean {
+  if (draft.splitMode === "equal") return true;
+  const sum = draft.splitAmong.reduce(
+    (acc, id) => acc + (parseFloat(draft.splitValues[id] ?? "") || 0),
+    0
+  );
+  const target = draft.splitMode === "amount" ? total : 100;
+  return Math.abs(round2(sum - target)) < 0.005;
+}
+
+/**
+ * Splits an expense unevenly.
+ *
+ * Weights used to be the only option here — "1 and 1", which is 50/50 but says so to
+ * nobody. Percent and exact amount are the two ways people actually describe a split,
+ * and each row shows what it comes to in money, which is the number they wanted in the
+ * first place.
+ *
+ * The server stores a proportion per member either way, so both modes map onto the same
+ * field: percentages are proportions already, and amounts are proportions of the total.
+ * That equivalence is also the trap — amounts that do not add up to the total would be
+ * scaled to fit and silently change what everyone owes, so they have to add up before
+ * the form will submit.
+ */
+function SplitEditor({
+  members,
+  draft,
+  setDraft,
+  total,
+  currency,
+  toggleSplit,
+}: {
+  members: Member[];
+  draft: ExpenseDraft;
+  setDraft: (patch: Partial<ExpenseDraft>) => void;
+  total: number;
+  currency: string;
+  toggleSplit: (id: string) => void;
+}) {
+  const included = members.filter((m) => draft.splitAmong.includes(m.id));
+
+  const valueOf = (id: string) => parseFloat(draft.splitValues[id] ?? "") || 0;
+  const sum = included.reduce((acc, m) => acc + valueOf(m.id), 0);
+
+  /** What each member ends up paying, in the trip's currency. */
+  const share = (id: string): number => {
+    if (draft.splitMode === "equal") return included.length ? total / included.length : 0;
+    if (draft.splitMode === "amount") return valueOf(id);
+    return (total * valueOf(id)) / 100;
+  };
+
+  const target = draft.splitMode === "amount" ? total : 100;
+  const off = round2(sum - target);
+  const balanced = Math.abs(off) < 0.005;
+
+  /**
+   * Switching modes keeps the split rather than resetting it: someone who typed 70/30
+   * and then wants to see it in euros should not have to type it again.
+   */
+  const changeMode = (mode: SplitMode) => {
+    if (mode === draft.splitMode) return;
+    if (mode === "equal") {
+      setDraft({ splitMode: "equal", splitValues: {} });
+      return;
+    }
+
+    const values: Record<string, string> = {};
+    for (const m of included) {
+      const current = share(m.id);
+      const next = mode === "amount" ? current : total > 0 ? (current / total) * 100 : 0;
+      values[m.id] = String(round2(next));
+    }
+    setDraft({ splitMode: mode, splitValues: values });
+  };
+
+  /**
+   * Puts whatever is missing on one member, so the last row does not need mental
+   * arithmetic. Clamped at zero: when the others already add up to more than the whole
+   * expense, the fix is to lower one of theirs, not to give this one a negative share.
+   */
+  const giveRemainder = (id: string) => {
+    const corrected = Math.max(0, round2(valueOf(id) - off));
+    setDraft({ splitValues: { ...draft.splitValues, [id]: String(corrected) } });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label>Split among</Label>
+        <div className="flex gap-0.5 rounded-lg bg-secondary p-0.5">
+          {([
+            ["equal", "Equal"],
+            ["percent", "%"],
+            ["amount", currencySymbol(currency)],
+          ] as const).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => changeMode(mode)}
+              className={cn(
+                "min-w-9 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                draft.splitMode === mode
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        {members.map((m) => {
+          const inSplit = draft.splitAmong.includes(m.id);
+          return (
+            <div
+              key={m.id}
+              className={cn(
+                "flex items-center gap-2 rounded-lg border p-1.5 transition-colors",
+                inSplit ? "border-border bg-secondary/40" : "border-transparent opacity-45"
+              )}
+            >
+              <button
+                type="button"
+                onClick={() => toggleSplit(m.id)}
+                aria-pressed={inSplit}
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <MemberAvatar emoji={m.emoji} size="sm" />
+                <span className="truncate text-sm">{m.name}</span>
+              </button>
+
+              {inSplit && draft.splitMode !== "equal" && (
+                <div className="flex shrink-0 items-center gap-1">
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step={draft.splitMode === "amount" ? "0.01" : "1"}
+                    aria-label={
+                      draft.splitMode === "amount"
+                        ? `Amount for ${m.name}`
+                        : `Percentage for ${m.name}`
+                    }
+                    value={draft.splitValues[m.id] ?? ""}
+                    onChange={(e) =>
+                      setDraft({ splitValues: { ...draft.splitValues, [m.id]: e.target.value } })
+                    }
+                    className="tabular h-8 w-20 text-right"
+                  />
+                  <span className="w-4 text-xs text-muted-foreground">
+                    {draft.splitMode === "percent" ? "%" : currencySymbol(currency)}
+                  </span>
+                </div>
+              )}
+
+              {/* The point of all this: what it actually costs them. */}
+              {inSplit && (
+                <span className="w-20 shrink-0 text-right text-sm text-muted-foreground tabular">
+                  {total > 0 ? `${currencySymbol(currency)}${formatAmount(share(m.id))}` : "—"}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {draft.splitMode !== "equal" && (
+        <div className="flex items-center justify-between gap-2 px-1.5 text-xs">
+          <span className={cn("tabular", balanced ? "text-muted-foreground" : "text-warning")}>
+            {draft.splitMode === "percent"
+              ? `${round2(sum)}% of 100%`
+              : `${currencySymbol(currency)}${formatAmount(sum)} of ${currencySymbol(currency)}${formatAmount(total)}`}
+          </span>
+
+          {balanced ? (
+            <span className="flex items-center gap-1 text-primary">
+              <Check className="size-3.5" />
+              adds up
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => giveRemainder(included[included.length - 1]?.id)}
+              disabled={included.length === 0}
+              className="rounded text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {off > 0 ? "over by" : "short by"}{" "}
+              {draft.splitMode === "percent"
+                ? `${Math.abs(off)}%`
+                : `${currencySymbol(currency)}${formatAmount(Math.abs(off))}`}
+              {" — fix"}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

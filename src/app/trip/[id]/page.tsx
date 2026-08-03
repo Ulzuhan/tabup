@@ -102,7 +102,7 @@ const emptyExpense = (currency: string, members: Member[]): ExpenseDraft => ({
   splitAmong: members.map((m) => m.id),
   category: "food",
   splitMode: "equal",
-  customShares: {},
+  splitValues: {},
   date: today(),
 });
 
@@ -192,10 +192,12 @@ export default function TripPage() {
     if (!trip) return;
     setBusy(true);
     try {
+      // Percentages and exact amounts are both proportions, which is exactly what the
+      // server stores, so neither mode needs converting — only the labelling differs.
       const shares: Record<string, number> = {};
-      if (expenseDraft.splitMode === "custom") {
+      if (expenseDraft.splitMode !== "equal") {
         for (const mid of expenseDraft.splitAmong) {
-          const value = parseFloat(expenseDraft.customShares[mid] || "1");
+          const value = parseFloat(expenseDraft.splitValues[mid] ?? "");
           if (value > 0) shares[mid] = value;
         }
       }
@@ -209,7 +211,7 @@ export default function TripPage() {
         splitAmong: expenseDraft.splitAmong,
         category: expenseDraft.category,
         splitShares:
-          expenseDraft.splitMode === "custom" && Object.keys(shares).length > 0
+          expenseDraft.splitMode !== "equal" && Object.keys(shares).length > 0
             ? shares
             : undefined,
         date: expenseDraft.date ? new Date(expenseDraft.date).getTime() : Date.now(),
@@ -345,10 +347,10 @@ export default function TripPage() {
       paidBy: expense.paidBy,
       splitAmong: [...expense.splitAmong],
       category: expense.category,
-      splitMode: expense.splitShares ? "custom" : "equal",
-      customShares: Object.fromEntries(
-        Object.entries(expense.splitShares ?? {}).map(([k, v]) => [k, String(v)])
-      ),
+      splitMode: expense.splitShares ? "percent" : "equal",
+      // Stored shares are proportions on an arbitrary scale, so they are normalised to
+      // percentages — the one reading that is always right, whatever scale was used.
+      splitValues: normaliseToPercent(expense.splitShares),
       date: new Date(expense.date).toISOString().split("T")[0],
     });
     setExpenseOpen(true);
@@ -866,4 +868,31 @@ function TripSkeleton() {
       </div>
     </div>
   );
+}
+
+/**
+ * Turns stored split shares into percentages that add up to 100.
+ *
+ * Shares are proportions on whatever scale they were entered with — "3 and 1" and
+ * "75 and 25" mean the same thing — so reopening an expense shows the share of the
+ * total rather than the raw numbers somebody happened to type.
+ */
+function normaliseToPercent(shares?: Record<string, number>): Record<string, string> {
+  if (!shares) return {};
+  const entries = Object.entries(shares);
+  const total = entries.reduce((sum, [, v]) => sum + v, 0);
+  if (total <= 0) return {};
+
+  const percents = entries.map(([id, v]) => [id, Math.round((v / total) * 10000) / 100] as const);
+
+  // Rounding can leave the total at 99.99; the difference goes on the largest share,
+  // where a hundredth of a percent is least visible.
+  const drift = Math.round((100 - percents.reduce((s, [, p]) => s + p, 0)) * 100) / 100;
+  if (drift !== 0 && percents.length > 0) {
+    const biggest = percents.reduce((a, b) => (b[1] > a[1] ? b : a));
+    const index = percents.findIndex(([id]) => id === biggest[0]);
+    percents[index] = [biggest[0], Math.round((biggest[1] + drift) * 100) / 100];
+  }
+
+  return Object.fromEntries(percents.map(([id, p]) => [id, String(p)]));
 }
