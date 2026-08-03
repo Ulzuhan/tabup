@@ -4,6 +4,8 @@ export interface Trip {
   id: string;
   name: string;
   currency: string;
+  /** Optional spending target; null/undefined means nobody set one. */
+  budget?: number | null;
   createdAt: number;
   version?: number;
   members: Member[];
@@ -30,6 +32,7 @@ export interface Expense {
   date: number;
   exchangeRate?: number;
   rateAvailable?: boolean; // false if no live/cached rate was found
+  note?: string; // free text, for what the description has no room for
 }
 
 export interface Payment {

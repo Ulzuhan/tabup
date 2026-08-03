@@ -87,6 +87,7 @@ export async function getTrip(id: string): Promise<Trip | null> {
     id: trip.id,
     name: trip.name,
     currency: trip.currency,
+    budget: trip.budget,
     createdAt: trip.createdAt,
     version: trip.version,
     members: memberRows.map((m): Member => ({ id: m.id, name: m.name, emoji: m.emoji })),
@@ -109,6 +110,7 @@ export async function getTrip(id: string): Promise<Trip | null> {
         date: e.date,
         exchangeRate: e.exchangeRate ?? undefined,
         rateAvailable: e.rateAvailable,
+        note: e.note ?? undefined,
       };
     }),
     payments: paymentRows.map((p): Payment => ({
@@ -338,7 +340,7 @@ export async function deleteTrip(id: string): Promise<boolean> {
 
 export async function updateTripMeta(
   id: string,
-  patch: { name?: string; currency?: string }
+  patch: { name?: string; currency?: string; budget?: number | null }
 ): Promise<boolean> {
   if (!isValidId(id)) return false;
   const result = db
@@ -361,6 +363,7 @@ export interface AddExpenseInput {
   date?: number;
   exchangeRate?: number;
   rateAvailable?: boolean;
+  note?: string;
   /** Idempotency key from the client; see the schema for why. */
   clientId?: string;
 }
@@ -401,6 +404,7 @@ export async function addExpense(tripId: string, input: AddExpenseInput): Promis
         date,
         exchangeRate: input.exchangeRate ?? null,
         rateAvailable: input.rateAvailable ?? true,
+        note: input.note ?? null,
         clientId: input.clientId ?? null,
       })
       .run();
@@ -687,5 +691,6 @@ export async function findExpenseByClientId(
     date: row.date,
     exchangeRate: row.exchangeRate ?? undefined,
     rateAvailable: row.rateAvailable,
+    note: row.note ?? undefined,
   };
 }

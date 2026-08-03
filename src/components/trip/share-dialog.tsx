@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import qrcode from "qrcode-generator";
-import { Check, Copy, Share2, TriangleAlert } from "lucide-react";
+import { Check, Copy, FileText, ImageDown, Loader2, Share2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useT } from "@/i18n/provider";
+import { useT, useIntlLocale } from "@/i18n/provider";
+import { renderSummary, canvasToBlob } from "./summary-image";
 import {
   Dialog,
   DialogContent,
@@ -65,14 +66,24 @@ export function ShareDialog({
   url,
   tripName,
   anonymous,
+  summary,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   url: string;
   tripName: string;
   anonymous: boolean;
+  summary: {
+    currency: string;
+    total: number;
+    expenseCount: number;
+    balances: { name: string; emoji: string; balance: number }[];
+    settlements: { fromName: string; toName: string; amount: number }[];
+  };
 }) {
   const t = useT();
+  const locale = useIntlLocale();
+  const { build, busy } = useSummaryImage();
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -130,6 +141,53 @@ export function ShareDialog({
           </Button>
         )}
 
+        <div className="space-y-2 rounded-xl border border-border p-3">
+          <div>
+            <p className="text-sm font-medium">{t("shareTrip.summary")}</p>
+            <p className="text-xs text-muted-foreground">{t("shareTrip.summaryHint")}</p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              disabled={busy}
+              onClick={() =>
+                build(
+                  {
+                    tripName,
+                    locale,
+                    labels: {
+                      total: t("trip.totalSpent"),
+                      settlements: t("trip.settleUp"),
+                      allSettled: t("trip.allSettled"),
+                      expenses: t("trip.expenses").toLowerCase(),
+                    },
+                    ...summary,
+                  },
+                  `${tripName.replace(/[^\p{L}\p{N}]+/gu, "-").toLowerCase() || "tabup"}.png`
+                )
+              }
+            >
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <ImageDown className="size-4" />}
+              {typeof navigator !== "undefined" && "canShare" in navigator
+                ? t("shareTrip.shareImage")
+                : t("shareTrip.saveImage")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              render={
+                <a href={`${url.split("?")[0]}/print`} target="_blank" rel="noreferrer">
+                  <FileText className="size-4" />
+                  PDF
+                </a>
+              }
+            />
+          </div>
+        </div>
+
         {anonymous && (
           <p className="flex gap-2 text-xs text-muted-foreground">
             <TriangleAlert className="mt-px size-3.5 shrink-0 text-warning" />
@@ -139,4 +197,47 @@ export function ShareDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+/**
+ * Builds the summary image and hands it to the share sheet, or downloads it.
+ *
+ * `navigator.share` with a file is what puts it straight into WhatsApp on a phone;
+ * where that is unavailable — desktop, mostly — a download is the honest fallback.
+ */
+export function useSummaryImage() {
+  const [busy, setBusy] = useState(false);
+
+  const build = async (input: Parameters<typeof renderSummary>[0], filename: string) => {
+    setBusy(true);
+    try {
+      const canvas = renderSummary(input);
+      const blob = await canvasToBlob(canvas);
+      if (!blob) return;
+
+      const file = new File([blob], filename, { type: "image/png" });
+
+      if (
+        typeof navigator !== "undefined" &&
+        "canShare" in navigator &&
+        navigator.canShare?.({ files: [file] })
+      ) {
+        await navigator.share({ files: [file], title: input.tripName }).catch(() => {});
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      // Revoking in the same tick can cancel the download before the browser has read
+      // the blob — the click only queues it.
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return { build, busy };
 }

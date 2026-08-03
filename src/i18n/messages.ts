@@ -132,6 +132,12 @@ export const es = {
     overBy: "sobra {amount}",
     shortBy: "falta {amount}",
     fix: "ajustar",
+    note: "Nota",
+    notePlaceholder: "Lo que no cabe en la descripción",
+    duplicate: "Duplicar",
+    duplicated: "Copia lista para editar",
+    undo: "Deshacer",
+    restored: "Gasto restaurado",
     saveFailed: "No se ha podido guardar el gasto",
     added: "Gasto añadido",
     updated: "Gasto actualizado",
@@ -182,6 +188,11 @@ export const es = {
   shareTrip: {
     title: "Compartir este viaje",
     subtitle: "Apunta con la cámara al código, o envía el enlace.",
+    summary: "Resumen para el grupo",
+    summaryHint: "Una imagen con el total y quién debe a quién, lista para enviar.",
+    saveImage: "Guardar imagen",
+    shareImage: "Compartir imagen",
+    printable: "Ver para imprimir o PDF",
     anonymousWarning:
       "Cualquiera con este enlace puede abrir y editar el viaje: no lleva contraseña. Entra y reclámalo si prefieres elegir quién accede.",
   },
@@ -215,6 +226,17 @@ export const es = {
     anyone: "Cualquiera",
     anyCategory: "Cualquier categoría",
     results: "{count} de {total}",
+  },
+
+  pace: {
+    title: "Ritmo de gasto",
+    perDay: "al día",
+    ofBudget: "{used} de {budget}",
+    left: "Quedan {amount}",
+    over: "Te has pasado {amount}",
+    budget: "Presupuesto",
+    budgetHint: "Opcional. Déjalo vacío para no fijar ninguno.",
+    noBudget: "Sin presupuesto",
   },
 
   category: {
@@ -367,6 +389,12 @@ export const en: Messages = {
     overBy: "over by {amount}",
     shortBy: "short by {amount}",
     fix: "fix",
+    note: "Note",
+    notePlaceholder: "What the description has no room for",
+    duplicate: "Duplicate",
+    duplicated: "Copy ready to edit",
+    undo: "Undo",
+    restored: "Expense restored",
     saveFailed: "Could not save the expense",
     added: "Expense added",
     updated: "Expense updated",
@@ -417,6 +445,11 @@ export const en: Messages = {
   shareTrip: {
     title: "Share this trip",
     subtitle: "Point a camera at the code, or send the link.",
+    summary: "Summary for the group",
+    summaryHint: "An image with the total and who owes whom, ready to send.",
+    saveImage: "Save image",
+    shareImage: "Share image",
+    printable: "Open printable view or PDF",
     anonymousWarning:
       "Anyone with this link can open and edit the trip — there is no password on it. Sign in and claim the trip if you would rather choose who gets in.",
   },
@@ -450,6 +483,17 @@ export const en: Messages = {
     anyone: "Anyone",
     anyCategory: "Any category",
     results: "{count} of {total}",
+  },
+
+  pace: {
+    title: "Spending pace",
+    perDay: "a day",
+    ofBudget: "{used} of {budget}",
+    left: "{amount} left",
+    over: "{amount} over",
+    budget: "Budget",
+    budgetHint: "Optional. Leave empty for no budget.",
+    noBudget: "No budget",
   },
 
   category: {

@@ -36,6 +36,7 @@ export interface ExpenseDraft {
   paidBy: string;
   splitAmong: string[];
   category: string;
+  note: string;
   splitMode: SplitMode;
   /** Per-member figure, meaning percent or currency depending on splitMode. */
   splitValues: Record<string, string>;
@@ -174,6 +175,20 @@ export function ExpenseDialog({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="expense-note">
+              {t("expense.note")}{" "}
+              <span className="font-normal text-muted-foreground">({t("settle.optional")})</span>
+            </Label>
+            <Input
+              id="expense-note"
+              value={draft.note}
+              onChange={(e) => setDraft({ note: e.target.value })}
+              placeholder={t("expense.notePlaceholder")}
+              className="h-11"
+            />
           </div>
 
           <div className="space-y-2">

@@ -18,6 +18,7 @@ import {
   Receipt,
   Settings,
   CloudOff,
+  CopyPlus,
   Trash2,
   TriangleAlert,
   UserPlus,
@@ -33,6 +34,7 @@ import { ExpenseDialog, type ExpenseDraft } from "@/components/trip/expense-dial
 import { SettleDialog, type PaymentDraft } from "@/components/trip/settle-dialog";
 import { ShareDialog } from "@/components/trip/share-dialog";
 import { ManageDialog } from "@/components/trip/manage-dialog";
+import { SpendingPace } from "@/components/trip/spending-pace";
 import {
   ExpenseFilterBar,
   NO_FILTERS,
@@ -91,6 +93,7 @@ interface TripData {
   currency: string;
   createdAt: number;
   version: number;
+  budget?: number | null;
   members: Member[];
   expenses: Expense[];
   payments: Payment[];
@@ -111,6 +114,7 @@ const emptyExpense = (currency: string, members: Member[]): ExpenseDraft => ({
   paidBy: members[0]?.id ?? "",
   splitAmong: members.map((m) => m.id),
   category: "food",
+  note: "",
   splitMode: "equal",
   splitValues: {},
   date: today(),
@@ -353,6 +357,12 @@ export default function TripPage() {
         }
         toast.error(t("trip.deleteTrip"));
       } else {
+        // Captured before the request: once it is gone from the server there is nothing
+        // left to rebuild it from.
+        const removed =
+          confirm.type === "expense"
+            ? trip?.expenses.find((e) => e.id === confirm.id)
+            : undefined;
         const endpoint = confirm.type === "expense" ? "expense" : "payment";
         const key = confirm.type === "expense" ? "expenseId" : "paymentId";
         const res = await fetch(`/api/trips/${id}/${endpoint}`, {
@@ -364,7 +374,39 @@ export default function TripPage() {
           toast.error(t("common.somethingWrong"));
         } else {
           await loadTrip();
-          toast.success(confirm.type === "expense" ? t("expense.deleted") : t("settle.deleted"));
+
+          // Deleting is the one destructive action people take by accident, and a
+          // confirmation dialog does not help when the mistake is picking the wrong
+          // row. Re-sending the same expense is enough to put it back.
+          if (confirm.type === "expense" && removed) {
+            toast.success(t("expense.deleted"), {
+              action: {
+                label: t("expense.undo"),
+                onClick: async () => {
+                  await fetch(`/api/trips/${id}/expense`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      description: removed.description,
+                      amount: removed.amount,
+                      currency: removed.currency,
+                      paidBy: removed.paidBy,
+                      splitAmong: removed.splitAmong,
+                      splitShares: removed.splitShares,
+                      category: removed.category,
+                      note: removed.note,
+                      date: removed.date,
+                      clientId: newClientId(),
+                    }),
+                  }).catch(() => {});
+                  await loadTrip();
+                  toast.success(t("expense.restored"));
+                },
+              },
+            });
+          } else {
+            toast.success(confirm.type === "expense" ? t("expense.deleted") : t("settle.deleted"));
+          }
         }
       }
     } catch {
@@ -382,6 +424,30 @@ export default function TripPage() {
     setExpenseOpen(true);
   };
 
+  /**
+   * Opens a copy of an expense, dated today and not yet saved.
+   *
+   * "Another coffee" is the single most repeated action on a trip, and retyping the
+   * same four fields for it is the kind of friction that makes people stop bothering.
+   */
+  const duplicateExpense = (expense: Expense) => {
+    setEditingId(null);
+    setExpenseDraft({
+      description: expense.description,
+      amount: String(expense.amount),
+      currency: expense.currency,
+      paidBy: expense.paidBy,
+      splitAmong: [...expense.splitAmong],
+      category: expense.category,
+      note: expense.note ?? "",
+      splitMode: expense.splitShares ? "percent" : "equal",
+      splitValues: normaliseToPercent(expense.splitShares),
+      date: today(),
+    });
+    setExpenseOpen(true);
+    toast.info(t("expense.duplicated"));
+  };
+
   const openEditExpense = (expense: Expense) => {
     setEditingId(expense.id);
     setExpenseDraft({
@@ -391,6 +457,7 @@ export default function TripPage() {
       paidBy: expense.paidBy,
       splitAmong: [...expense.splitAmong],
       category: expense.category,
+      note: expense.note ?? "",
       splitMode: expense.splitShares ? "percent" : "equal",
       // Stored shares are proportions on an arbitrary scale, so they are normalised to
       // percentages — the one reading that is always right, whatever scale was used.
@@ -580,6 +647,13 @@ export default function TripPage() {
         </Card>
       )}
 
+      <SpendingPace
+        expenses={view?.expenses ?? []}
+        currency={trip.currency}
+        budget={trip.budget}
+        startedAt={trip.createdAt}
+      />
+
       {/* Category breakdown */}
       {categoryBreakdown.length > 0 && (
         <Card className="mb-4">
@@ -689,6 +763,11 @@ export default function TripPage() {
 
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{expense.description}</p>
+                        {expense.note && (
+                          <p className="truncate text-[13px] text-muted-foreground italic">
+                            {expense.note}
+                          </p>
+                        )}
                         <p className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-muted-foreground">
                           {"pending" in expense && (
                             <CloudOff className="size-3.5 shrink-0 text-warning" />
@@ -721,6 +800,15 @@ export default function TripPage() {
 
                       {!readOnly && !("pending" in expense) && (
                         <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-100">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground"
+                            onClick={() => duplicateExpense(expense)}
+                            aria-label={`${t("expense.duplicate")}: ${expense.description}`}
+                          >
+                            <CopyPlus className="size-3.5" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -858,6 +946,21 @@ export default function TripPage() {
         url={typeof window === "undefined" ? "" : window.location.href}
         tripName={trip.name}
         anonymous={trip.anonymous}
+        summary={{
+          currency: trip.currency,
+          total: view?.totalExpenses ?? trip.totalExpenses,
+          expenseCount: view?.expenses.length ?? 0,
+          balances: (view?.balances ?? []).map((b) => ({
+            name: memberById(b.memberId)?.name ?? "",
+            emoji: memberById(b.memberId)?.emoji ?? "",
+            balance: b.balance,
+          })),
+          settlements: (view?.settlements ?? []).map((s) => ({
+            fromName: memberById(s.from)?.name ?? "",
+            toName: memberById(s.to)?.name ?? "",
+            amount: s.amount,
+          })),
+        }}
       />
 
       <ExpenseDialog
@@ -887,6 +990,8 @@ export default function TripPage() {
         onOpenChange={setManageOpen}
         tripId={id}
         tripName={trip.name}
+        tripBudget={trip.budget}
+        currency={trip.currency}
         members={trip.members}
         collaborators={trip.collaborators}
         access={trip.access}

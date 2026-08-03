@@ -1,4 +1,4 @@
-import type { Trip, Balance, Settlement } from "./types";
+import type { Trip, Expense, Balance, Settlement } from "./types";
 
 /**
  * Balance and settlement maths.
@@ -91,4 +91,33 @@ export function calculateSettlements(trip: Trip): Settlement[] {
   }
 
   return settlements;
+}
+
+/**
+ * What each participant owes for a single expense.
+ *
+ * The same weighting `calculateBalances` applies, exposed on its own so the CSV and the
+ * printable report can show the split per row without recomputing it differently and
+ * ending up with columns that do not add to the total.
+ */
+export function expenseShares(expense: Expense): Record<string, number> {
+  const result: Record<string, number> = {};
+  const weights = expense.splitShares;
+
+  if (weights && Object.keys(weights).length > 0) {
+    const totalWeight = Object.values(weights).reduce((sum, w) => sum + w, 0);
+    if (totalWeight > 0) {
+      for (const memberId of expense.splitAmong) {
+        if (weights[memberId]) {
+          result[memberId] = (expense.amountEur * weights[memberId]) / totalWeight;
+        }
+      }
+    }
+    return result;
+  }
+
+  const count = expense.splitAmong.length;
+  if (count === 0) return result;
+  for (const memberId of expense.splitAmong) result[memberId] = expense.amountEur / count;
+  return result;
 }

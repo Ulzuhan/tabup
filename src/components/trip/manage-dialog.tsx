@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Loader2, Mail, Trash2, UserPlus, X } from "lucide-react";
 import type { Member } from "@/lib/types";
 import { MemberAvatar } from "@/components/member-avatar";
+import { currencySymbol } from "@/components/money";
 import { useT } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +46,8 @@ export function ManageDialog({
   onOpenChange,
   tripId,
   tripName,
+  tripBudget,
+  currency,
   members,
   collaborators,
   access,
@@ -55,6 +58,8 @@ export function ManageDialog({
   onOpenChange: (open: boolean) => void;
   tripId: string;
   tripName: string;
+  tripBudget?: number | null;
+  currency: string;
   members: Member[];
   collaborators: Collaborator[];
   access: "viewer" | "editor" | "owner";
@@ -63,6 +68,7 @@ export function ManageDialog({
 }) {
   const t = useT();
   const [name, setName] = useState(tripName);
+  const [budget, setBudget] = useState(tripBudget != null ? String(tripBudget) : "");
   const [newMember, setNewMember] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"editor" | "viewer">("editor");
@@ -100,6 +106,16 @@ export function ManageDialog({
       method: "PATCH",
       body: JSON.stringify({ name: trimmed }),
     }, t("manage.renamed"));
+  };
+
+  const saveBudget = async () => {
+    const trimmed = budget.trim();
+    const value = trimmed === "" ? null : Number(trimmed);
+    if (value !== null && !(value > 0)) return;
+    await call("budget", `/api/trips/${tripId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ budget: value }),
+    }, t("pace.budget"));
   };
 
   const addMember = async () => {
@@ -162,6 +178,33 @@ export function ManageDialog({
               {busy === "rename" ? <Loader2 className="size-4 animate-spin" /> : t("common.save")}
             </Button>
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="trip-budget">{t("pace.budget")}</Label>
+          <div className="flex gap-2">
+            <div className="relative min-w-0 flex-1">
+              <span className="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground">
+                {currencySymbol(currency)}
+              </span>
+              <Input
+                id="trip-budget"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="10"
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveBudget()}
+                placeholder={t("pace.noBudget")}
+                className="tabular h-10 pl-8"
+              />
+            </div>
+            <Button variant="outline" onClick={saveBudget} disabled={busy !== null}>
+              {busy === "budget" ? <Loader2 className="size-4 animate-spin" /> : t("common.save")}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">{t("pace.budgetHint")}</p>
         </div>
 
         <Separator />

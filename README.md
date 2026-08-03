@@ -182,6 +182,25 @@ Icons are generated from one vector definition:
 node scripts/generate-icons.mjs
 ```
 
+## Reports and sharing
+
+- **CSV** — the whole trip, not just the expense list: each person's share as its own
+  column, the payments, the closing balances and who pays whom. Exporting only the
+  expenses looks complete until you try to reconstruct the accounts from it. Written
+  with a BOM so Excel opens the accents correctly.
+- **Printable report** at `/trip/<id>/print` — every browser turns that into a PDF, on
+  desktop and on a phone, and does a better job of typography and page breaks than
+  hand-positioned text in a PDF library would. No dependency.
+- **Summary image** from the share dialog: total, who owes whom and the balances, drawn
+  on a canvas and handed to the share sheet. At the end of a trip somebody sends this to
+  the group, and until now that meant a badly cropped screenshot.
+
+## Budget and pace
+
+An optional budget per trip, plus the daily average and a bar per day. The total on its
+own never answered the question people actually ask halfway through a trip — "are we
+going over?" — because a number means nothing without a rate to compare it to.
+
 ## Operations
 
 ```bash

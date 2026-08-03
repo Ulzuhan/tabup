@@ -126,6 +126,8 @@ function migrate(sqlite: Database.Database) {
   // on databases that already have the table, so new columns need adding separately.
   addColumn(sqlite, "trips", "owner_id", "TEXT REFERENCES users(id) ON DELETE SET NULL");
   addColumn(sqlite, "expenses", "client_id", "TEXT");
+  addColumn(sqlite, "expenses", "note", "TEXT");
+  addColumn(sqlite, "trips", "budget", "REAL");
   addColumn(sqlite, "payments", "client_id", "TEXT");
   addColumn(sqlite, "members", "user_id", "TEXT REFERENCES users(id) ON DELETE SET NULL");
   sqlite.exec("CREATE INDEX IF NOT EXISTS trips_owner_idx ON trips(owner_id);");

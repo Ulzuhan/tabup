@@ -130,6 +130,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       date: body.date ? new Date(body.date).getTime() : Date.now(),
       exchangeRate: expCurrency !== "EUR" && amountEur > 0 ? parsedAmount / amountEur : undefined,
       rateAvailable: rateUsed,
+      note: typeof body.note === "string" && body.note.trim() ? body.note.trim().slice(0, 500) : undefined,
       // Supplied by queued offline writes so a retry cannot duplicate the expense.
       clientId: typeof body.clientId === "string" ? body.clientId.slice(0, 64) : undefined,
     });

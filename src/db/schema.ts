@@ -71,6 +71,13 @@ export const trips = sqliteTable(
     version: integer("version").notNull().default(1),
     /** Null means anonymous: access is granted by knowing the link. */
     ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+    /**
+     * Optional spending target for the whole trip, in the trip's currency.
+     *
+     * Null means nobody set one, which is different from zero — a budget of zero would
+     * report every trip as over budget from the first coffee.
+     */
+    budget: real("budget"),
   },
   (t) => [index("trips_owner_idx").on(t.ownerId)]
 );
@@ -131,6 +138,8 @@ export const expenses = sqliteTable(
     category: text("category").notNull().default("other"),
     date: integer("date").notNull(),
     exchangeRate: real("exchange_rate"),
+    /** Free text, for what a description has no room for. */
+    note: text("note"),
     /**
      * Idempotency key chosen by the client, unique per trip.
      *

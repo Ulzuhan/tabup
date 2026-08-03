@@ -123,6 +123,19 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
       await updateTripMeta(id, { name: body.name.trim().slice(0, 100) });
     }
 
+    // null clears it; a number sets it. Absent leaves it alone, so a rename does not
+    // wipe the budget as a side effect.
+    if (body.budget !== undefined) {
+      const parsed = body.budget === null ? null : Number(body.budget);
+      if (parsed !== null && (!isFinite(parsed) || parsed <= 0 || parsed > 1e9)) {
+        return NextResponse.json(
+          { error: "Budget must be a positive number up to 1 billion" },
+          { status: 400 }
+        );
+      }
+      await updateTripMeta(id, { budget: parsed });
+    }
+
     if (body.removeMembers && Array.isArray(body.removeMembers)) {
       // Their expenses, payments and share rows go with them (ON DELETE CASCADE).
       await removeMembers(id, body.removeMembers as string[]);

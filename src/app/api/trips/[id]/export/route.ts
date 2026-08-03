@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTrip } from "@/lib/store";
+import { calculateBalances, calculateSettlements, expenseShares } from "@/lib/balances";
 import { authorizeTrip } from "@/lib/authorize";
 
+/**
+ * The whole trip as a spreadsheet.
+ *
+ * It used to export the expense list alone, which looks complete until you try to use
+ * it: without each person's share, the payments already made, or the closing balances,
+ * you cannot reconstruct who owes what — which is the only reason to export a trip in
+ * the first place. Now it carries every section, with one column per person so the
+ * split is readable across the row.
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -15,38 +25,124 @@ export async function GET(
     return NextResponse.json({ error: "Trip not found" }, { status: 404 });
   }
 
-  // Generate CSV
-  const sanitizeCsv = (val: string) => {
-    const str = String(val);
-    if (/^[=+\-@\t\r]/.test(str)) {
-      return `'${str}`;
-    }
-    return str;
+  /**
+   * Spreadsheets treat a leading =, +, - or @ as a formula, so a description like
+   * "=cmd" would execute on open. Prefixing with a quote makes it text.
+   */
+  const safe = (value: unknown) => {
+    const str = String(value ?? "");
+    const escaped = str.replace(/"/g, '""');
+    return /^[=+\-@\t\r]/.test(str) ? `"'${escaped}"` : `"${escaped}"`;
   };
 
+  const num = (n: number) => n.toFixed(2);
+  const day = (ms: number) => new Date(ms).toISOString().split("T")[0];
+  const memberName = (memberId: string) =>
+    trip.members.find((m) => m.id === memberId)?.name || memberId;
 
-  const memberName = (id: string) => trip.members.find((m) => m.id === id)?.name || id;
+  const balances = calculateBalances(trip);
+  const settlements = calculateSettlements(trip);
+  const total = trip.expenses.reduce((sum, e) => sum + e.amountEur, 0);
 
-  const rows = [
-    ["Date", "Description", "Category", "Amount", "Currency", "Amount (€)", "Paid By", "Split Among"].join(","),
-    ...trip.expenses.map((e) =>
+  const lines: string[] = [];
+  const section = (title: string) => {
+    if (lines.length) lines.push("");
+    lines.push(safe(title));
+  };
+
+  // ── Summary ────────────────────────────────────────────────────────
+  section("Trip");
+  lines.push([safe("Name"), safe(trip.name)].join(","));
+  lines.push([safe("Currency"), safe(trip.currency)].join(","));
+  lines.push([safe("Total"), num(total)].join(","));
+  if (trip.budget != null) {
+    lines.push([safe("Budget"), num(trip.budget)].join(","));
+    lines.push([safe("Remaining"), num(trip.budget - total)].join(","));
+  }
+  lines.push([safe("People"), trip.members.length].join(","));
+  lines.push([safe("Expenses"), trip.expenses.length].join(","));
+
+  // ── Expenses, one column per person ────────────────────────────────
+  section("Expenses");
+  lines.push(
+    [
+      safe("Date"),
+      safe("Description"),
+      safe("Category"),
+      safe("Amount"),
+      safe("Currency"),
+      safe(`Amount (${trip.currency})`),
+      safe("Paid by"),
+      safe("Note"),
+      ...trip.members.map((m) => safe(m.name)),
+    ].join(",")
+  );
+
+  for (const expense of [...trip.expenses].sort((a, b) => a.date - b.date)) {
+    const shares = expenseShares(expense);
+    lines.push(
       [
-        new Date(e.date).toISOString().split("T")[0],
-        `"${sanitizeCsv(e.description)}"`,
-        e.category,
-        e.amount.toFixed(2),
-        e.currency,
-        e.amountEur.toFixed(2),
-        `"${sanitizeCsv(memberName(e.paidBy))}"`,
-        `"${e.splitAmong.map((id) => sanitizeCsv(memberName(id))).join(", ")}"`,
+        safe(day(expense.date)),
+        safe(expense.description),
+        safe(expense.category),
+        num(expense.amount),
+        safe(expense.currency),
+        num(expense.amountEur),
+        safe(memberName(expense.paidBy)),
+        safe(expense.note ?? ""),
+        // Blank rather than 0.00 for someone left out of the split: an empty cell reads
+        // as "not involved", a zero reads as "involved and owes nothing".
+        ...trip.members.map((m) => (shares[m.id] ? num(shares[m.id]) : "")),
       ].join(",")
-    ),
-  ];
+    );
+  }
 
-  const csv = rows.join("\n");
-  const filename = `${trip.name.replace(/[^a-zA-Z0-9]/g, "_")}_expenses.csv`;
+  // ── Payments ───────────────────────────────────────────────────────
+  if (trip.payments.length > 0) {
+    section("Payments");
+    lines.push([safe("Date"), safe("From"), safe("To"), safe("Amount"), safe("Note")].join(","));
+    for (const payment of [...trip.payments].sort((a, b) => a.date - b.date)) {
+      lines.push(
+        [
+          safe(day(payment.date)),
+          safe(memberName(payment.from)),
+          safe(memberName(payment.to)),
+          num(payment.amount),
+          safe(payment.note ?? ""),
+        ].join(",")
+      );
+    }
+  }
 
-  return new NextResponse(csv, {
+  // ── Closing position ───────────────────────────────────────────────
+  section("Balances");
+  lines.push([safe("Person"), safe("Paid"), safe("Owes"), safe("Balance")].join(","));
+  for (const balance of balances) {
+    lines.push(
+      [
+        safe(memberName(balance.memberId)),
+        num(balance.totalPaid),
+        num(balance.totalShare),
+        num(balance.balance),
+      ].join(",")
+    );
+  }
+
+  if (settlements.length > 0) {
+    section("Who pays whom");
+    lines.push([safe("From"), safe("To"), safe("Amount")].join(","));
+    for (const s of settlements) {
+      lines.push(
+        [safe(memberName(s.from)), safe(memberName(s.to)), num(s.amount)].join(",")
+      );
+    }
+  }
+
+  const filename = `${trip.name.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_|_$/g, "") || "trip"}.csv`;
+
+  // The BOM is what makes Excel open a UTF-8 CSV without mangling accents, and this app
+  // is full of names like "Begoña".
+  return new NextResponse("﻿" + lines.join("\r\n"), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
