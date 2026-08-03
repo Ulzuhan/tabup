@@ -211,6 +211,28 @@ export const payments = sqliteTable(
   ]
 );
 
+/**
+ * Invitation links.
+ *
+ * Sharing an owned trip used to require the other person to already have an account
+ * here — and registration is closed by default, so in practice there was no way in at
+ * all: scanning the QR of an owned trip just returned 404. A token in a link fixes
+ * both halves: it identifies the trip and it is proof enough to be allowed to register.
+ */
+export const invites = sqliteTable(
+  "invites",
+  {
+    token: text("token").primaryKey(),
+    tripId: text("trip_id")
+      .notNull()
+      .references(() => trips.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("editor"),
+    createdAt: integer("created_at").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+  },
+  (t) => [index("invites_trip_idx").on(t.tripId)]
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type TripRow = typeof trips.$inferSelect;
 export type MemberRow = typeof members.$inferSelect;

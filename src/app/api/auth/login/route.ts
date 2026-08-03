@@ -8,10 +8,10 @@ import {
   recordAttempt,
   tooManyAttempts,
 } from "@/lib/auth";
-import { claimTrip, isValidId } from "@/lib/store";
+import { claimTrip, isValidId, redeemInvite } from "@/lib/store";
 
 export async function POST(request: NextRequest) {
-  let body: { email?: string; password?: string; claimTripIds?: unknown };
+  let body: { email?: string; password?: string; claimTripIds?: unknown; inviteToken?: string };
   try {
     body = await request.json();
   } catch {
@@ -48,5 +48,11 @@ export async function POST(request: NextRequest) {
   }
 
   await createSession(user.id);
-  return NextResponse.json({ user: publicUser(user), claimed });
+
+  let joinedTripId: string | null = null;
+  if (typeof body.inviteToken === "string") {
+    joinedTripId = await redeemInvite(body.inviteToken, user.id);
+  }
+
+  return NextResponse.json({ user: publicUser(user), claimed, tripId: joinedTripId });
 }

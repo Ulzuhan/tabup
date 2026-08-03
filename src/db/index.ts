@@ -120,6 +120,15 @@ function migrate(sqlite: Database.Database) {
       PRIMARY KEY (trip_id, user_id)
     );
     CREATE INDEX IF NOT EXISTS trip_access_user_idx ON trip_access(user_id);
+
+    CREATE TABLE IF NOT EXISTS invites (
+      token TEXT PRIMARY KEY,
+      trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+      role TEXT NOT NULL DEFAULT 'editor',
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS invites_trip_idx ON invites(trip_id);
   `);
 
   // Columns added after the first release. CREATE TABLE IF NOT EXISTS above is a no-op
@@ -142,8 +151,10 @@ function migrate(sqlite: Database.Database) {
     "CREATE UNIQUE INDEX IF NOT EXISTS payments_client_idx ON payments(trip_id, client_id) WHERE client_id IS NOT NULL;"
   );
 
-  // Sessions are cheap to clear and there is no other moment that reliably runs.
+  // Sessions and invitations are cheap to clear and there is no other moment that
+  // reliably runs.
   sqlite.prepare("DELETE FROM sessions WHERE expires_at < ?").run(Date.now());
+  sqlite.prepare("DELETE FROM invites WHERE expires_at < ?").run(Date.now());
 }
 
 /** ALTER TABLE ADD COLUMN is not idempotent, so check the table shape first. */

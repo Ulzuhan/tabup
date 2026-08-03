@@ -19,7 +19,16 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import { eq, asc, and, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { trips, members, expenses, expenseSplits, payments, users, tripAccess } from "@/db/schema";
+import {
+  trips,
+  members,
+  expenses,
+  expenseSplits,
+  payments,
+  users,
+  tripAccess,
+  invites,
+} from "@/db/schema";
 import type { Trip, Member, Expense, Payment } from "./types";
 
 const DATA_DIR = process.env.TABUP_DATA_DIR?.trim() || join(process.cwd(), "data");
@@ -697,4 +706,75 @@ export async function findExpenseByClientId(
     note: row.note ?? undefined,
     receipt: row.receipt ?? undefined,
   };
+}
+
+// ─── Invitations ─────────────────────────────────────────────────────
+
+/** A week is long enough for a trip to be planned and short enough to stop mattering. */
+const INVITE_DAYS = 7;
+
+/**
+ * Creates an invitation link for an owned trip.
+ *
+ * Anonymous trips do not need one — their link already lets anyone in — so this is
+ * only ever reached for a trip that has an owner.
+ */
+export async function createInvite(
+  tripId: string,
+  role: "viewer" | "editor" = "editor"
+): Promise<{ token: string; expiresAt: number } | null> {
+  if (!isValidId(tripId)) return null;
+
+  const token = randomBytes(24).toString("base64url");
+  const now = Date.now();
+  const expiresAt = now + INVITE_DAYS * 24 * 60 * 60 * 1000;
+
+  db.insert(invites).values({ token, tripId, role, createdAt: now, expiresAt }).run();
+  return { token, expiresAt };
+}
+
+export interface InviteDetails {
+  tripId: string;
+  tripName: string;
+  role: "viewer" | "editor";
+}
+
+/** Looks up a token, treating an expired one as if it never existed. */
+export function readInvite(token: string): InviteDetails | null {
+  if (!token || token.length > 64) return null;
+
+  const invite = db.select().from(invites).where(eq(invites.token, token)).get();
+  if (!invite || invite.expiresAt < Date.now()) return null;
+
+  const trip = db
+    .select({ name: trips.name })
+    .from(trips)
+    .where(eq(trips.id, invite.tripId))
+    .get();
+  if (!trip) return null;
+
+  return {
+    tripId: invite.tripId,
+    tripName: trip.name,
+    role: invite.role === "viewer" ? "viewer" : "editor",
+  };
+}
+
+/**
+ * Redeems an invitation for a user.
+ *
+ * The token is deliberately not consumed: a trip link gets forwarded around a group,
+ * and a single-use invite would work for whoever tapped first and leave everyone else
+ * with an error they cannot explain. The expiry is what bounds it.
+ */
+export async function redeemInvite(token: string, userId: string): Promise<string | null> {
+  const invite = readInvite(token);
+  if (!invite) return null;
+
+  // The owner opening their own link should not be demoted to editor.
+  const current = accessLevel(invite.tripId, userId);
+  if (current === "owner") return invite.tripId;
+
+  const granted = await grantAccess(invite.tripId, userId, invite.role);
+  return granted ? invite.tripId : null;
 }

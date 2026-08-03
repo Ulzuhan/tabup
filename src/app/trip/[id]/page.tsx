@@ -962,6 +962,7 @@ export default function TripPage() {
         open={shareOpen}
         onOpenChange={setShareOpen}
         url={typeof window === "undefined" ? "" : window.location.href}
+        tripId={id}
         tripName={trip.name}
         anonymous={trip.anonymous}
         summary={{

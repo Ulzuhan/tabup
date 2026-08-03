@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import qrcode from "qrcode-generator";
-import { Check, Copy, FileText, ImageDown, Loader2, Share2, TriangleAlert } from "lucide-react";
+import { Check, Copy, FileText, ImageDown, Loader2, Share2, TriangleAlert, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useT, useIntlLocale } from "@/i18n/provider";
 import { renderSummary, canvasToBlob } from "./summary-image";
@@ -64,6 +64,7 @@ export function ShareDialog({
   open,
   onOpenChange,
   url,
+  tripId,
   tripName,
   anonymous,
   summary,
@@ -71,6 +72,7 @@ export function ShareDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   url: string;
+  tripId: string;
   tripName: string;
   anonymous: boolean;
   summary: {
@@ -84,11 +86,37 @@ export function ShareDialog({
   const t = useT();
   const locale = useIntlLocale();
   const { build, busy } = useSummaryImage();
+
+  /**
+   * What the QR and the copy button actually hand over.
+   *
+   * For an owned trip the plain URL is useless to anyone else — it returns 404, which
+   * is exactly what happened to the first person who scanned one. An invitation link
+   * works for a stranger, so it is generated on demand and replaces the URL here.
+   */
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [creatingInvite, setCreatingInvite] = useState(false);
+  const shareUrl = anonymous ? url : (inviteUrl ?? url);
+
+  const createInvite = async () => {
+    setCreatingInvite(true);
+    try {
+      const res = await fetch(`/api/trips/${tripId}/invite`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setInviteUrl(`${window.location.origin}/join/${data.token}`);
+      }
+    } catch {
+      /* the plain link stays on screen; it still works for anyone already invited */
+    } finally {
+      setCreatingInvite(false);
+    }
+  };
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -99,7 +127,7 @@ export function ShareDialog({
 
   const nativeShare = async () => {
     try {
-      await navigator.share({ title: tripName, url });
+      await navigator.share({ title: tripName, url: shareUrl });
     } catch {
       // Includes the user simply dismissing the sheet, which is not an error.
     }
@@ -117,7 +145,7 @@ export function ShareDialog({
 
         <div className="flex justify-center">
           <div className="rounded-2xl bg-white p-3">
-            <QrCode value={url} className="size-48" label={t("shareTrip.title")} />
+            <QrCode value={shareUrl} className="size-48" label={t("shareTrip.title")} />
           </div>
         </div>
 
@@ -126,7 +154,7 @@ export function ShareDialog({
             dialog and `truncate` never gets a chance to apply. */}
         <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-secondary/50 p-2">
           <span className="min-w-0 flex-1 truncate pl-1 font-mono text-xs text-muted-foreground">
-            {url}
+            {shareUrl}
           </span>
           <Button size="sm" variant="ghost" onClick={copy} className="shrink-0">
             {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
@@ -187,6 +215,28 @@ export function ShareDialog({
             />
           </div>
         </div>
+
+        {!anonymous && !inviteUrl && (
+          <div className="space-y-2 rounded-xl border border-warning/25 bg-warning/[0.06] p-3">
+            <p className="text-xs text-muted-foreground">{t("join.inviteHint")}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={createInvite}
+              disabled={creatingInvite}
+            >
+              {creatingInvite ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <>
+                  <UserPlus className="size-4" />
+                  {t("join.createInvite")}
+                </>
+              )}
+            </Button>
+          </div>
+        )}
 
         {anonymous && (
           <p className="flex gap-2 text-xs text-muted-foreground">

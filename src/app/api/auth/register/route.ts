@@ -10,7 +10,7 @@ import {
   registrationOpen,
   tooManyAttempts,
 } from "@/lib/auth";
-import { claimTrip, isValidId } from "@/lib/store";
+import { claimTrip, isValidId, readInvite, redeemInvite } from "@/lib/store";
 
 /**
  * Creates an account.
@@ -24,7 +24,22 @@ export async function POST(request: NextRequest) {
   // internet, and an open registration endpoint on a personal instance means anyone
   // who finds the URL can create accounts on it. The first account is always allowed
   // so a fresh install can be set up; after that, opening it up is a deliberate act.
-  if (!registrationOpen()) {
+  let body: { email?: string; name?: string; password?: string; claimTripIds?: unknown; inviteToken?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  /**
+   * A valid invitation is permission to register.
+   *
+   * Otherwise the invite flow cannot work at all on a closed instance: the person being
+   * invited has no account and no way to make one, which is exactly the dead end a
+   * friend hit after scanning a QR code.
+   */
+  const invite = typeof body.inviteToken === "string" ? readInvite(body.inviteToken) : null;
+  if (!invite && !registrationOpen()) {
     return NextResponse.json(
       { error: "Registration is closed on this instance" },
       { status: 403 }
@@ -34,13 +49,6 @@ export async function POST(request: NextRequest) {
   const throttleKey = clientKey(request, "register");
   if (tooManyAttempts(throttleKey)) {
     return NextResponse.json({ error: "Too many attempts, try again later" }, { status: 429 });
-  }
-
-  let body: { email?: string; name?: string; password?: string; claimTripIds?: unknown };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   const email = typeof body.email === "string" ? body.email : "";
@@ -73,5 +81,12 @@ export async function POST(request: NextRequest) {
   }
 
   await createSession(user.id);
-  return NextResponse.json({ user: publicUser(user), claimed });
+
+  // Redeemed after the account exists, so the invited person lands already inside.
+  let joinedTripId: string | null = null;
+  if (invite && typeof body.inviteToken === "string") {
+    joinedTripId = await redeemInvite(body.inviteToken, user.id);
+  }
+
+  return NextResponse.json({ user: publicUser(user), claimed, tripId: joinedTripId });
 }

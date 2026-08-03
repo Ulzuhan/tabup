@@ -7,7 +7,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -80,10 +79,16 @@ export function AppHeader({
             }
           />
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel className="font-normal">
+            {/*
+              A plain div, not DropdownMenuLabel. That maps to Base UI's Menu.GroupLabel,
+              which requires a surrounding Menu.Group — without one it throws and the
+              whole menu silently fails to open, which is exactly what was happening
+              here: clicking your own name did nothing at all.
+            */}
+            <div className="px-1.5 py-1">
               <p className="text-sm font-medium">{user.name}</p>
               <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-            </DropdownMenuLabel>
+            </div>
             <DropdownMenuSeparator />
             <LanguageItems />
             <DropdownMenuSeparator />

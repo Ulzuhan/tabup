@@ -256,6 +256,29 @@ export const es = {
     other: "Otros",
   },
 
+  notFound: {
+    title: "Aquí no hay nada",
+    hint: "El enlace puede estar mal escrito, o lo que había ya no existe.",
+    home: "Ir al inicio",
+  },
+
+  join: {
+    title: "Te han invitado a un viaje",
+    subtitle: "Entra o crea una cuenta para unirte a {trip}.",
+    joinAs: "Unirte como {name}",
+    joining: "Uniéndote…",
+    joined: "Ya estás dentro",
+    expired: "Esta invitación ya no vale",
+    expiredHint: "Pide al dueño del viaje que te mande una nueva.",
+    createAccount: "Crear cuenta y unirme",
+    signIn: "Ya tengo cuenta",
+    inviteLink: "Enlace de invitación",
+    inviteHint: "Quien lo abra podrá unirse al viaje, aunque no tenga cuenta todavía. Caduca en 7 días.",
+    createInvite: "Crear invitación",
+    creating: "Creando…",
+    role: "Puede",
+  },
+
   language: "Idioma",
 } as const;
 
@@ -518,6 +541,29 @@ export const en: Messages = {
     shopping: "Shopping",
     health: "Health & pharmacy",
     other: "Other",
+  },
+
+  notFound: {
+    title: "Nothing here",
+    hint: "The link may be mistyped, or whatever was here is gone.",
+    home: "Go home",
+  },
+
+  join: {
+    title: "You have been invited to a trip",
+    subtitle: "Sign in or create an account to join {trip}.",
+    joinAs: "Join as {name}",
+    joining: "Joining…",
+    joined: "You are in",
+    expired: "This invitation is no longer valid",
+    expiredHint: "Ask the trip owner to send you a new one.",
+    createAccount: "Create account and join",
+    signIn: "I already have an account",
+    inviteLink: "Invitation link",
+    inviteHint: "Whoever opens it can join the trip, even without an account yet. Expires in 7 days.",
+    createInvite: "Create invitation",
+    creating: "Creating…",
+    role: "Can",
   },
 
   language: "Language",

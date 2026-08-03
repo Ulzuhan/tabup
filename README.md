@@ -61,6 +61,21 @@ everyone who still has the old link.
 Signing in sends the trip ids this browser remembers, and any that still have no owner
 become yours. Nothing is lost by having used the app anonymously first.
 
+### Invitations
+
+Sharing an owned trip with someone who has no account used to be impossible: the share
+link returned 404 to them, and registration is closed by default, so there was no way
+in at all — a friend scanning the QR of an owned trip simply hit a dead end.
+
+The share dialog now offers an invitation link for owned trips, and the QR encodes that
+instead of the raw URL. Opening it names the trip and lets the visitor sign in or
+register; either way they land inside. **A valid invitation is itself permission to
+register**, which is what makes this work on a closed instance.
+
+Invitations last 7 days and are not single-use — a trip link gets forwarded around a
+group, and a one-shot invite would work for whoever tapped first and leave everyone
+else with an error they could not explain. Only the owner can create them.
+
 ### Registration
 
 Once an instance has its first account, sign-ups are refused unless
