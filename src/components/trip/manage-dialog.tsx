@@ -51,7 +51,6 @@ export function ManageDialog({
   members,
   collaborators,
   access,
-  anonymous,
   onChanged,
 }: {
   open: boolean;
@@ -63,7 +62,6 @@ export function ManageDialog({
   members: Member[];
   collaborators: Collaborator[];
   access: "viewer" | "editor" | "owner";
-  anonymous: boolean;
   onChanged: () => Promise<void>;
 }) {
   const t = useT();
@@ -259,13 +257,6 @@ export function ManageDialog({
             <Separator />
             <div className="space-y-2">
               <Label>{t("manage.accounts")}</Label>
-
-              {anonymous ? (
-                <p className="rounded-lg border border-border bg-secondary/40 p-2.5 text-xs text-muted-foreground">
-                  {t("manage.anonymousNote")}
-                </p>
-              ) : (
-                <>
                   <ul className="space-y-1">
                     {collaborators.map((c) => (
                       <li
@@ -335,8 +326,6 @@ export function ManageDialog({
                   <p className="text-xs text-muted-foreground">
                     {t("manage.inviteHint")}
                   </p>
-                </>
-              )}
             </div>
           </>
         )}

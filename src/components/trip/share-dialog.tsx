@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import qrcode from "qrcode-generator";
-import { Check, Copy, FileText, ImageDown, Loader2, Share2, TriangleAlert, UserPlus } from "lucide-react";
+import { Check, Copy, FileText, ImageDown, Loader2, Share2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useT, useIntlLocale } from "@/i18n/provider";
 import { renderSummary, canvasToBlob } from "./summary-image";
@@ -66,7 +66,6 @@ export function ShareDialog({
   url,
   tripId,
   tripName,
-  anonymous,
   summary,
 }: {
   open: boolean;
@@ -74,7 +73,6 @@ export function ShareDialog({
   url: string;
   tripId: string;
   tripName: string;
-  anonymous: boolean;
   summary: {
     currency: string;
     total: number;
@@ -90,13 +88,13 @@ export function ShareDialog({
   /**
    * What the QR and the copy button actually hand over.
    *
-   * For an owned trip the plain URL is useless to anyone else — it returns 404, which
-   * is exactly what happened to the first person who scanned one. An invitation link
-   * works for a stranger, so it is generated on demand and replaces the URL here.
+   * The plain URL is useless to anyone else: every trip belongs to an account, so a
+   * stranger opening it gets a 404. An invitation link is the only thing worth handing
+   * over, and it replaces the URL here as soon as one exists.
    */
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [creatingInvite, setCreatingInvite] = useState(false);
-  const shareUrl = anonymous ? url : (inviteUrl ?? url);
+  const shareUrl = inviteUrl ?? url;
 
   const createInvite = async () => {
     setCreatingInvite(true);
@@ -216,7 +214,7 @@ export function ShareDialog({
           </div>
         </div>
 
-        {!anonymous && !inviteUrl && (
+        {!inviteUrl && (
           <div className="space-y-2 rounded-xl border border-warning/25 bg-warning/[0.06] p-3">
             <p className="text-xs text-muted-foreground">{t("join.inviteHint")}</p>
             <Button
@@ -238,12 +236,6 @@ export function ShareDialog({
           </div>
         )}
 
-        {anonymous && (
-          <p className="flex gap-2 text-xs text-muted-foreground">
-            <TriangleAlert className="mt-px size-3.5 shrink-0 text-warning" />
-            <span>{t("shareTrip.anonymousWarning")}</span>
-          </p>
-        )}
       </DialogContent>
     </Dialog>
   );

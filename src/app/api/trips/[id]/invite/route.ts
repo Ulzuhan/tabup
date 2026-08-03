@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createInvite, isAnonymousTrip } from "@/lib/store";
+import { createInvite } from "@/lib/store";
 import { authorizeTrip } from "@/lib/authorize";
 
 /** Creates an invitation link. Owners only, and only for a trip that has one. */
@@ -7,13 +7,6 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
   const { id } = await ctx.params;
   const auth = await authorizeTrip(id, "own");
   if (!auth.ok) return auth.response;
-
-  if (isAnonymousTrip(id)) {
-    return NextResponse.json(
-      { error: "An unclaimed trip is already open to anyone with its link" },
-      { status: 400 }
-    );
-  }
 
   let role: "viewer" | "editor" = "editor";
   try {

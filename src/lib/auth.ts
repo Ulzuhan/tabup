@@ -2,8 +2,8 @@ import { randomBytes, scrypt, timingSafeEqual, createHash } from "crypto";
 import type { BinaryLike, ScryptOptions } from "crypto";
 import { promisify } from "util";
 import { cookies } from "next/headers";
-import { eq, lt, sql } from "drizzle-orm";
-import { db, users, sessions } from "@/db";
+import { eq, lt, sql, isNull } from "drizzle-orm";
+import { db, users, sessions, trips } from "@/db";
 import type { UserRow } from "@/db";
 
 /**
@@ -180,12 +180,21 @@ export async function createUser(
     plan: "free",
   };
 
+  const wasEmpty = db.select({ count: sql<number>`count(*)` }).from(users).all()[0].count === 0;
+
   try {
     db.insert(users).values(row).run();
   } catch {
     // The unique index on email is what makes concurrent registrations safe.
     return null;
   }
+
+  // On a fresh install the first account adopts any trip left without an owner, which
+  // is how a database restored from before accounts existed stays reachable.
+  if (wasEmpty) {
+    db.update(trips).set({ ownerId: id }).where(isNull(trips.ownerId)).run();
+  }
+
   return row;
 }
 

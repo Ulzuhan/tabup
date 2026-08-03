@@ -169,10 +169,39 @@ function migrate(sqlite: Database.Database) {
     "CREATE UNIQUE INDEX IF NOT EXISTS payments_client_idx ON payments(trip_id, client_id) WHERE client_id IS NOT NULL;"
   );
 
+  adoptOrphanTrips(sqlite);
+
   // Sessions and invitations are cheap to clear and there is no other moment that
   // reliably runs.
   sqlite.prepare("DELETE FROM sessions WHERE expires_at < ?").run(Date.now());
   sqlite.prepare("DELETE FROM invites WHERE expires_at < ?").run(Date.now());
+}
+
+/**
+ * Gives ownerless trips to the only account there is.
+ *
+ * Anonymous trips are gone: everything now belongs to an account. Trips created before
+ * that change have no owner, and without this they would simply become unreachable —
+ * the data would still be in the file, and nobody could open it.
+ *
+ * Only runs when there is exactly one account, because with several there is no honest
+ * way to guess whose they were. On a fresh install with no accounts there is nothing to
+ * adopt, and the first person to register gets them instead.
+ */
+function adoptOrphanTrips(sqlite: Database.Database) {
+  const [{ count }] = sqlite.prepare("SELECT COUNT(*) AS count FROM users").all() as {
+    count: number;
+  }[];
+  if (count !== 1) return;
+
+  const owner = sqlite.prepare("SELECT id FROM users LIMIT 1").get() as { id: string };
+  const result = sqlite
+    .prepare("UPDATE trips SET owner_id = ? WHERE owner_id IS NULL")
+    .run(owner.id);
+
+  if (result.changes > 0) {
+    console.log(`Adopted ${result.changes} ownerless trip(s) into the only account.`);
+  }
 }
 
 /** ALTER TABLE ADD COLUMN is not idempotent, so check the table shape first. */

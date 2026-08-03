@@ -17,7 +17,7 @@ import { randomBytes } from "crypto";
 import { existsSync } from "fs";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { join } from "path";
-import { eq, asc, and, isNull } from "drizzle-orm";
+import { eq, asc, and } from "drizzle-orm";
 import { db } from "@/db";
 import {
   trips,
@@ -135,17 +135,10 @@ export async function getTrip(id: string): Promise<Trip | null> {
   };
 }
 
-/**
- * Lightweight listing; does not pull expenses or payments.
- *
- * With a user, this is their own trips plus the ones shared with them. Without one it
- * returns nothing: an anonymous visitor reaches trips by link, never by browsing.
- */
-export async function listTrips(userId?: string): Promise<
+/** Lightweight listing: the user's own trips plus the ones shared with them. */
+export async function listTrips(userId: string): Promise<
   { id: string; name: string; currency: string; createdAt: number; memberCount: number; expenseCount: number; owned: boolean }[]
 > {
-  if (!userId) return [];
-
   const owned = db.select().from(trips).where(eq(trips.ownerId, userId)).all();
   const sharedIds = db
     .select({ tripId: tripAccess.tripId })
@@ -180,23 +173,21 @@ export type Access = "none" | "viewer" | "editor" | "owner";
 /**
  * What a given visitor may do with a trip.
  *
- * An ownerless trip is open to anyone holding the link — that is the anonymous mode the
- * app started with, and removing it would break every link already shared. Once a trip
- * has an owner the link alone is no longer enough.
+ * Every trip belongs to an account. There is no anonymous mode: holding a link is not
+ * access, and someone who has been given one joins through an invitation instead. That
+ * removed a whole second set of rules — claiming, ownerless deletion, trips remembered
+ * only by one browser — and with it the questions they raised, like what happens when
+ * two people claim the same link.
  */
 export function accessLevel(tripId: string, userId?: string): Access {
+  if (!userId) return "none";
+
   const trip = db
     .select({ ownerId: trips.ownerId })
     .from(trips)
     .where(eq(trips.id, tripId))
     .get();
   if (!trip) return "none";
-
-  // An unclaimed trip belongs to whoever holds the link, deletion included. That is
-  // exactly what the app did before accounts existed, and every link already shared
-  // keeps working.
-  if (trip.ownerId === null) return "owner";
-  if (!userId) return "none";
   if (trip.ownerId === userId) return "owner";
 
   const grant = db
@@ -210,22 +201,6 @@ export function accessLevel(tripId: string, userId?: string): Access {
 
 export const canRead = (level: Access) => level !== "none";
 export const canWrite = (level: Access) => level === "editor" || level === "owner";
-
-/**
- * Attaches an ownerless trip to an account.
- *
- * The WHERE clause covers the race: two people claiming the same link at once means one
- * UPDATE matches and the other changes nothing.
- */
-export async function claimTrip(tripId: string, userId: string): Promise<boolean> {
-  if (!isValidId(tripId)) return false;
-  const result = db
-    .update(trips)
-    .set({ ownerId: userId, updatedAt: Date.now() })
-    .where(and(eq(trips.id, tripId), isNull(trips.ownerId)))
-    .run();
-  return result.changes > 0;
-}
 
 /** Gives another account access to an owned trip. Idempotent. */
 export async function grantAccess(
@@ -312,8 +287,8 @@ export interface CreateTripInput {
   name: string;
   currency: string;
   members: { name: string; emoji: string }[];
-  /** Omitted for anonymous trips, which stay reachable by link alone. */
-  ownerId?: string;
+  /** Every trip belongs to somebody; there is no anonymous mode. */
+  ownerId: string;
 }
 
 export async function createTrip(input: CreateTripInput): Promise<Trip> {
@@ -329,7 +304,7 @@ export async function createTrip(input: CreateTripInput): Promise<Trip> {
         createdAt: now,
         updatedAt: now,
         version: 1,
-        ownerId: input.ownerId ?? null,
+        ownerId: input.ownerId,
       })
       .run();
     input.members.forEach((m, i) => {
@@ -658,11 +633,6 @@ export async function convertToEurSafe(
   }
 }
 
-/** True while a trip still belongs to nobody and travels on its link alone. */
-export function isAnonymousTrip(tripId: string): boolean {
-  const row = db.select({ ownerId: trips.ownerId }).from(trips).where(eq(trips.id, tripId)).get();
-  return row ? row.ownerId === null : false;
-}
 
 
 /**

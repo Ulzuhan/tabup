@@ -10,21 +10,20 @@ import {
   registrationOpen,
   tooManyAttempts,
 } from "@/lib/auth";
-import { claimTrip, isValidId, readInvite, redeemInvite } from "@/lib/store";
+import { readInvite, redeemInvite } from "@/lib/store";
 
 /**
  * Creates an account.
  *
- * `claimTripIds` is the conversion path: someone who has been using the app anonymously
- * sends the trip ids their browser remembers, and the ones that still have no owner
- * become theirs. Trips already owned by someone else are silently left alone.
+ * An invitation token, when present, is both permission to register on a closed
+ * instance and the trip the new account joins on the way in.
  */
 export async function POST(request: NextRequest) {
   // Closed by default once the instance has an owner. This is reachable from the
   // internet, and an open registration endpoint on a personal instance means anyone
   // who finds the URL can create accounts on it. The first account is always allowed
   // so a fresh install can be set up; after that, opening it up is a deliberate act.
-  let body: { email?: string; name?: string; password?: string; claimTripIds?: unknown; inviteToken?: string };
+  let body: { email?: string; name?: string; password?: string; inviteToken?: string };
   try {
     body = await request.json();
   } catch {
@@ -41,7 +40,7 @@ export async function POST(request: NextRequest) {
   const invite = typeof body.inviteToken === "string" ? readInvite(body.inviteToken) : null;
   if (!invite && !registrationOpen()) {
     return NextResponse.json(
-      { error: "Registration is closed on this instance" },
+      { error: "This server is not accepting new accounts. Use an invitation link." },
       { status: 403 }
     );
   }
@@ -73,12 +72,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "That email is already registered" }, { status: 409 });
   }
 
-  let claimed = 0;
-  if (Array.isArray(body.claimTripIds)) {
-    for (const id of body.claimTripIds.slice(0, 50)) {
-      if (typeof id === "string" && isValidId(id) && (await claimTrip(id, user.id))) claimed++;
-    }
-  }
 
   await createSession(user.id);
 
@@ -88,5 +81,5 @@ export async function POST(request: NextRequest) {
     joinedTripId = await redeemInvite(body.inviteToken, user.id);
   }
 
-  return NextResponse.json({ user: publicUser(user), claimed, tripId: joinedTripId });
+  return NextResponse.json({ user: publicUser(user), tripId: joinedTripId });
 }

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, publicUser } from "@/lib/auth";
+import { getCurrentUser, publicUser, registrationOpen } from "@/lib/auth";
 import { FREE_TRIP_LIMIT, ownedTripCount } from "@/lib/store";
 
 /** Who is signed in, and how much of the free plan they have used. */
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ user: null });
+  // Reported so the sign-in screen can hide a path that would only end in a refusal.
+  if (!user) return NextResponse.json({ user: null, registrationOpen: registrationOpen() });
 
   return NextResponse.json({
     user: publicUser(user),

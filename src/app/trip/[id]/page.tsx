@@ -25,7 +25,6 @@ import {
   Wallet,
 } from "lucide-react";
 import type { Member, Expense, Payment } from "@/lib/types";
-import { rememberTrip } from "@/lib/local-trips";
 import { cn } from "@/lib/utils";
 import { CategoryBadge, CategoryIcon, categoryTint, useCategoryName } from "@/components/category-icon";
 import { MemberAvatar, MemberStack } from "@/components/member-avatar";
@@ -101,7 +100,6 @@ interface TripData {
   settlements: EnrichedSettlement[];
   totalExpenses: number;
   access: "viewer" | "editor" | "owner";
-  anonymous: boolean;
   collaborators: { id: string; email: string; name: string; role: string }[];
 }
 
@@ -175,10 +173,6 @@ export default function TripPage() {
       // The service worker sets this when it served a cached copy because the network
       // was unreachable, so the page can say the figures are not current.
       setStale(res.headers.get("X-TabUp-Offline") === "1");
-
-      // Opening an anonymous trip by link is how someone joins it. Recording the id
-      // here is what puts it on their home screen afterwards.
-      if (data.anonymous) rememberTrip(data.id);
 
       setPaymentDraft((d) => ({
         ...d,
@@ -964,7 +958,6 @@ export default function TripPage() {
         url={typeof window === "undefined" ? "" : window.location.href}
         tripId={id}
         tripName={trip.name}
-        anonymous={trip.anonymous}
         summary={{
           currency: trip.currency,
           total: view?.totalExpenses ?? trip.totalExpenses,
@@ -1015,7 +1008,6 @@ export default function TripPage() {
         members={trip.members}
         collaborators={trip.collaborators}
         access={trip.access}
-        anonymous={trip.anonymous}
         onChanged={loadTrip}
       />
 

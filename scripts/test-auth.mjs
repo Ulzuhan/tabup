@@ -101,7 +101,7 @@ async function main() {
   console.log("\nOwnership");
   const { body: aliceTrip } = await newTrip(alice, "Alice's trip");
   check("owner sees it listed", (await alice("/api/trips")).body.trips.length, 1);
-  check("anonymous listing is empty", (await anonymous("/api/trips")).body.trips.length, 0);
+  check("listing without an account is refused", (await anonymous("/api/trips")).status, 401);
 
   const peek = await anonymous(`/api/trips/${aliceTrip.id}`);
   check("stranger knowing the id gets 404", peek.status, 404);
@@ -124,30 +124,10 @@ async function main() {
   check("stranger cannot delete", stealDelete.status, 404);
   check("trip survived", (await alice(`/api/trips/${aliceTrip.id}`)).status, 200);
 
-  // ── Anonymous trips still work ─────────────────────────────────────
-  console.log("\nAnonymous trips");
-  const { body: openTrip } = await newTrip(anonymous, "Open trip");
-  check("anyone with the link can read", (await client()(`/api/trips/${openTrip.id}`)).status, 200);
-
-  const openWrite = await client()(`/api/trips/${openTrip.id}/expense`, {
-    method: "POST",
-    body: JSON.stringify({
-      description: "Beers",
-      amount: 12,
-      paidBy: openTrip.members[0].id,
-      category: "food",
-    }),
-  });
-  check("anyone with the link can write", openWrite.status, 200);
-
-  // ── Claiming ───────────────────────────────────────────────────────
-  console.log("\nClaiming");
-  const claim = await alice(`/api/trips/${openTrip.id}/claim`, { method: "POST" });
-  check("signed-in user claims it", claim.status, 200);
-  check("now closed to strangers", (await client()(`/api/trips/${openTrip.id}`)).status, 404);
-
-  const reclaim = await client()(`/api/trips/${openTrip.id}/claim`, { method: "POST" });
-  check("claiming without an account fails", reclaim.status, 401);
+  // ── An account is required, always ─────────────────────────────────
+  console.log("\nNo anonymous mode");
+  const anonCreate = await newTrip(anonymous, "Should not exist");
+  check("creating without an account is refused", anonCreate.status, 401);
 
   const bob = client();
   const bobEmail = `bob-${uniq()}@example.com`;
@@ -155,8 +135,6 @@ async function main() {
     method: "POST",
     body: JSON.stringify({ email: bobEmail, name: "Bob", password: "another good password" }),
   });
-  const steal = await bob(`/api/trips/${openTrip.id}/claim`, { method: "POST" });
-  check("an owned trip cannot be claimed", steal.status, 409);
 
   // ── Sharing ────────────────────────────────────────────────────────
   console.log("\nSharing");
@@ -224,6 +202,48 @@ async function main() {
   check("access is revoked", revoked.status, 200);
   check("and they lose sight of it", (await bob(`/api/trips/${aliceTrip.id}`)).status, 404);
 
+  // ── Invitations ────────────────────────────────────────────────────
+  console.log("\nInvitations");
+  const { body: inviteTrip } = await newTrip(alice, "Invited trip");
+  const invite = await alice(`/api/trips/${inviteTrip.id}/invite`, { method: "POST" });
+  check("owner creates an invitation", invite.status, 200);
+
+  const guest = client();
+  check("stranger cannot see the trip", (await guest(`/api/trips/${inviteTrip.id}`)).status, 404);
+
+  const lookup = await guest(`/api/join?token=${encodeURIComponent(invite.body.token)}`);
+  check("the invitation names the trip", lookup.body.tripName, "Invited trip");
+
+  // A valid invitation is permission to register even when sign-ups are closed.
+  const joined = await guest("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify({
+      email: `guest-${uniq()}@example.com`,
+      name: "Guest",
+      password: "a guest password",
+      inviteToken: invite.body.token,
+    }),
+  });
+  check("invited guest registers", joined.status, 200);
+  check("and lands in the trip", joined.body.tripId, inviteTrip.id);
+  check("who can now read it", (await guest(`/api/trips/${inviteTrip.id}`)).status, 200);
+
+  // The suite runs with sign-ups open, so a bogus token cannot be tested as a
+  // registration wall here — what it must not do is grant access to anything.
+  const badToken = await client()("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify({
+      email: `nobody-${uniq()}@example.com`,
+      name: "Nobody",
+      password: "another password",
+      inviteToken: "made-up-token",
+    }),
+  });
+  check("a made-up token joins nothing", badToken.body.tripId ?? null, null);
+
+  const guestInvite = await guest(`/api/trips/${inviteTrip.id}/invite`, { method: "POST" });
+  check("an editor cannot invite others", guestInvite.status, 403);
+
   // ── Login and logout ───────────────────────────────────────────────
   console.log("\nLogin and logout");
   await alice("/api/auth/logout", { method: "POST" });
@@ -265,12 +285,10 @@ async function main() {
   const { body: usage } = await carol("/api/auth/me");
   check("and no limit is advertised", usage.usage.tripLimit, null);
 
-  const anonAgain = await newTrip(client(), "Still free");
-  check("anonymous creation works too", anonAgain.status, 200);
+
 
   // ── Cleanup ────────────────────────────────────────────────────────
   await alice(`/api/trips/${aliceTrip.id}`, { method: "DELETE" });
-  await alice(`/api/trips/${openTrip.id}`, { method: "DELETE" });
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);

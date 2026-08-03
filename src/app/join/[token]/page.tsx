@@ -11,7 +11,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { localTripIds, forgetTrips } from "@/lib/local-trips";
 
 /**
  * Landing page for an invitation link.
@@ -87,16 +86,14 @@ export default function JoinPage() {
     setBusy(true);
     setError(null);
 
-    const claimTripIds = localTripIds();
-
     try {
       const res = await fetch(`/api/auth/${mode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
           mode === "register"
-            ? { email, name, password, claimTripIds, inviteToken: token }
-            : { email, password, claimTripIds, inviteToken: token }
+            ? { email, name, password, inviteToken: token }
+            : { email, password, inviteToken: token }
         ),
       });
       const data = await res.json();
@@ -107,7 +104,6 @@ export default function JoinPage() {
         return;
       }
 
-      if (data.claimed > 0) forgetTrips(claimTripIds);
       router.push(data.tripId ? `/trip/${data.tripId}` : "/");
     } catch {
       setError(t("common.serverUnreachable"));

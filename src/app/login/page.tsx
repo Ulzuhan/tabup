@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { forgetTrips, localTripIds } from "@/lib/local-trips";
 import { Wordmark } from "@/components/app-header";
 import { useT } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
@@ -12,13 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-/**
- * Sign in and registration on one screen.
- *
- * The trips this browser has been using anonymously ride along in the request: the
- * server claims the ones that still have no owner, which turns "I have been using this
- * for a week" into an account without losing anything.
- */
+/** Sign in and registration on one screen. */
 export default function LoginPage() {
   const t = useT();
   const router = useRouter();
@@ -28,6 +21,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [canRegister, setCanRegister] = useState<boolean | null>(null);
+
+  // Asked before offering the choice: proposing "create one" and then refusing it is
+  // the kind of dead end that makes people think the app is broken.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => !cancelled && setCanRegister(Boolean(d.registrationOpen)))
+      .catch(() => !cancelled && setCanRegister(false));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const registering = mode === "register";
 
@@ -37,15 +44,11 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
 
-    const claimTripIds = localTripIds();
-
     try {
       const res = await fetch(`/api/auth/${mode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          registering ? { email, name, password, claimTripIds } : { email, password, claimTripIds }
-        ),
+        body: JSON.stringify(registering ? { email, name, password } : { email, password }),
       });
       const data = await res.json();
 
@@ -54,10 +57,6 @@ export default function LoginPage() {
         setBusy(false);
         return;
       }
-
-      // Claimed trips are on the account now; keeping them in localStorage would show
-      // them twice on the home screen.
-      if (data.claimed > 0) forgetTrips(claimTripIds);
 
       router.push("/");
       router.refresh();
@@ -155,27 +154,27 @@ export default function LoginPage() {
         </CardContent>
       </Card>
 
-      <p className="mt-5 text-center text-sm text-muted-foreground">
-        {registering ? t("auth.alreadyHaveAccount") : t("auth.newHere")}{" "}
-        <button
-          type="button"
-          onClick={() => {
-            setMode(registering ? "login" : "register");
-            setError(null);
-          }}
-          className="rounded font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {registering ? t("auth.signIn") : t("auth.createOne")}
-        </button>
-      </p>
+      {canRegister === false && !registering ? (
+        <div className="mt-6 rounded-xl border border-border bg-card p-3 text-center">
+          <p className="text-sm font-medium">{t("auth.closed")}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("auth.closedHint")}</p>
+        </div>
+      ) : (
+        <p className="mt-5 text-center text-sm text-muted-foreground">
+          {registering ? t("auth.alreadyHaveAccount") : t("auth.newHere")}{" "}
+          <button
+            type="button"
+            onClick={() => {
+              setMode(registering ? "login" : "register");
+              setError(null);
+            }}
+            className="rounded font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {registering ? t("auth.signIn") : t("auth.createOne")}
+          </button>
+        </p>
+      )}
 
-      <p className="mt-8 text-center text-xs text-muted-foreground">
-        {t("auth.noAccountNeeded")}{" "}
-        <Link href="/" className="text-primary underline-offset-4 hover:underline">
-          {t("auth.startWithout")}
-        </Link>
-        .
-      </p>
     </div>
   );
 }

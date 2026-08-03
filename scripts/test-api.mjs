@@ -4,7 +4,7 @@
  *
  * Runs against a live server, no dependencies and no test framework:
  *
- *   npm run start &
+ *   TABUP_ALLOW_REGISTRATION=true npm run start &
  *   npm run test:api
  *
  * The concurrency case is the important one. Before the SQLite migration this API
@@ -25,11 +25,25 @@ function check(name, actual, expected) {
   else failed++;
 }
 
-const api = async (path, options) => {
+/**
+ * Keeps the session cookie between calls.
+ *
+ * Every trip belongs to an account now — there is no anonymous mode — so the suite
+ * signs in once and works as that user.
+ */
+let cookie = "";
+
+const api = async (path, options = {}) => {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(cookie ? { cookie } : {}),
+      ...(options.headers || {}),
+    },
   });
+  const setCookie = res.headers.get("set-cookie");
+  if (setCookie) cookie = setCookie.split(";")[0];
   return { status: res.status, body: await res.json().catch(() => ({})) };
 };
 
@@ -46,9 +60,23 @@ const newTrip = (names = ["Ana", "Bea"]) =>
 async function main() {
   console.log(`Testing against ${BASE}\n`);
 
-  const health = await fetch(`${BASE}/api/trips`).catch(() => null);
+  const health = await fetch(`${BASE}/api/auth/me`).catch(() => null);
   if (!health?.ok) {
     console.error(`No server at ${BASE}. Start one with: npm run start`);
+    process.exit(1);
+  }
+
+  // Needs TABUP_ALLOW_REGISTRATION=true unless the database is empty.
+  const signUp = await api("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify({
+      email: `api-${Math.random().toString(36).slice(2, 10)}@example.com`,
+      name: "API",
+      password: "a password for the suite",
+    }),
+  });
+  if (signUp.status !== 200) {
+    console.error(`Could not create an account (HTTP ${signUp.status}). Start the server with TABUP_ALLOW_REGISTRATION=true.`);
     process.exit(1);
   }
 
@@ -167,10 +195,10 @@ async function main() {
   });
   check("unknown payer is rejected", stranger.status, 400);
 
-  const traversal = await fetch(`${BASE}/api/trips/..%2f..%2fetc%2fpasswd`);
+  const traversal = await fetch(`${BASE}/api/trips/..%2f..%2fetc%2fpasswd`, { headers: { cookie } });
   check("path traversal is rejected", [400, 404].includes(traversal.status), true);
 
-  const exported = await fetch(`${BASE}/api/trips/${trip.id}/export`);
+  const exported = await fetch(`${BASE}/api/trips/${trip.id}/export`, { headers: { cookie } });
   check("CSV export works", exported.status, 200);
 
   await api(`/api/trips/${trip.id}`, { method: "DELETE" });

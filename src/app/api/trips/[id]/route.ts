@@ -5,7 +5,6 @@ import {
   calculateSettlements,
   deleteTrip,
   getTrip,
-  isAnonymousTrip,
   listCollaborators,
   removeMembers,
   updateTripMeta,
@@ -55,8 +54,6 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/trips/[
     // The UI hides the write controls on a read-only trip; the server refuses them
     // regardless, this only avoids showing buttons that would fail.
     access: auth.level,
-    // Anonymous trips have no collaborator list — the link is the access control.
-    anonymous: isAnonymousTrip(id),
     collaborators: listCollaborators(id),
   });
 }

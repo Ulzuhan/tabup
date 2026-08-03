@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { CalendarClock, Download, Loader2, Pencil, Plus, Repeat, Trash2 } from "lucide-react";
 import { useT, useIntlLocale } from "@/i18n/provider";
 import { AppHeader, type SessionUser } from "@/components/app-header";
-import { SectionTabs } from "@/components/section-tabs";
+import { SectionTabs, SectionTabsSpacer } from "@/components/section-tabs";
 import { CategoryIcon, categoryTint, useCategoryName } from "@/components/category-icon";
 import { Money, currencySymbol, formatAmount } from "@/components/money";
 import { RecurringDialog, type RecurringDraft, emptyRecurring } from "@/components/recurring/recurring-dialog";
@@ -372,6 +372,7 @@ export default function RecurringPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <SectionTabsSpacer />
     </div>
   );
 }

@@ -8,18 +8,15 @@ import {
   Loader2,
   Plus,
   Receipt,
-  Sparkles,
   Users,
   X,
 } from "lucide-react";
 import { CURRENCIES, EMOJIS } from "@/lib/types";
-import { forgetTrips, localTripIds, rememberTrip } from "@/lib/local-trips";
 import { useT } from "@/i18n/provider";
 import { AppHeader, Wordmark, type SessionUser } from "@/components/app-header";
-import { SectionTabs } from "@/components/section-tabs";
+import { SectionTabs, SectionTabsSpacer } from "@/components/section-tabs";
 import { MemberAvatar } from "@/components/member-avatar";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +37,6 @@ interface TripSummary {
   expenseCount: number;
   createdAt: number;
   owned?: boolean;
-  anonymous?: boolean;
 }
 
 export default function Home() {
@@ -55,48 +51,22 @@ export default function Home() {
   const [members, setMembers] = useState(["", ""]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [claiming, setClaiming] = useState(false);
 
-  /**
-   * The list is two sources merged: trips the account owns or was given, and trips this
-   * browser remembers from before there was an account. Anonymous trips live only in
-   * localStorage, so without the second half they would vanish from this screen even
-   * though their links still work.
-   */
+  /** Trips the account owns or was given. There is no other source any more. */
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
-      const remembered = localTripIds();
-      const [session, owned, local] = await Promise.all([
+      const [session, owned] = await Promise.all([
         fetch("/api/auth/me").then((r) => r.json()).catch(() => ({ user: null })),
-        fetch("/api/trips").then((r) => r.json()).catch(() => ({ trips: [] })),
-        remembered.length
-          ? fetch("/api/trips/lookup", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ ids: remembered }),
-            })
-              .then((r) => r.json())
-              .catch(() => ({ trips: [] }))
-          : Promise.resolve({ trips: [] }),
+        fetch("/api/trips").then((r) => (r.ok ? r.json() : { trips: [] })).catch(() => ({ trips: [] })),
       ]);
 
       if (cancelled) return;
 
-      // Trips that no longer resolve were deleted elsewhere; stop carrying their ids.
-      const alive = new Set((local.trips ?? []).map((t: TripSummary) => t.id));
-      const stale = remembered.filter((id) => !alive.has(id));
-      if (stale.length) forgetTrips(stale);
-
-      const merged = new Map<string, TripSummary>();
-      for (const trip of [...(owned.trips ?? []), ...(local.trips ?? [])]) {
-        merged.set(trip.id, { ...merged.get(trip.id), ...trip });
-      }
-
       setUser(session.user ?? null);
       setUsage(session.usage ?? null);
-      setTrips([...merged.values()].sort((a, b) => b.createdAt - a.createdAt));
+      setTrips([...(owned.trips ?? [])].sort((a, b) => b.createdAt - a.createdAt));
       setLoading(false);
     };
 
@@ -111,30 +81,6 @@ export default function Home() {
     window.location.reload();
   };
 
-  /**
-   * Attaches the browser's leftover anonymous trips to the account.
-   *
-   * Anything the server refuses — already owned, over the plan limit — is left alone
-   * and stays in the local list.
-   */
-  const claimAnonymous = async () => {
-    const ids = trips.filter((t) => t.anonymous).map((t) => t.id);
-    if (ids.length === 0) return;
-    setClaiming(true);
-
-    const claimed: string[] = [];
-    for (const id of ids) {
-      const res = await fetch(`/api/trips/${id}/claim`, { method: "POST" }).catch(() => null);
-      if (res?.ok) claimed.push(id);
-    }
-
-    forgetTrips(claimed);
-    if (claimed.length > 0) {
-      window.location.reload();
-      return;
-    }
-    setClaiming(false);
-  };
 
   const addMember = () => {
     if (members.length < 10) setMembers([...members, ""]);
@@ -175,9 +121,6 @@ export default function Home() {
         return;
       }
 
-      // Without an account the link is the only way back to it, so the browser keeps
-      // the id. Signing in later offers these up to be claimed.
-      if (!user) rememberTrip(data.id);
       window.location.href = `/trip/${data.id}`;
     } catch {
       setCreateError(t("common.serverUnreachable"));
@@ -190,7 +133,22 @@ export default function Home() {
       <AppHeader user={user} loading={loading} onSignOut={signOut} showWordmark={false} />
       <SectionTabs current="trips" />
 
-      {showCreate ? (
+      {!loading && !user ? (
+        /* Offering "new trip" to someone with no session would only end in a 401:
+           every trip belongs to an account now. */
+        <div className="mt-6 rounded-2xl border border-dashed border-border px-6 py-14 text-center">
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-secondary">
+            <Compass className="size-6 text-muted-foreground" />
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            <Wordmark />
+          </h1>
+          <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">
+            {t("home.tagline")}
+          </p>
+          <Button className="mt-6" render={<Link href="/login">{t("auth.signIn")}</Link>} />
+        </div>
+      ) : showCreate ? (
         <CreateTripForm
           tripName={tripName}
           setTripName={setTripName}
@@ -244,18 +202,6 @@ export default function Home() {
                   )}
                 </div>
 
-                {user && trips.some((t) => t.anonymous) && (
-                  <Card className="mb-3 flex-row items-center gap-3 border-primary/25 bg-primary/[0.06] p-3">
-                    <Sparkles className="size-4 shrink-0 text-primary" />
-                    <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-                      {t("home.localOnly")}
-                    </p>
-                    <Button size="sm" variant="ghost" onClick={claimAnonymous} disabled={claiming}>
-                      {claiming ? <Loader2 className="size-4 animate-spin" /> : t("home.saveToAccount")}
-                    </Button>
-                  </Card>
-                )}
-
                 <ul className="space-y-2">
                   {trips.map((trip) => (
                     <li key={trip.id}>
@@ -296,12 +242,7 @@ function TripRow({ trip }: { trip: TripSummary }) {
             <Receipt className="size-3.5" />
             <span className="tabular">{trip.expenseCount}</span>
           </span>
-          {trip.anonymous && (
-            <Badge variant="outline" className="h-5 px-1.5 text-[11px] font-normal">
-              {t("home.thisDevice")}
-            </Badge>
-          )}
-          {trip.owned === false && !trip.anonymous && (
+          {trip.owned === false && (
             <Badge variant="outline" className="h-5 px-1.5 text-[11px] font-normal">
               {t("home.shared")}
             </Badge>
@@ -333,6 +274,7 @@ function EmptyState({ signedIn }: { signedIn: boolean }) {
           {t("home.signInToKeep")}
         </p>
       )}
+      <SectionTabsSpacer />
     </div>
   );
 }

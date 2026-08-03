@@ -5,10 +5,13 @@ import { CURRENCIES, EMOJIS } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
   try {
-    // Signing in is optional. Without an account the trip has no owner and lives on
-    // its link, which is what keeps the first use free of a registration wall.
+    // Every trip belongs to an account: there is no anonymous mode, so this is the
+    // one place that decides a trip exists at all.
     const user = await getCurrentUser();
-    if (user && atTripLimit(user)) {
+    if (!user) {
+      return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+    }
+    if (atTripLimit(user)) {
       return NextResponse.json(
         {
           error: `This account is capped at ${FREE_TRIP_LIMIT} trips.`,
@@ -51,7 +54,7 @@ export async function POST(request: NextRequest) {
         name: m.name.trim(),
         emoji: EMOJIS[i % EMOJIS.length],
       })),
-      ownerId: user?.id,
+      ownerId: user.id,
     });
 
     return NextResponse.json({
@@ -70,7 +73,10 @@ export async function GET() {
   try {
     // Only ever the caller's own trips: there is no endpoint that lists everyone's.
     const user = await getCurrentUser();
-    const trips = await listTrips(user?.id);
+    if (!user) {
+      return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+    }
+    const trips = await listTrips(user.id);
     return NextResponse.json({ trips });
   } catch (error) {
     console.error("List trips error:", error);
