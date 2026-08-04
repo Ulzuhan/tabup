@@ -1,53 +1,36 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import {
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
-  Download,
-  Eye,
-  Loader2,
-  MoreVertical,
-  Pencil,
-  Share2,
-  Plus,
-  Receipt,
-  Settings,
-  CloudOff,
-  CopyPlus,
-  Trash2,
-  TriangleAlert,
-  UserPlus,
-  Wallet,
-} from "lucide-react";
-import type { Member, Expense, Payment } from "@/lib/types";
-import { cn } from "@/lib/utils";
-import { CategoryBadge, CategoryIcon, categoryTint, useCategoryName } from "@/components/category-icon";
-import { MemberAvatar, MemberStack } from "@/components/member-avatar";
-import { Money, currencySymbol, formatAmount } from "@/components/money";
+import { Loader2, Plus, TriangleAlert } from "lucide-react";
+import type { Expense, Member } from "@/lib/types";
 import { ExpenseDialog, type ExpenseDraft } from "@/components/trip/expense-dialog";
 import { SettleDialog, type PaymentDraft } from "@/components/trip/settle-dialog";
 import { ShareDialog } from "@/components/trip/share-dialog";
 import { ManageDialog } from "@/components/trip/manage-dialog";
 import { SpendingPace } from "@/components/trip/spending-pace";
+import { TripHeader } from "@/components/trip/trip-header";
+import {
+  BalancesCard,
+  CategoryBreakdown,
+  PendingBanner,
+  ReadOnlyNotice,
+  TripTotal,
+} from "@/components/trip/overview";
+import { ExpenseList } from "@/components/trip/expense-list";
+import { PaymentHistory, SettlementList } from "@/components/trip/settle-up";
+import { useTripData } from "@/components/trip/use-trip-data";
 import {
   ExpenseFilterBar,
   NO_FILTERS,
-  filterExpenses,
   type ExpenseFilters,
 } from "@/components/trip/expense-filter";
 import { OfflineBanner } from "@/components/offline";
 import { enqueue, newClientId } from "@/lib/write-queue";
-import { usePendingWrites, mergePending } from "@/lib/use-pending";
-import { useT, useIntlLocale, usePlural } from "@/i18n/provider";
-import { LanguageItems } from "@/components/app-header";
+import { useT } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -59,49 +42,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
-interface EnrichedSettlement {
-  from: string;
-  to: string;
-  amount: number;
-  fromName: string;
-  fromEmoji: string;
-  toName: string;
-  toEmoji: string;
-}
-
-interface EnrichedBalance {
-  memberId: string;
-  totalPaid: number;
-  totalShare: number;
-  balance: number;
-  name: string;
-  emoji: string;
-}
-
-interface TripData {
-  id: string;
-  name: string;
-  currency: string;
-  createdAt: number;
-  version: number;
-  budget?: number | null;
-  members: Member[];
-  expenses: Expense[];
-  payments: Payment[];
-  balances: EnrichedBalance[];
-  settlements: EnrichedSettlement[];
-  totalExpenses: number;
-  access: "viewer" | "editor" | "owner";
-  collaborators: { id: string; email: string; name: string; role: string }[];
-}
+/**
+ * One trip.
+ *
+ * This page owns the state and the writes — loading, the drafts, what a button press
+ * sends, and what happens when it cannot be sent — and hands the drawing to the
+ * components under components/trip. It used to draw all of it as well, which came to
+ * some twelve hundred lines and twenty-two hooks in a single function, and every one of
+ * the hook-order bugs this app has had came out of that.
+ */
 
 const today = () => new Date().toISOString().split("T")[0];
 
@@ -120,16 +70,27 @@ const emptyExpense = (currency: string, members: Member[]): ExpenseDraft => ({
 
 export default function TripPage() {
   const t = useT();
-  const plural = usePlural();
-  const categoryName = useCategoryName();
-  const intlLocale = useIntlLocale();
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
 
-  const [trip, setTrip] = useState<TripData | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [filters, setFilters] = useState<ExpenseFilters>(NO_FILTERS);
+
+  const {
+    trip,
+    error,
+    stale,
+    seeded,
+    view,
+    visibleExpenses,
+    categoryBreakdown,
+    breakdownTotal,
+    pending,
+    loadTrip,
+    refreshPending,
+    flushPending,
+  } = useTripData(id, filters);
 
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -145,9 +106,7 @@ export default function TripPage() {
   });
 
   const [shareOpen, setShareOpen] = useState(false);
-  const [stale, setStale] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
-  const [filters, setFilters] = useState<ExpenseFilters>(NO_FILTERS);
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
 
   const [confirm, setConfirm] = useState<{
@@ -161,69 +120,19 @@ export default function TripPage() {
   const patchPayment = (patch: Partial<PaymentDraft>) =>
     setPaymentDraft((d) => ({ ...d, ...patch }));
 
-  const loadTrip = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/trips/${id}`);
-      if (!res.ok) {
-        setError(t("trip.notFound"));
-        return;
-      }
-      const data: TripData = await res.json();
-      setTrip(data);
-      // The service worker sets this when it served a cached copy because the network
-      // was unreachable, so the page can say the figures are not current.
-      setStale(res.headers.get("X-TabUp-Offline") === "1");
-
-      setPaymentDraft((d) => ({
-        ...d,
-        from: d.from || data.members[0]?.id || "",
-        to: d.to || data.members[1]?.id || "",
-      }));
-    } catch {
-      setError(t("trip.notFound"));
-    }
-  }, [id, t]);
-
-  // Wrapped in a promise callback so nothing updates state during the render pass:
-  // every setState inside loadTrip runs after the fetch has resolved.
-  useEffect(() => {
-    Promise.resolve().then(loadTrip);
-  }, [loadTrip]);
-
-  const { pending, refresh: refreshPending, flush: flushPending } = usePendingWrites(id, () => {
-    // Something in the queue reached the server, so the trip on screen is now behind.
-    Promise.resolve().then(() => loadTrip());
-  });
-
-
   /**
-   * What the screen shows: the server's data with the queued writes folded in.
+   * Opens the payment dialog with the first two members already picked.
    *
-   * Balances come out of the merged set, computed with the same functions the server
-   * uses, so typing an expense with no signal moves the figures immediately. Showing
-   * the expense but leaving the balances behind would be worse than useless.
+   * Seeded on opening rather than when the trip loads: an effect that writes state the
+   * moment data arrives is a render pass nobody asked for, and this is the only moment
+   * the value is actually needed.
    */
-  const view = useMemo(
-    () => (trip ? mergePending(trip, pending) : null),
-    [trip, pending]
-  );
-
-  const visibleExpenses = useMemo(
-    () => (view ? filterExpenses(view.expenses, filters) : []),
-    [view, filters]
-  );
-
-  const categoryBreakdown = useMemo(() => {
-    if (!view) return [];
-    const totals: Record<string, number> = {};
-    for (const e of view.expenses) totals[e.category] = (totals[e.category] || 0) + e.amountBase;
-    return Object.entries(totals).sort((a, b) => b[1] - a[1]);
-  }, [view]);
-
-  const breakdownTotal = useMemo(
-    () => categoryBreakdown.reduce((sum, [, v]) => sum + v, 0),
-    [categoryBreakdown]
-  );
+  const openSettle = () => {
+    if (seeded) {
+      setPaymentDraft((d) => ({ ...d, from: d.from || seeded.from, to: d.to || seeded.to }));
+    }
+    setSettleOpen(true);
+  };
 
   const submitExpense = async () => {
     if (!trip) return;
@@ -487,163 +396,36 @@ export default function TripPage() {
 
   const readOnly = trip.access === "viewer";
   const memberById = (mid: string) => trip.members.find((m) => m.id === mid);
-
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-20">
-      {/* Header */}
-      <header className="mb-6 flex items-start gap-3 pt-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="-ml-2 shrink-0 text-muted-foreground"
-          render={
-            <Link href="/" aria-label={t("common.back")}>
-              <ArrowLeft className="size-5" />
-            </Link>
-          }
-        />
-
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold tracking-tight">{trip.name}</h1>
-          <div className="mt-2 flex items-center gap-2.5">
-            <MemberStack members={trip.members} />
-            {!readOnly && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-1.5 text-xs text-muted-foreground"
-                onClick={() => setManageOpen(true)}
-              >
-                <UserPlus className="size-3.5" />
-                {t("trip.manage")}
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0"
-          onClick={() => setShareOpen(true)}
-          aria-label={t("common.share")}
-        >
-          <Share2 className="size-4" />
-        </Button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button variant="ghost" size="icon" className="shrink-0" aria-label={t("trip.settings")}>
-                <MoreVertical className="size-4" />
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setManageOpen(true)}>
-              <Settings className="size-4" />
-              {t("trip.settings")}
-            </DropdownMenuItem>
-            <DropdownMenuItem render={<a href={`/api/trips/${id}/export`} download />}>
-              <Download className="size-4" />
-              {t("trip.exportCsv")}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {/* The trip screen has its own header, so without this the language picker
-                would only exist on the home screen. */}
-            <LanguageItems />
-            {trip.access === "owner" && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  variant="destructive"
-                  onClick={() => setConfirm({ type: "trip", id })}
-                >
-                  <Trash2 className="size-4" />
-                  {t("trip.deleteTrip")}
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </header>
+      <TripHeader
+        tripId={id}
+        name={trip.name}
+        members={trip.members}
+        access={trip.access}
+        onManage={() => setManageOpen(true)}
+        onShare={() => setShareOpen(true)}
+        onDelete={() => setConfirm({ type: "trip", id })}
+      />
 
       <OfflineBanner stale={stale} />
+      <PendingBanner count={pending.length} onFlush={() => flushPending()} />
 
-      {pending.length > 0 && (
-        <div
-          role="status"
-          className="mb-4 flex items-center gap-2.5 rounded-xl border border-warning/25 bg-warning/10 px-4 py-2.5 text-sm text-warning"
-        >
-          <CloudOff className="size-4 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <p className="font-medium">
-              {pending.length === 1
-                ? t("offline.pendingOne")
-                : t("offline.pendingMany", { count: pending.length })}
-            </p>
-            <p className="text-xs opacity-80">{t("offline.pendingHint")}</p>
-          </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="shrink-0 text-warning hover:text-warning"
-            onClick={() => flushPending()}
-          >
-            {t("offline.sendNow")}
-          </Button>
-        </div>
-      )}
+      <TripTotal
+        total={view?.totalExpenses ?? trip.totalExpenses}
+        currency={trip.currency}
+        expenseCount={view?.expenses.length ?? 0}
+        memberCount={trip.members.length}
+      />
 
-      {/* Total */}
-      <Card className="edge-light mb-4">
-        <CardContent className="py-1 text-center">
-          <p className="text-xs tracking-wider text-muted-foreground uppercase">{t("trip.totalSpent")}</p>
-          <p className="mt-1.5 text-4xl font-semibold tracking-tight">
-            <Money amount={view?.totalExpenses ?? trip.totalExpenses} currency={trip.currency} />
-          </p>
-          {trip.expenses.length > 0 && (
-            <p className="mt-1 text-sm text-muted-foreground tabular">
-              {t("trip.expenseCount", {
-                expenses: plural("trip.nExpenses", view?.expenses.length ?? 0),
-                people: plural("trip.nPeople", trip.members.length),
-              })}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {readOnly && <ReadOnlyNotice />}
 
-      {readOnly && (
-        <div className="mb-4 flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-muted-foreground">
-          <Eye className="size-4 shrink-0" />
-          {t("trip.readOnly")}
-        </div>
-      )}
-
-      {/* Balances */}
-      {trip.balances.length > 0 && (view?.expenses.length ?? 0) > 0 && (
-        <Card className="mb-4">
-          <CardContent className="space-y-2.5">
-            <h2 className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-              {t("trip.balances")}
-            </h2>
-            {(view?.balances ?? []).map((b) => {
-              const member = memberById(b.memberId);
-              return (
-              <div key={b.memberId} className="flex items-center gap-2.5">
-                <MemberAvatar emoji={member?.emoji} name={member?.name} size="sm" />
-                <span className="min-w-0 flex-1 truncate text-sm">{member?.name}</span>
-                <Money
-                  amount={b.balance}
-                  currency={trip.currency}
-                  signed
-                  className="text-sm font-medium"
-                />
-              </div>
-              );
-            })}
-          </CardContent>
-        </Card>
+      {(view?.expenses.length ?? 0) > 0 && (
+        <BalancesCard
+          balances={view?.balances ?? []}
+          members={trip.members}
+          currency={trip.currency}
+        />
       )}
 
       <SpendingPace
@@ -653,40 +435,12 @@ export default function TripPage() {
         startedAt={trip.createdAt}
       />
 
-      {/* Category breakdown */}
-      {categoryBreakdown.length > 0 && (
-        <Card className="mb-4">
-          <CardContent className="space-y-3">
-            <h2 className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-              {t("trip.byCategory")}
-            </h2>
-            {categoryBreakdown.map(([catId, amount]) => {
-              const pct = breakdownTotal > 0 ? (amount / breakdownTotal) * 100 : 0;
-              return (
-                <div key={catId} className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-sm">
-                    <CategoryIcon category={catId} className={cn("size-4", categoryTint(catId))} />
-                    <span className="min-w-0 flex-1 truncate">{categoryName(catId)}</span>
-                    <span className="text-muted-foreground tabular">{pct.toFixed(0)}%</span>
-                    <span className="w-20 text-right tabular">
-                      {currencySymbol(trip.currency)}
-                      {formatAmount(amount)}
-                    </span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-                    <div
-                      className={cn("h-full rounded-full bg-current transition-all", categoryTint(catId))}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
+      <CategoryBreakdown
+        breakdown={categoryBreakdown}
+        total={breakdownTotal}
+        currency={trip.currency}
+      />
 
-      {/* Tabs */}
       <Tabs defaultValue="expenses" className="flex-1">
         <TabsList className="w-full">
           <TabsTrigger value="expenses" className="flex-1">
@@ -700,7 +454,6 @@ export default function TripPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Expenses */}
         <TabsContent value="expenses" className="mt-4 space-y-3">
           {!readOnly && (
             <Button className="h-11 w-full" onClick={openNewExpense}>
@@ -720,235 +473,38 @@ export default function TripPage() {
             />
           )}
 
-          {trip.expenses.length === 0 ? (
-            <EmptyPanel
-              icon={<Receipt className="size-5 text-muted-foreground" />}
-              title={t("trip.noExpenses")}
-              hint={readOnly ? undefined : t("trip.noExpensesHint")}
-            />
-          ) : visibleExpenses.length === 0 ? (
-            <EmptyPanel
-              icon={<Receipt className="size-5 text-muted-foreground" />}
-              title={t("search.noResults")}
-              hint={t("search.noResultsHint")}
-            />
-          ) : (
-            <div className="space-y-4">
-              {groupByDay(visibleExpenses).map(([day, dayExpenses]) => (
-                <section key={day}>
-                  <div className="mb-1.5 flex items-baseline justify-between px-1">
-                    <h3 className="text-xs font-medium text-muted-foreground">{formatDay(day, t, intlLocale)}</h3>
-                    <span className="text-xs text-muted-foreground tabular">
-                      {currencySymbol(trip.currency)}
-                      {formatAmount(dayExpenses.reduce((sum, e) => sum + e.amountBase, 0))}
-                    </span>
-                  </div>
-                  <ul className="space-y-1.5">
-              {dayExpenses
-                .map((expense) => {
-                  const payer = memberById(expense.paidBy);
-                  const foreign = expense.currency !== trip.currency;
-                  return (
-                    <li
-                      key={expense.id}
-                      className={cn(
-                        "group flex items-center gap-3 rounded-xl border bg-card p-3",
-                        "pending" in expense
-                          ? "border-warning/30 bg-warning/[0.04]"
-                          : "border-border"
-                      )}
-                    >
-                      {expense.receipt ? (
-                        // The photo replaces the category icon rather than sitting next
-                        // to it: the row has no room for both, and a thumbnail of the
-                        // actual receipt says more than the category ever did.
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={`/api/trips/${id}/receipt?file=${encodeURIComponent(expense.receipt)}`}
-                          alt=""
-                          className="size-10 shrink-0 cursor-zoom-in rounded-xl object-cover"
-                          onClick={() => setViewingReceipt(expense.receipt ?? null)}
-                        />
-                      ) : (
-                        <CategoryBadge category={expense.category} />
-                      )}
-
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{expense.description}</p>
-                        {expense.note && (
-                          <p className="truncate text-[13px] text-muted-foreground italic">
-                            {expense.note}
-                          </p>
-                        )}
-                        <p className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-muted-foreground">
-                          {"pending" in expense && (
-                            <CloudOff className="size-3.5 shrink-0 text-warning" />
-                          )}
-                          {payer?.emoji} {t("trip.paidBy", { name: payer?.name ?? "" })} ·{" "}
-                          {plural("trip.ways", expense.splitAmong.length)}
-                          {expense.splitShares && ` · ${t("trip.uneven")}`}
-                        </p>
-                      </div>
-
-                      <div className="shrink-0 text-right">
-                        <p className="text-sm font-medium">
-                          <Money amount={expense.amount} currency={expense.currency} />
-                        </p>
-                        {foreign && (
-                          <p className="text-xs text-muted-foreground">
-                            ≈ <Money amount={expense.amountBase} currency={trip.currency} />
-                          </p>
-                        )}
-                        {!expense.rateAvailable && expense.currency !== "EUR" && (
-                          <Badge
-                            variant="outline"
-                            className="mt-0.5 h-4 gap-1 border-warning/30 px-1 text-[10px] text-warning"
-                          >
-                            <TriangleAlert className="size-2.5" />
-                            {t("trip.rateWarning")}
-                          </Badge>
-                        )}
-                      </div>
-
-                      {!readOnly && !("pending" in expense) && (
-                        <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-100">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 text-muted-foreground"
-                            onClick={() => duplicateExpense(expense)}
-                            aria-label={`${t("expense.duplicate")}: ${expense.description}`}
-                          >
-                            <CopyPlus className="size-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 text-muted-foreground"
-                            onClick={() => openEditExpense(expense)}
-                            aria-label={`${t("common.edit")}: ${expense.description}`}
-                          >
-                            <Pencil className="size-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => setConfirm({ type: "expense", id: expense.id })}
-                            aria-label={`${t("common.delete")}: ${expense.description}`}
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-                  </ul>
-                </section>
-              ))}
-            </div>
-          )}
+          <ExpenseList
+            tripId={id}
+            expenses={visibleExpenses}
+            members={trip.members}
+            currency={trip.currency}
+            totalCount={trip.expenses.length}
+            readOnly={readOnly}
+            onEdit={openEditExpense}
+            onDuplicate={duplicateExpense}
+            onDelete={(expenseId) => setConfirm({ type: "expense", id: expenseId })}
+            onViewReceipt={setViewingReceipt}
+          />
         </TabsContent>
 
-        {/* Settle up */}
         <TabsContent value="settle" className="mt-4 space-y-3">
-          {(view?.settlements.length ?? 0) === 0 ? (
-            <div className="rounded-xl border border-primary/25 bg-primary/[0.06] px-6 py-10 text-center">
-              <CheckCircle2 className="mx-auto mb-3 size-7 text-primary" />
-              <p className="font-medium">{t("trip.allSettled")}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{t("trip.allSettledHint")}</p>
-            </div>
-          ) : (
-            <ul className="space-y-1.5">
-              {(view?.settlements ?? []).map((s, i) => {
-                const from = memberById(s.from);
-                const to = memberById(s.to);
-                return (
-                <li
-                  key={`${s.from}-${s.to}-${i}`}
-                  className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-3"
-                >
-                  <MemberAvatar emoji={from?.emoji} name={from?.name} size="sm" />
-                  <span className="truncate text-sm font-medium">{from?.name}</span>
-                  <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
-                  <MemberAvatar emoji={to?.emoji} name={to?.name} size="sm" />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{to?.name}</span>
-                  <Money
-                    amount={s.amount}
-                    currency={trip.currency}
-                    className="shrink-0 text-sm font-semibold text-primary"
-                  />
-                </li>
-                );
-              })}
-            </ul>
-          )}
-
-          {!readOnly && (
-            <Button variant="outline" className="h-11 w-full" onClick={() => setSettleOpen(true)}>
-              <Wallet className="size-4" />
-              {t("trip.recordPayment")}
-            </Button>
-          )}
+          <SettlementList
+            settlements={view?.settlements ?? []}
+            members={trip.members}
+            currency={trip.currency}
+            readOnly={readOnly}
+            onRecordPayment={openSettle}
+          />
         </TabsContent>
 
-        {/* History */}
         <TabsContent value="history" className="mt-4">
-          {(view?.expenses ? trip.payments : []).length === 0 ? (
-            <EmptyPanel
-              icon={<Wallet className="size-5 text-muted-foreground" />}
-              title={t("trip.noPayments")}
-              hint={t("trip.noPaymentsHint")}
-            />
-          ) : (
-            <ul className="space-y-1.5">
-              {[...trip.payments]
-                .sort((a, b) => b.date - a.date)
-                .map((payment) => {
-                  const from = memberById(payment.from);
-                  const to = memberById(payment.to);
-                  return (
-                    <li
-                      key={payment.id}
-                      className="group flex items-center gap-2.5 rounded-xl border border-border bg-card p-3"
-                    >
-                      <MemberAvatar emoji={from?.emoji} name={from?.name} size="sm" />
-                      <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
-                      <MemberAvatar emoji={to?.emoji} name={to?.name} size="sm" />
-
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm">
-                          {t("trip.paidTo", { from: from?.name ?? "", to: to?.name ?? "" })}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {new Date(payment.date).toLocaleDateString(intlLocale)}
-                          {payment.note && ` · ${payment.note}`}
-                        </p>
-                      </div>
-
-                      <Money
-                        amount={payment.amount}
-                        currency={trip.currency}
-                        className="shrink-0 text-sm font-medium"
-                      />
-
-                      {!readOnly && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-destructive max-sm:opacity-100"
-                          onClick={() => setConfirm({ type: "payment", id: payment.id })}
-                          aria-label={t("common.delete")}
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
-                      )}
-                    </li>
-                  );
-                })}
-            </ul>
-          )}
+          <PaymentHistory
+            payments={trip.payments}
+            members={trip.members}
+            currency={trip.currency}
+            readOnly={readOnly}
+            onDelete={(paymentId) => setConfirm({ type: "payment", id: paymentId })}
+          />
         </TabsContent>
       </Tabs>
 
@@ -1011,7 +567,6 @@ export default function TripPage() {
         onChanged={loadTrip}
       />
 
-      {/* Receipt viewer */}
       <Dialog open={Boolean(viewingReceipt)} onOpenChange={(o) => !o && setViewingReceipt(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -1028,7 +583,6 @@ export default function TripPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation */}
       <Dialog open={Boolean(confirm)} onOpenChange={(open) => !open && setConfirm(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
@@ -1053,26 +607,6 @@ export default function TripPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-function EmptyPanel({
-  icon,
-  title,
-  hint,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  hint?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-dashed border-border px-6 py-12 text-center">
-      <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-2xl bg-secondary">
-        {icon}
-      </div>
-      <p className="text-sm font-medium">{title}</p>
-      {hint && <p className="mt-1 text-sm text-muted-foreground">{hint}</p>}
     </div>
   );
 }
@@ -1124,56 +658,4 @@ function normaliseToPercent(shares?: Record<string, number>): Record<string, str
   }
 
   return Object.fromEntries(percents.map(([id, p]) => [id, String(p)]));
-}
-
-/**
- * Groups expenses into days, newest first.
- *
- * A date on every row would repeat itself half a dozen times per day and add nothing;
- * a heading per day says the same thing once and gives the list a shape you can scan.
- * The day total is there because "what did Tuesday cost us" is a question people
- * actually ask on a trip.
- */
-function groupByDay(expenses: Expense[]): [string, Expense[]][] {
-  const days = new Map<string, Expense[]>();
-
-  for (const expense of [...expenses].sort((a, b) => b.date - a.date)) {
-    // Local date, not ISO: an expense at 01:00 in Madrid belongs to that day, and
-    // toISOString would file it under the previous one.
-    const date = new Date(expense.date);
-    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-      date.getDate()
-    ).padStart(2, "0")}`;
-    const list = days.get(key);
-    if (list) list.push(expense);
-    else days.set(key, [expense]);
-  }
-
-  return [...days.entries()];
-}
-
-/**
- * "Today", "Yesterday", or a written date — relative labels only where they help.
- *
- * Takes its wording and its locale as arguments rather than reaching for the hook,
- * because it is called from inside a render loop and a plain function keeps it cheap.
- */
-function formatDay(key: string, t: (k: "trip.today" | "trip.yesterday") => string, locale: string): string {
-  const [year, month, day] = key.split("-").map(Number);
-  const date = new Date(year, month - 1, day);
-
-  const midnight = new Date();
-  midnight.setHours(0, 0, 0, 0);
-  const daysAgo = Math.round((midnight.getTime() - date.getTime()) / 86_400_000);
-
-  if (daysAgo === 0) return t("trip.today");
-  if (daysAgo === 1) return t("trip.yesterday");
-
-  return date.toLocaleDateString(locale, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    // The year only matters once it is not this one.
-    year: date.getFullYear() === midnight.getFullYear() ? undefined : "numeric",
-  });
 }
