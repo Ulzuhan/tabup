@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addPayment, deletePayment, getTrip } from "@/lib/store";
 import { authorizeTrip } from "@/lib/authorize";
+import { logError } from "@/lib/errors";
 
 /**
  * Settle-up payments: one member transferring money to another.
@@ -40,6 +41,11 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       return NextResponse.json({ error: "Cannot settle with yourself" }, { status: 400 });
     }
 
+    const parsedDate = body.date === undefined ? Date.now() : new Date(body.date).getTime();
+    if (!isFinite(parsedDate)) {
+      return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+    }
+
     const parsedAmount = parseFloat(String(amount));
     if (!isFinite(parsedAmount) || parsedAmount <= 0 || parsedAmount > 1e9) {
       return NextResponse.json(
@@ -52,7 +58,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       from,
       to,
       amount: Math.round(parsedAmount * 100) / 100,
-      date: body.date ? new Date(body.date).getTime() : Date.now(),
+      date: parsedDate,
       note: typeof note === "string" && note.trim() ? note.trim().slice(0, 200) : undefined,
       clientId: typeof body.clientId === "string" ? body.clientId.slice(0, 64) : undefined,
     });
@@ -62,7 +68,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
     }
     return NextResponse.json(payment);
   } catch (error) {
-    console.error("Add payment error:", error);
+    logError("POST /api/trips/[id]/payment", error);
     return NextResponse.json({ error: "Failed to record payment" }, { status: 500 });
   }
 }

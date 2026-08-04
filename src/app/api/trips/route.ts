@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { atTripLimit, createTrip, FREE_TRIP_LIMIT, listTrips } from "@/lib/store";
 import { getCurrentUser } from "@/lib/auth";
 import { CURRENCIES, EMOJIS } from "@/lib/types";
+import { logError } from "@/lib/errors";
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
       createdAt: trip.createdAt,
     });
   } catch (error) {
-    console.error("Create trip error:", error);
+    logError("POST /api/trips", error);
     return NextResponse.json({ error: "Failed to create trip" }, { status: 500 });
   }
 }
@@ -79,7 +80,7 @@ export async function GET() {
     const trips = await listTrips(user.id);
     return NextResponse.json({ trips });
   } catch (error) {
-    console.error("List trips error:", error);
+    logError("GET /api/trips", error);
     return NextResponse.json({ error: "Failed to list trips" }, { status: 500 });
   }
 }

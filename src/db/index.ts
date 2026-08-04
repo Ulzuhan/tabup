@@ -156,6 +156,19 @@ function migrate(sqlite: Database.Database) {
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS recurring_user_idx ON recurring(user_id);
+
+    CREATE TABLE IF NOT EXISTS error_log (
+      id TEXT PRIMARY KEY,
+      context TEXT NOT NULL,
+      message TEXT NOT NULL,
+      stack TEXT,
+      first_seen INTEGER NOT NULL,
+      last_seen INTEGER NOT NULL,
+      count INTEGER NOT NULL DEFAULT 1,
+      acknowledged_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS error_log_last_idx ON error_log(last_seen);
+    CREATE UNIQUE INDEX IF NOT EXISTS error_log_same_idx ON error_log(context, message);
   `);
 
   // Columns added after the first release. CREATE TABLE IF NOT EXISTS above is a no-op

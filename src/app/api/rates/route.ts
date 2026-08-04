@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchExchangeRates } from "@/lib/store";
+import { logError } from "@/lib/errors";
 
 export async function GET() {
   try {
@@ -9,7 +10,7 @@ export async function GET() {
     }
     return NextResponse.json({ base: "EUR", rates, timestamp: Date.now() });
   } catch (error) {
-    console.error("Fetch rates error:", error);
+    logError("GET /api/rates", error);
     return NextResponse.json({ error: "Failed to fetch exchange rates" }, { status: 500 });
   }
 }

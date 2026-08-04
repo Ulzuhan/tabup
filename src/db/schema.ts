@@ -292,6 +292,40 @@ export const recurring = sqliteTable(
   (t) => [index("recurring_user_idx").on(t.userId)]
 );
 
+/**
+ * Server failures, kept so somebody can see them.
+ *
+ * Until now a failure went to `console.error` and then to the systemd journal, which
+ * means the only way to learn that the OCR or the exchange rates had stopped working was
+ * to run into it yourself. Writing them down puts them in the admin's hands instead.
+ *
+ * Identical failures collapse onto one row with a count rather than filling the page:
+ * a rate provider that is down produces the same error every few seconds, and a hundred
+ * copies of it hide everything else.
+ */
+export const errorLog = sqliteTable(
+  "error_log",
+  {
+    id: text("id").primaryKey(),
+    /** Where it happened — the route or the operation, not a stack frame. */
+    context: text("context").notNull(),
+    message: text("message").notNull(),
+    /** Trimmed; enough to find the line, not the whole novel. */
+    stack: text("stack"),
+    firstSeen: integer("first_seen").notNull(),
+    lastSeen: integer("last_seen").notNull(),
+    count: integer("count").notNull().default(1),
+    /** Cleared by the admin once they have looked at it. */
+    acknowledgedAt: integer("acknowledged_at"),
+  },
+  (t) => [
+    index("error_log_last_idx").on(t.lastSeen),
+    // What "the same failure" means, so repeats collapse instead of piling up.
+    uniqueIndex("error_log_same_idx").on(t.context, t.message),
+  ]
+);
+
+export type ErrorLogRow = typeof errorLog.$inferSelect;
 export type RecurringRow = typeof recurring.$inferSelect;
 export type UserRow = typeof users.$inferSelect;
 export type TripRow = typeof trips.$inferSelect;

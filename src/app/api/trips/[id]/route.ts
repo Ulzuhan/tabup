@@ -11,6 +11,7 @@ import {
 } from "@/lib/store";
 import { authorizeTrip } from "@/lib/authorize";
 import { EMOJIS } from "@/lib/types";
+import { logError } from "@/lib/errors";
 
 // GET — trip with balances and the minimal set of settlements
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/trips/[id]">) {
@@ -141,7 +142,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     const updated = await getTrip(id);
     return NextResponse.json({ members: updated?.members ?? [] });
   } catch (error) {
-    console.error("Update trip error:", error);
+    logError("PATCH /api/trips/[id]", error);
     return NextResponse.json({ error: "Failed to update trip" }, { status: 500 });
   }
 }

@@ -3,6 +3,7 @@ import { mkdir, readFile, unlink, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import { join, resolve } from "path";
 import sharp from "sharp";
+import { logError } from "./errors";
 
 /**
  * Receipt photos and reading them.
@@ -120,9 +121,17 @@ export async function readReceiptFields(image: Buffer): Promise<ReceiptReading |
       signal: AbortSignal.timeout(OCR_TIMEOUT_MS),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Recorded rather than swallowed: the whole point of the log is that a model that
+      // has stopped answering should be visible without anyone stumbling into it.
+      logError("receipt OCR", new Error(`Ollama replied ${res.status} for model ${OCR_MODEL}`));
+      return null;
+    }
     const data = await res.json();
-    if (data.error || typeof data.response !== "string") return null;
+    if (data.error || typeof data.response !== "string") {
+      logError("receipt OCR", new Error(String(data.error ?? "Model returned no text")));
+      return null;
+    }
 
     // Models wrap JSON in a fence often enough that stripping it is cheaper than
     // fighting about it in the prompt.
@@ -133,7 +142,8 @@ export async function readReceiptFields(image: Buffer): Promise<ReceiptReading |
 
     const parsed = JSON.parse(text.slice(start, end + 1));
     return sanitise(parsed);
-  } catch {
+  } catch (error) {
+    logError("receipt OCR", error);
     return null;
   }
 }

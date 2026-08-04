@@ -10,6 +10,7 @@ import { authorizeTrip } from "@/lib/authorize";
 import { deleteReceipt } from "@/lib/receipts";
 import { CATEGORIES } from "@/lib/types";
 import type { Trip } from "@/lib/types";
+import { logError } from "@/lib/errors";
 
 /**
  * Expense endpoints.
@@ -35,6 +36,18 @@ function validateAmount(raw: unknown): number | null {
   const parsed = parseFloat(String(raw));
   if (!isFinite(parsed) || parsed <= 0 || parsed > 1e9) return null;
   return parsed;
+}
+
+/**
+ * A date, or null if it is not one.
+ *
+ * `new Date("nonsense").getTime()` is NaN, and NaN reached the insert as a null and came
+ * back out as a 500 with a constraint violation in it — a request the client got wrong,
+ * reported as the server breaking. Found by the error log on its first day.
+ */
+function validateDate(raw: unknown): number | null {
+  const parsed = new Date(raw as string).getTime();
+  return isFinite(parsed) ? parsed : null;
 }
 
 /** Checks the split members exist and that any weights refer to them. */
@@ -94,6 +107,11 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       return NextResponse.json({ error: "Invalid paidBy member" }, { status: 400 });
     }
 
+    const parsedDate = body.date === undefined ? null : validateDate(body.date);
+    if (body.date !== undefined && parsedDate === null) {
+      return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+    }
+
     const splitIds: string[] = splitAmong || trip.members.map((m) => m.id);
     const invalid = validateSplit(trip, splitIds, body.splitShares);
     if (invalid) return invalid;
@@ -128,7 +146,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       splitShares:
         body.splitShares && Object.keys(body.splitShares).length > 0 ? body.splitShares : undefined,
       category: CATEGORIES.find((c) => c.id === category) ? category : "other",
-      date: body.date ? new Date(body.date).getTime() : Date.now(),
+      date: parsedDate ?? Date.now(),
       exchangeRate:
         expCurrency !== trip.currency && amountBase > 0 ? parsedAmount / amountBase : undefined,
       rateAvailable: rateUsed,
@@ -148,7 +166,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
     }
     return NextResponse.json(expense);
   } catch (error) {
-    console.error("Add expense error:", error);
+    logError("POST /api/trips/[id]/expense", error);
     return NextResponse.json({ error: "Failed to add expense" }, { status: 500 });
   }
 }
@@ -176,6 +194,11 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     const newPaidBy = paidBy || existing.paidBy;
     if (!trip.members.find((m) => m.id === newPaidBy)) {
       return NextResponse.json({ error: "Invalid paidBy member" }, { status: 400 });
+    }
+
+    const parsedDate = body.date === undefined ? null : validateDate(body.date);
+    if (body.date !== undefined && parsedDate === null) {
+      return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     }
 
     const newSplitAmong: string[] = splitAmong || existing.splitAmong;
@@ -230,7 +253,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
           : existing.splitShares,
       category:
         category && CATEGORIES.find((c) => c.id === category) ? category : existing.category,
-      date: body.date ? new Date(body.date).getTime() : existing.date,
+      date: parsedDate ?? existing.date,
       exchangeRate:
         newCurrency !== trip.currency && newAmountBase > 0 ? newAmount / newAmountBase : undefined,
       rateAvailable: rateUsed,
@@ -241,7 +264,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     }
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("Edit expense error:", error);
+    logError("PATCH /api/trips/[id]/expense", error);
     return NextResponse.json({ error: "Failed to edit expense" }, { status: 500 });
   }
 }

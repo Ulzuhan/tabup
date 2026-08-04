@@ -293,8 +293,10 @@ export const es = {
   },
 
   admin: {
-    title: "Solicitudes de cuenta",
-    subtitle: "Gente que ha pedido entrar en este servidor.",
+    title: "Administración",
+    subtitle: "Quién entra, quién es quién y qué se ha roto.",
+    requests: "Solicitudes de cuenta",
+    requestsHint: "Gente que ha pedido entrar en este servidor.",
     none: "No hay solicitudes pendientes",
     approve: "Aprobar",
     reject: "Rechazar",
@@ -302,6 +304,27 @@ export const es = {
     rejected: "Solicitud rechazada",
     requestedOn: "Pidió acceso el {date}",
     badge: "{count} pendientes",
+
+    accounts: "Cuentas",
+    accountsHint: "Aquí no se manda correo, así que las contraseñas se cambian desde aquí.",
+    adminRole: "Admin",
+    joinedOn: "Desde el {date}",
+    changePassword: "Cambiar contraseña",
+    newPassword: "Contraseña nueva",
+    passwordChanged: "Contraseña de {name} cambiada; sus sesiones se han cerrado",
+    passwordWarning:
+      "Se le cierran todas las sesiones y tendrás que darle la contraseña nueva tú mismo.",
+
+    errors: "Errores del servidor",
+    errorsHint: "Lo que ha fallado sin que nadie estuviera mirando.",
+    noErrors: "Nada roto",
+    noErrorsHint: "Los fallos del servidor aparecerían aquí.",
+    occurrences: "{count} veces",
+    lastSeen: "Última vez: {when}",
+    dismiss: "Descartar",
+    clearAll: "Borrar el historial",
+    cleared: "Historial de errores borrado",
+    newBadge: "sin ver",
   },
 
   landing: {
@@ -659,8 +682,10 @@ export const en: Messages = {
   },
 
   admin: {
-    title: "Account requests",
-    subtitle: "People who have asked to join this server.",
+    title: "Administration",
+    subtitle: "Who gets in, who is who, and what has broken.",
+    requests: "Account requests",
+    requestsHint: "People who have asked to join this server.",
     none: "No pending requests",
     approve: "Approve",
     reject: "Reject",
@@ -668,6 +693,27 @@ export const en: Messages = {
     rejected: "Request rejected",
     requestedOn: "Asked on {date}",
     badge: "{count} pending",
+
+    accounts: "Accounts",
+    accountsHint: "Nothing here sends email, so passwords are changed from here.",
+    adminRole: "Admin",
+    joinedOn: "Joined {date}",
+    changePassword: "Change password",
+    newPassword: "New password",
+    passwordChanged: "Changed {name}'s password; their sessions are closed",
+    passwordWarning:
+      "Every session of theirs is closed, and you will have to hand them the new password yourself.",
+
+    errors: "Server errors",
+    errorsHint: "What broke while nobody was watching.",
+    noErrors: "Nothing broken",
+    noErrorsHint: "Server failures would show up here.",
+    occurrences: "{count} times",
+    lastSeen: "Last seen {when}",
+    dismiss: "Dismiss",
+    clearAll: "Clear the history",
+    cleared: "Error history cleared",
+    newBadge: "unseen",
   },
 
   landing: {

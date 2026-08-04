@@ -2,7 +2,7 @@ import { randomBytes, scrypt, timingSafeEqual, createHash } from "crypto";
 import type { BinaryLike, ScryptOptions } from "crypto";
 import { promisify } from "util";
 import { cookies } from "next/headers";
-import { eq, lt, sql, isNull, and } from "drizzle-orm";
+import { eq, lt, sql, isNull, isNotNull, and } from "drizzle-orm";
 import { db, users, sessions, trips } from "@/db";
 import type { UserRow } from "@/db";
 
@@ -334,4 +334,46 @@ export function rejectUser(userId: string): boolean {
     .where(and(eq(users.id, userId), isNull(users.approvedAt)))
     .run();
   return result.changes > 0;
+}
+
+/** Every approved account, for the admin's list. */
+export function approvedUsers() {
+  return db
+    .select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      role: users.role,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(isNotNull(users.approvedAt))
+    .orderBy(users.createdAt)
+    .all();
+}
+
+/**
+ * Sets somebody's password for them.
+ *
+ * This is what stands in for a reset email on an instance that sends no mail: the person
+ * who runs it can hand out a new password directly. Every session of theirs is dropped
+ * at the same time — if the reason for the change is that someone else got in, leaving
+ * that someone signed in would defeat the whole exercise.
+ *
+ * Deliberately no "current password" check, because the admin does not have it. That
+ * makes this the one place in the app where being the admin means being able to read
+ * another person's trips, by taking over their account. It is a real power and the
+ * alternative — losing an account permanently to a forgotten password — is worse on an
+ * instance with no other way back in.
+ */
+export async function setPassword(userId: string, password: string): Promise<boolean> {
+  const result = db
+    .update(users)
+    .set({ passwordHash: await hashPassword(password) })
+    .where(eq(users.id, userId))
+    .run();
+
+  if (result.changes === 0) return false;
+  destroyAllSessions(userId);
+  return true;
 }
