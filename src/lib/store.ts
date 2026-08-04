@@ -109,7 +109,7 @@ export async function getTrip(id: string): Promise<Trip | null> {
         description: e.description,
         amount: e.amount,
         currency: e.currency,
-        amountEur: e.amountEur,
+        amountBase: e.amountBase,
         paidBy: e.paidBy,
         splitAmong: splits.map((s) => s.memberId),
         // Only surfaced when the split is actually uneven, matching the old shape.
@@ -341,7 +341,7 @@ export interface AddExpenseInput {
   description: string;
   amount: number;
   currency: string;
-  amountEur: number;
+  amountBase: number;
   paidBy: string;
   splitAmong: string[];
   splitShares?: Record<string, number>;
@@ -385,7 +385,7 @@ export async function addExpense(tripId: string, input: AddExpenseInput): Promis
         description: input.description,
         amount: input.amount,
         currency: input.currency,
-        amountEur: input.amountEur,
+        amountBase: input.amountBase,
         paidBy: input.paidBy,
         category: input.category,
         date,
@@ -435,7 +435,7 @@ export async function updateExpense(
       "description",
       "amount",
       "currency",
-      "amountEur",
+      "amountBase",
       "paidBy",
       "category",
       "date",
@@ -606,28 +606,43 @@ export async function fetchExchangeRates(base: string = "EUR"): Promise<Record<s
 }
 
 /**
- * Convert to the common unit. Throws when no rate is available rather than falling
- * back to 1:1, which would quietly corrupt everyone's balances.
+ * Converts between any two currencies.
+ *
+ * Rates are quoted against the euro, so anything else goes through it: pesos to euros,
+ * euros to pounds. That is arithmetic on the way past, not a claim that euros are the
+ * unit anything is stored in — a trip in pesos stores pesos.
+ *
+ * Throws when no rate is available rather than falling back to 1:1, which would quietly
+ * corrupt everyone's balances.
  */
-export async function convertToEur(
+export async function convertTo(
   amount: number,
-  fromCurrency: string
-): Promise<{ amountEur: number; rateUsed: boolean }> {
-  if (fromCurrency === "EUR") return { amountEur: Math.round(amount * 100) / 100, rateUsed: true };
+  fromCurrency: string,
+  toCurrency: string
+): Promise<{ amount: number; rateUsed: boolean }> {
+  const round = (n: number) => Math.round(n * 100) / 100;
+  if (fromCurrency === toCurrency) return { amount: round(amount), rateUsed: true };
+
   const rates = await fetchExchangeRates("EUR");
-  if (rates && rates[fromCurrency]) {
-    return { amountEur: Math.round((amount / rates[fromCurrency]) * 100) / 100, rateUsed: true };
-  }
-  throw new Error(`No exchange rate available for ${fromCurrency}. Cannot convert to EUR.`);
+  // The base of the table is not listed in it, so euros are added here rather than
+  // special-cased at every use.
+  const rate = (code: string) => (code === "EUR" ? 1 : rates?.[code]);
+
+  const from = rate(fromCurrency);
+  const to = rate(toCurrency);
+  if (from && to) return { amount: round((amount / from) * to), rateUsed: true };
+
+  throw new Error(`No exchange rate available for ${fromCurrency} → ${toCurrency}.`);
 }
 
 /** Display-only variant: returns null instead of throwing. */
-export async function convertToEurSafe(
+export async function convertToSafe(
   amount: number,
-  fromCurrency: string
-): Promise<{ amountEur: number; rateUsed: boolean } | null> {
+  fromCurrency: string,
+  toCurrency: string
+): Promise<{ amount: number; rateUsed: boolean } | null> {
   try {
-    return await convertToEur(amount, fromCurrency);
+    return await convertTo(amount, fromCurrency, toCurrency);
   } catch {
     return null;
   }
@@ -664,7 +679,7 @@ export async function findExpenseByClientId(
     description: row.description,
     amount: row.amount,
     currency: row.currency,
-    amountEur: row.amountEur,
+    amountBase: row.amountBase,
     paidBy: row.paidBy,
     splitAmong: splits.map((sp) => sp.memberId),
     splitShares: uneven

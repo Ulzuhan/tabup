@@ -40,7 +40,7 @@ const insertMember = db.prepare(
   "INSERT INTO members (id, trip_id, name, emoji, position) VALUES (?, ?, ?, ?, ?)"
 );
 const insertExpense = db.prepare(
-  `INSERT INTO expenses (id, trip_id, description, amount, currency, amount_eur, paid_by, category, date, exchange_rate, rate_available)
+  `INSERT INTO expenses (id, trip_id, description, amount, currency, amount_base, paid_by, category, date, exchange_rate, rate_available)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 );
 const insertSplit = db.prepare(
@@ -99,7 +99,10 @@ for (const file of files) {
         e.description ?? "",
         e.amount ?? 0,
         e.currency ?? trip.currency ?? "EUR",
-        e.amountEur ?? e.amount ?? 0,
+        // The old format normalised to euros. That is the right base only for a trip
+        // kept in euros; anywhere else the amount as entered is closer to the truth than
+        // a euro figure wearing another currency's symbol.
+        (trip.currency ?? "EUR") === "EUR" ? (e.amountEur ?? e.amount ?? 0) : (e.amount ?? 0),
         e.paidBy,
         e.category ?? "other",
         e.date ?? now,

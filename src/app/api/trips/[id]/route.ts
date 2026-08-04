@@ -44,7 +44,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/trips/[
     };
   });
 
-  const totalExpenses = trip.expenses.reduce((sum, e) => sum + e.amountEur, 0);
+  const totalExpenses = trip.expenses.reduce((sum, e) => sum + e.amountBase, 0);
 
   return NextResponse.json({
     ...trip,

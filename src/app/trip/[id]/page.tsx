@@ -216,7 +216,7 @@ export default function TripPage() {
   const categoryBreakdown = useMemo(() => {
     if (!view) return [];
     const totals: Record<string, number> = {};
-    for (const e of view.expenses) totals[e.category] = (totals[e.category] || 0) + e.amountEur;
+    for (const e of view.expenses) totals[e.category] = (totals[e.category] || 0) + e.amountBase;
     return Object.entries(totals).sort((a, b) => b[1] - a[1]);
   }, [view]);
 
@@ -740,7 +740,7 @@ export default function TripPage() {
                     <h3 className="text-xs font-medium text-muted-foreground">{formatDay(day, t, intlLocale)}</h3>
                     <span className="text-xs text-muted-foreground tabular">
                       {currencySymbol(trip.currency)}
-                      {formatAmount(dayExpenses.reduce((sum, e) => sum + e.amountEur, 0))}
+                      {formatAmount(dayExpenses.reduce((sum, e) => sum + e.amountBase, 0))}
                     </span>
                   </div>
                   <ul className="space-y-1.5">
@@ -796,7 +796,7 @@ export default function TripPage() {
                         </p>
                         {foreign && (
                           <p className="text-xs text-muted-foreground">
-                            ≈ <Money amount={expense.amountEur} currency={trip.currency} />
+                            ≈ <Money amount={expense.amountBase} currency={trip.currency} />
                           </p>
                         )}
                         {!expense.rateAvailable && expense.currency !== "EUR" && (

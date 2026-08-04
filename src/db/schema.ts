@@ -141,8 +141,17 @@ export const expenses = sqliteTable(
     /** Amount as entered, in `currency`. */
     amount: real("amount").notNull(),
     currency: text("currency").notNull(),
-    /** Converted to the common unit used for every balance computation. */
-    amountEur: real("amount_eur").notNull(),
+    /**
+     * The same amount in the trip's own currency, which is what every total, balance and
+     * settlement is computed and displayed in.
+     *
+     * This used to be euros, and the trip's currency was only ever a symbol printed in
+     * front of the number — so a trip kept in pesos showed its totals converted to euros
+     * with a ₱ in front, off by a factor of seventy. Normalising to the trip's currency
+     * instead means the common unit and the unit on screen are the same thing, and a
+     * trip in the currency people are actually spending needs no conversion at all.
+     */
+    amountBase: real("amount_base").notNull(),
     paidBy: text("paid_by")
       .notNull()
       .references(() => members.id, { onDelete: "cascade" }),

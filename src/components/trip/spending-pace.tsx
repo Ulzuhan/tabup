@@ -39,11 +39,11 @@ export function SpendingPace({
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
         d.getDate()
       ).padStart(2, "0")}`;
-      byDay.set(key, (byDay.get(key) ?? 0) + e.amountEur);
+      byDay.set(key, (byDay.get(key) ?? 0) + e.amountBase);
     }
 
     const days = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b));
-    const total = expenses.reduce((sum, e) => sum + e.amountEur, 0);
+    const total = expenses.reduce((sum, e) => sum + e.amountBase, 0);
 
     /**
      * Elapsed days, not days with expenses.

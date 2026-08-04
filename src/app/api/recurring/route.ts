@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import {
   addRecurring,
-  convertToEur,
+  convertTo,
   deleteRecurring,
   listRecurring,
   updateRecurring,
@@ -62,10 +62,14 @@ async function parseBody(body: Record<string, unknown>) {
   }
 
   // Converted once and stored, so a total does not move every time rates refresh.
+  //
+  // Euros are the declared base here, unlike a trip, which keeps its own currency: fixed
+  // costs belong to one person rather than a group, and the monthly total is labelled in
+  // euros on screen — so the unit stored and the unit shown agree.
   let amountBase = amount;
   if (currency !== "EUR") {
     try {
-      ({ amountEur: amountBase } = await convertToEur(amount, currency));
+      ({ amount: amountBase } = await convertTo(amount, currency, "EUR"));
     } catch {
       return { error: `No exchange rate available for ${currency}` };
     }

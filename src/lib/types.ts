@@ -24,7 +24,7 @@ export interface Expense {
   description: string;
   amount: number;
   currency: string;
-  amountEur: number;
+  amountBase: number;
   paidBy: string;
   splitAmong: string[];
   splitShares?: Record<string, number>; // optional: member id → share weight for unequal splits

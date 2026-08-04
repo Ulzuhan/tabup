@@ -104,7 +104,7 @@ export function mergePending(
         currency: String(body.currency ?? trip.currency),
         // No conversion is possible without the network, so a foreign-currency expense
         // counts at face value until it syncs. Flagged in the UI as approximate.
-        amountEur: Number(body.amountEur ?? amount),
+        amountBase: Number(body.amountBase ?? amount),
         paidBy: String(body.paidBy ?? ""),
         splitAmong: (body.splitAmong as string[] | undefined) ?? trip.members.map((m) => m.id),
         splitShares: body.splitShares as Record<string, number> | undefined,
@@ -134,7 +134,7 @@ export function mergePending(
   return {
     expenses,
     totalExpenses:
-      Math.round(expenses.reduce((sum, e) => sum + e.amountEur, 0) * 100) / 100,
+      Math.round(expenses.reduce((sum, e) => sum + e.amountBase, 0) * 100) / 100,
     balances: calculateBalances(merged),
     settlements: calculateSettlements(merged),
     pendingCount: pending.length,

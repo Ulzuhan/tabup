@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   addExpense,
-  convertToEur,
+  convertTo,
   deleteExpense,
   getTrip,
   updateExpense,
@@ -99,18 +99,18 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
     if (invalid) return invalid;
 
     const expCurrency = currency || trip.currency;
-    let amountEur: number;
+    let amountBase: number;
     let rateUsed: boolean;
     try {
-      ({ amountEur, rateUsed } = await convertToEur(parsedAmount, expCurrency).then((r) => ({
-        amountEur: r.amountEur,
-        rateUsed: r.rateUsed,
-      })));
+      // Into the trip's currency, which is the unit every balance is kept and shown in.
+      // When the expense is already in it — the usual case — no rate is consulted at all,
+      // so a trip run entirely in pesos never depends on the network.
+      ({ amount: amountBase, rateUsed } = await convertTo(parsedAmount, expCurrency, trip.currency));
     } catch (err) {
       // Refusing beats guessing: a made-up 1:1 rate would corrupt every balance.
       return NextResponse.json(
         {
-          error: `Cannot convert ${expCurrency} to EUR: ${
+          error: `Cannot convert ${expCurrency} to ${trip.currency}: ${
             err instanceof Error ? err.message : "Rate unavailable"
           }`,
         },
@@ -122,14 +122,15 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       description: String(description).trim(),
       amount: parsedAmount,
       currency: expCurrency,
-      amountEur,
+      amountBase,
       paidBy,
       splitAmong: splitIds,
       splitShares:
         body.splitShares && Object.keys(body.splitShares).length > 0 ? body.splitShares : undefined,
       category: CATEGORIES.find((c) => c.id === category) ? category : "other",
       date: body.date ? new Date(body.date).getTime() : Date.now(),
-      exchangeRate: expCurrency !== "EUR" && amountEur > 0 ? parsedAmount / amountEur : undefined,
+      exchangeRate:
+        expCurrency !== trip.currency && amountBase > 0 ? parsedAmount / amountBase : undefined,
       rateAvailable: rateUsed,
       note: typeof body.note === "string" && body.note.trim() ? body.note.trim().slice(0, 500) : undefined,
       // Filename returned by the receipt upload; validated on read, so a made-up value
@@ -194,18 +195,18 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
       newAmount = parsed;
     }
 
-    let newAmountEur = existing.amountEur;
+    let newAmountBase = existing.amountBase;
     let rateUsed = true;
     const amountChanged = newAmount !== existing.amount || currency !== undefined;
     if (amountChanged) {
       try {
-        const result = await convertToEur(newAmount, newCurrency);
-        newAmountEur = result.amountEur;
+        const result = await convertTo(newAmount, newCurrency, trip.currency);
+        newAmountBase = result.amount;
         rateUsed = result.rateUsed;
       } catch (err) {
         return NextResponse.json(
           {
-            error: `Cannot convert ${newCurrency} to EUR: ${
+            error: `Cannot convert ${newCurrency} to ${trip.currency}: ${
               err instanceof Error ? err.message : "Rate unavailable"
             }`,
           },
@@ -218,7 +219,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
       description: description?.trim() || existing.description,
       amount: newAmount,
       currency: newCurrency,
-      amountEur: newAmountEur,
+      amountBase: newAmountBase,
       paidBy: newPaidBy,
       splitAmong: newSplitAmong,
       splitShares:
@@ -230,7 +231,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
       category:
         category && CATEGORIES.find((c) => c.id === category) ? category : existing.category,
       date: body.date ? new Date(body.date).getTime() : existing.date,
-      exchangeRate: newCurrency !== "EUR" && newAmountEur > 0 ? newAmount / newAmountEur : undefined,
+      exchangeRate:
+        newCurrency !== trip.currency && newAmountBase > 0 ? newAmount / newAmountBase : undefined,
       rateAvailable: rateUsed,
     });
 

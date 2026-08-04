@@ -28,7 +28,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
 
   const balances = calculateBalances(trip);
   const settlements = calculateSettlements(trip);
-  const total = trip.expenses.reduce((sum, e) => sum + e.amountEur, 0);
+  const total = trip.expenses.reduce((sum, e) => sum + e.amountBase, 0);
   const symbol = CURRENCIES.find((c) => c.code === trip.currency)?.symbol ?? trip.currency;
 
   const money = (n: number) =>

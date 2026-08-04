@@ -28,7 +28,16 @@ function create() {
   // Cascading deletes are declared in the schema; SQLite ignores them unless this is on.
   sqlite.pragma("foreign_keys = ON");
 
-  migrate(sqlite);
+  // Not while building.
+  //
+  // `db` is created when this module is imported, and a production build imports every
+  // route to work out what it is — so `next build` opened the live database and ran the
+  // migrations against it, unasked and unwatched. It got away with it here, but a build
+  // is the wrong moment to alter the file people's money is in: nobody is looking, the
+  // running server still holds the old shape in memory, and there is no backup taken.
+  // Migrations belong to a server that is starting up.
+  if (process.env.NEXT_PHASE !== "phase-production-build") migrate(sqlite);
+
   return drizzle(sqlite, { schema });
 }
 
@@ -66,7 +75,7 @@ function migrate(sqlite: Database.Database) {
       description TEXT NOT NULL,
       amount REAL NOT NULL,
       currency TEXT NOT NULL,
-      amount_eur REAL NOT NULL,
+      amount_base REAL NOT NULL,
       paid_by TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
       category TEXT NOT NULL DEFAULT 'other',
       date INTEGER NOT NULL,
@@ -173,6 +182,7 @@ function migrate(sqlite: Database.Database) {
 
   adoptOrphanTrips(sqlite);
   seedFirstAdmin(sqlite);
+  rebaseAmountsToTripCurrency(sqlite);
 
   // Sessions and invitations are cheap to clear and there is no other moment that
   // reliably runs.
@@ -230,6 +240,62 @@ function adoptOrphanTrips(sqlite: Database.Database) {
   if (result.changes > 0) {
     console.log(`Adopted ${result.changes} ownerless trip(s) into the only account.`);
   }
+}
+
+/**
+ * Moves stored amounts from euros to each trip's own currency.
+ *
+ * Three cases, in descending order of how much they can be trusted:
+ *
+ *   The expense is already in the trip's currency — the great majority — so the amount
+ *   as typed is the answer and no rate is involved at all.
+ *
+ *   The trip is in euros, so the euro figure that was stored is already right.
+ *
+ *   Anything left is a foreign-currency expense in a foreign-currency trip, and there is
+ *   no rate to hand at boot. Rather than invent one, the euro figure is kept and the row
+ *   is marked as having no rate, which is what the UI already uses to say a converted
+ *   amount is approximate.
+ */
+function rebaseAmountsToTripCurrency(sqlite: Database.Database) {
+  const columns = sqlite.prepare("PRAGMA table_info(expenses)").all() as { name: string }[];
+  if (!columns.some((c) => c.name === "amount_eur")) return;
+
+  addColumn(sqlite, "expenses", "amount_base", "REAL");
+
+  const exact = sqlite
+    .prepare(
+      `UPDATE expenses SET amount_base = amount
+         WHERE amount_base IS NULL
+           AND currency = (SELECT currency FROM trips WHERE trips.id = expenses.trip_id)`
+    )
+    .run();
+
+  const euroTrips = sqlite
+    .prepare(
+      `UPDATE expenses SET amount_base = amount_eur
+         WHERE amount_base IS NULL
+           AND (SELECT currency FROM trips WHERE trips.id = expenses.trip_id) = 'EUR'`
+    )
+    .run();
+
+  const approximate = sqlite
+    .prepare(
+      "UPDATE expenses SET amount_base = amount_eur, rate_available = 0 WHERE amount_base IS NULL"
+    )
+    .run();
+
+  const total = exact.changes + euroTrips.changes + approximate.changes;
+  if (total > 0) {
+    console.log(
+      `Rebased ${total} expense(s) to their trip's currency ` +
+        `(${exact.changes} exact, ${euroTrips.changes} already in euros, ${approximate.changes} approximate).`
+    );
+  }
+
+  // Dropped rather than left behind: two columns holding "the amount, normalised" is an
+  // invitation to read the wrong one.
+  sqlite.exec("ALTER TABLE expenses DROP COLUMN amount_eur");
 }
 
 /** ALTER TABLE ADD COLUMN is not idempotent, so check the table shape first. */

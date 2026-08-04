@@ -42,7 +42,7 @@ export async function GET(
 
   const balances = calculateBalances(trip);
   const settlements = calculateSettlements(trip);
-  const total = trip.expenses.reduce((sum, e) => sum + e.amountEur, 0);
+  const total = trip.expenses.reduce((sum, e) => sum + e.amountBase, 0);
 
   const lines: string[] = [];
   const section = (title: string) => {
@@ -87,7 +87,7 @@ export async function GET(
         safe(expense.category),
         num(expense.amount),
         safe(expense.currency),
-        num(expense.amountEur),
+        num(expense.amountBase),
         safe(memberName(expense.paidBy)),
         safe(expense.note ?? ""),
         // Blank rather than 0.00 for someone left out of the split: an empty cell reads
