@@ -43,6 +43,24 @@ function client() {
   };
 }
 
+/**
+ * Bails out clearly when the sign-up throttle has kicked in.
+ *
+ * The suite creates a handful of accounts per run, and running it several times against
+ * the same instance trips the limiter — correctly. Without this the next assertion reads
+ * a field off an error body and the whole thing dies with a TypeError, which looks like
+ * a broken app rather than a rate limit. Restart against a fresh database, or wait.
+ */
+function assertNotThrottled(res) {
+  if (res.status !== 429) return;
+  console.error(
+    "\nRegistration is being throttled (429). That is the rate limiter working, not a\n" +
+      "failure: this suite creates several accounts per run. Restart the server against a\n" +
+      "fresh database and try again."
+  );
+  process.exit(1);
+}
+
 const uniq = () => Math.random().toString(36).slice(2, 10);
 
 const newTrip = (api, name = "Trip") =>
@@ -85,6 +103,7 @@ async function main() {
     method: "POST",
     body: JSON.stringify({ email: aliceEmail, name: "Alice", password: "correct horse battery" }),
   });
+  assertNotThrottled(reg);
   check("registration succeeds", reg.status, 200);
   check("session is live", (await alice("/api/auth/me")).body.user?.email, aliceEmail);
 
@@ -303,6 +322,20 @@ async function main() {
     }),
   });
   check("who can still add expenses", stillEditor.status, 200);
+
+  // ── /api/admin is closed to normal accounts ────────────────────────
+  // Whoever registered first on this instance is the admin; Bob was not, so these hold
+  // however the database got into its current state. The admin's own side of the panel
+  // needs a known-first account and lives in test-admin.mjs.
+  console.log("\nAdmin is not for everyone");
+  check("a normal account cannot list the accounts", (await bob("/api/admin/users")).status, 403);
+  check("nor read the error log", (await bob("/api/admin/errors")).status, 403);
+  check("nor set anybody's password", (
+    await bob("/api/admin/users", {
+      method: "POST",
+      body: JSON.stringify({ id: "whoever", action: "password", password: "let me in please" }),
+    })
+  ).status, 403);
 
   // ── Login and logout ───────────────────────────────────────────────
   console.log("\nLogin and logout");

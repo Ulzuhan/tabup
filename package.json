@@ -10,7 +10,9 @@
     "test:api": "node scripts/test-api.mjs",
     "migrate:json": "node scripts/migrate-json.mjs",
     "test:auth": "node scripts/test-auth.mjs",
-    "test:recurring": "tsx scripts/test-recurring.mts"
+    "test:recurring": "tsx scripts/test-recurring.mts",
+    "test:money": "node scripts/test-money.mjs",
+    "test:admin": "node scripts/test-admin.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
