@@ -89,17 +89,27 @@ async function main() {
     })
   );
 
-  /** A trip with `names` members in `currency`, and the ids back. */
+  /**
+   * A trip with `names` participants in `currency`, and the ids back.
+   *
+   * The account creating it is its first participant, so the first name is applied to
+   * that seat rather than added next to it — otherwise every split below would quietly
+   * be shared one way further than the arithmetic being checked.
+   */
   const trip = async (currency, names) => {
     const { body } = await api("/api/trips", {
       method: "POST",
       body: JSON.stringify({
         name: `${currency} trip`,
         currency,
-        members: names.map((name) => ({ name })),
+        members: names.slice(1).map((name) => ({ name })),
       }),
     });
-    return { id: body.id, members: body.members.map((m) => m.id) };
+    const { body: renamed } = await api(`/api/trips/${body.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ renameMember: { id: body.members[0].id, name: names[0] } }),
+    });
+    return { id: body.id, members: (renamed.members ?? body.members).map((m) => m.id) };
   };
 
   const spend = (id, paidBy, amount, currency, extra = {}) =>

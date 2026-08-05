@@ -17,7 +17,7 @@ import { randomBytes } from "crypto";
 import { existsSync } from "fs";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { join } from "path";
-import { eq, asc, and } from "drizzle-orm";
+import { eq, asc, and, gt, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   trips,
@@ -30,6 +30,7 @@ import {
   invites,
   recurring,
 } from "@/db/schema";
+import { EMOJIS } from "./types";
 import type { Trip, Member, Expense, Payment } from "./types";
 
 const DATA_DIR = process.env.TABUP_DATA_DIR?.trim() || join(process.cwd(), "data");
@@ -57,9 +58,12 @@ export async function getTrip(id: string): Promise<Trip | null> {
   const [trip] = db.select().from(trips).where(eq(trips.id, id)).limit(1).all();
   if (!trip) return null;
 
+  // Joined rather than fetched per member: the account's own name is what a linked
+  // participant is called when nobody has set a different alias for this trip.
   const memberRows = db
-    .select()
+    .select({ member: members, accountName: users.name })
     .from(members)
+    .leftJoin(users, eq(members.userId, users.id))
     .where(eq(members.tripId, id))
     .orderBy(asc(members.position))
     .all();
@@ -100,7 +104,15 @@ export async function getTrip(id: string): Promise<Trip | null> {
     budget: trip.budget,
     createdAt: trip.createdAt,
     version: trip.version,
-    members: memberRows.map((m): Member => ({ id: m.id, name: m.name, emoji: m.emoji })),
+    members: memberRows.map(
+      ({ member: m, accountName }): Member => ({
+        id: m.id,
+        name: m.name,
+        emoji: m.emoji,
+        userId: m.userId,
+        accountName: accountName ?? undefined,
+      })
+    ),
     expenses: expenseRows.map((e): Expense => {
       const splits = splitsByExpense.get(e.id) ?? [];
       const uneven = splits.some((s) => s.share !== splits[0]?.share);
@@ -256,6 +268,24 @@ export function listCollaborators(
   return result;
 }
 
+/**
+ * The collaborator list as a given reader is allowed to see it.
+ *
+ * Email addresses belong to the owner, who typed them in order to share the trip.
+ * Handing every guest the address of everyone else on it is a different act from
+ * sharing a trip, and nothing on screen needs them: the list shows a name and a role.
+ * The owner keeps the full view, and everyone can see their own.
+ */
+export function visibleCollaborators(
+  tripId: string,
+  viewer: { id?: string; isOwner: boolean }
+): { id: string; email?: string; name: string; role: Access }[] {
+  return listCollaborators(tripId).map((c) => ({
+    ...c,
+    email: viewer.isOwner || c.id === viewer.id ? c.email : undefined,
+  }));
+}
+
 /** How many trips an account owns; the free plan is capped on this. */
 export function ownedTripCount(userId: string): number {
   return db.select().from(trips).where(eq(trips.ownerId, userId)).all().length;
@@ -283,12 +313,63 @@ export function atTripLimit(user: { id: string; plan: string }): boolean {
 }
 
 // ─── Writes ──────────────────────────────────────────────────────────
+
+/**
+ * Marks a trip as changed.
+ *
+ * Every write goes through this rather than setting `updatedAt` by hand, because the
+ * version used to be bumped in one single place — adding an expense — so an edit, a
+ * deletion or a settle-up left it behind. A version that only sometimes moves is worse
+ * than none at all: anything trusting it to notice stale data would be told, wrongly,
+ * that nothing had happened.
+ */
+type Writer = Pick<typeof db, "update">;
+
+function touchTrip(writer: Writer, tripId: string): void {
+  writer
+    .update(trips)
+    .set({ updatedAt: Date.now(), version: sql`${trips.version} + 1` })
+    .where(eq(trips.id, tripId))
+    .run();
+}
+
+/**
+ * Whether a row belongs to the trip it is being changed through.
+ *
+ * Authorisation is per trip, and every id below arrives in a request body rather than
+ * in the URL that was authorised. Without this pairing, write access to any one trip
+ * was write access to every row in the database whose id you happened to know — and a
+ * read-only guest is handed the ids of everything they can see.
+ */
+function belongsToTrip(
+  table: typeof expenses | typeof payments | typeof members,
+  rowId: string,
+  tripId: string
+): boolean {
+  return Boolean(
+    db
+      .select({ id: table.id })
+      .from(table)
+      .where(and(eq(table.id, rowId), eq(table.tripId, tripId)))
+      .get()
+  );
+}
+
 export interface CreateTripInput {
   name: string;
   currency: string;
+  /**
+   * Anyone else, by bare name. May be empty.
+   *
+   * A trip used to demand two names up front, which is backwards now that people
+   * arrive by invitation: at the moment of creating it you cannot know what the second
+   * person will be called, and a trip of one that grows is the normal way round.
+   */
   members: { name: string; emoji: string }[];
   /** Every trip belongs to somebody; there is no anonymous mode. */
   ownerId: string;
+  /** The owner is always the first participant, and is linked to their account. */
+  ownerName: string;
 }
 
 export async function createTrip(input: CreateTripInput): Promise<Trip> {
@@ -307,9 +388,23 @@ export async function createTrip(input: CreateTripInput): Promise<Trip> {
         ownerId: input.ownerId,
       })
       .run();
+
+    // The owner goes in first and linked: whoever creates a trip is in it, and the app
+    // knowing which participant they are is the whole point of linking at all.
+    tx.insert(members)
+      .values({
+        id: generateId(),
+        tripId: id,
+        name: input.ownerName,
+        emoji: EMOJIS[0],
+        position: 0,
+        userId: input.ownerId,
+      })
+      .run();
+
     input.members.forEach((m, i) => {
       tx.insert(members)
-        .values({ id: generateId(), tripId: id, name: m.name, emoji: m.emoji, position: i })
+        .values({ id: generateId(), tripId: id, name: m.name, emoji: m.emoji, position: i + 1 })
         .run();
     });
   });
@@ -331,7 +426,7 @@ export async function updateTripMeta(
   if (!isValidId(id)) return false;
   const result = db
     .update(trips)
-    .set({ ...patch, updatedAt: Date.now() })
+    .set({ ...patch, updatedAt: Date.now(), version: sql`${trips.version} + 1` })
     .where(eq(trips.id, id))
     .run();
   return result.changes > 0;
@@ -403,10 +498,7 @@ export async function addExpense(tripId: string, input: AddExpenseInput): Promis
         .run();
     }
 
-    tx.update(trips)
-      .set({ updatedAt: date, version: (db.select().from(trips).where(eq(trips.id, tripId)).all()[0]?.version ?? 1) + 1 })
-      .where(eq(trips.id, tripId))
-      .run();
+    touchTrip(tx, tripId);
   });
 
   const trip = await getTrip(tripId);
@@ -428,6 +520,8 @@ export async function updateExpense(
   patch: UpdateExpenseInput
 ): Promise<Expense | null> {
   if (!isValidId(tripId) || !isValidId(expenseId)) return null;
+  // The id comes from the request body; the authorisation came from the URL.
+  if (!belongsToTrip(expenses, expenseId, tripId)) return null;
 
   db.transaction((tx) => {
     const fields: Record<string, unknown> = {};
@@ -445,7 +539,10 @@ export async function updateExpense(
       if (patch[key] !== undefined) fields[key] = patch[key];
     }
     if (Object.keys(fields).length > 0) {
-      tx.update(expenses).set(fields).where(eq(expenses.id, expenseId)).run();
+      tx.update(expenses)
+        .set(fields)
+        .where(and(eq(expenses.id, expenseId), eq(expenses.tripId, tripId)))
+        .run();
     }
 
     if (patch.splitAmong) {
@@ -457,7 +554,7 @@ export async function updateExpense(
       }
     }
 
-    tx.update(trips).set({ updatedAt: Date.now() }).where(eq(trips.id, tripId)).run();
+    touchTrip(tx, tripId);
   });
 
   const trip = await getTrip(tripId);
@@ -466,10 +563,11 @@ export async function updateExpense(
 
 export async function deleteExpense(tripId: string, expenseId: string): Promise<boolean> {
   if (!isValidId(tripId) || !isValidId(expenseId)) return false;
-  const result = db.delete(expenses).where(eq(expenses.id, expenseId)).run();
-  if (result.changes > 0) {
-    db.update(trips).set({ updatedAt: Date.now() }).where(eq(trips.id, tripId)).run();
-  }
+  const result = db
+    .delete(expenses)
+    .where(and(eq(expenses.id, expenseId), eq(expenses.tripId, tripId)))
+    .run();
+  if (result.changes > 0) touchTrip(db, tripId);
   return result.changes > 0;
 }
 
@@ -520,7 +618,7 @@ export async function addPayment(tripId: string, input: AddPaymentInput): Promis
         clientId: input.clientId ?? null,
       })
       .run();
-    tx.update(trips).set({ updatedAt: date }).where(eq(trips.id, tripId)).run();
+    touchTrip(tx, tripId);
   });
 
   return { id, from: input.from, to: input.to, amount: input.amount, date, note: input.note };
@@ -528,7 +626,11 @@ export async function addPayment(tripId: string, input: AddPaymentInput): Promis
 
 export async function deletePayment(tripId: string, paymentId: string): Promise<boolean> {
   if (!isValidId(tripId) || !isValidId(paymentId)) return false;
-  const result = db.delete(payments).where(eq(payments.id, paymentId)).run();
+  const result = db
+    .delete(payments)
+    .where(and(eq(payments.id, paymentId), eq(payments.tripId, tripId)))
+    .run();
+  if (result.changes > 0) touchTrip(db, tripId);
   return result.changes > 0;
 }
 
@@ -540,26 +642,177 @@ export async function deletePayment(tripId: string, paymentId: string): Promise<
  * behaviour, which left dangling member ids inside other people's splits — those
  * expenses now simply get shared among whoever is left.
  */
-export async function removeMembers(tripId: string, memberIds: string[]): Promise<number> {
-  if (!isValidId(tripId) || memberIds.length === 0) return 0;
+export async function removeMembers(
+  tripId: string,
+  memberIds: string[],
+  /**
+   * Whether members tied to an account may go.
+   *
+   * A free member is a label on a column of arithmetic and anyone who can write may
+   * remove it. One tied to an account is a person who can open the trip, and removing
+   * them takes their expenses with it — so that is the owner's call alone.
+   */
+  options: { allowLinked?: boolean } = {}
+): Promise<{ removed: number; refused: number }> {
+  if (!isValidId(tripId) || memberIds.length === 0) return { removed: 0, refused: 0 };
 
   let removed = 0;
+  let refused = 0;
   db.transaction((tx) => {
     for (const memberId of memberIds) {
       if (!isValidId(memberId)) continue;
-      removed += tx.delete(members).where(eq(members.id, memberId)).run().changes;
+
+      // Scoped to the trip that was authorised, not to the id alone.
+      const scope = and(eq(members.id, memberId), eq(members.tripId, tripId));
+      const row = tx.select({ userId: members.userId }).from(members).where(scope).get();
+      if (!row) continue;
+      if (row.userId && !options.allowLinked) {
+        refused++;
+        continue;
+      }
+
+      removed += tx.delete(members).where(scope).run().changes;
     }
-    tx.update(trips).set({ updatedAt: Date.now() }).where(eq(trips.id, tripId)).run();
+    if (removed > 0) touchTrip(tx, tripId);
   });
-  return removed;
+  return { removed, refused };
 }
 
-export async function addMember(tripId: string, name: string, emoji: string): Promise<Member | null> {
+export async function addMember(
+  tripId: string,
+  name: string,
+  emoji: string,
+  /** Set when this participant is a registered account rather than a bare name. */
+  userId?: string
+): Promise<Member | null> {
   if (!isValidId(tripId)) return null;
   const id = generateId();
   const count = db.select().from(members).where(eq(members.tripId, tripId)).all().length;
-  db.insert(members).values({ id, tripId, name, emoji, position: count }).run();
-  return { id, name, emoji };
+  db.insert(members)
+    .values({ id, tripId, name, emoji, position: count, userId: userId ?? null })
+    .run();
+  touchTrip(db, tripId);
+  return { id, name, emoji, userId };
+}
+
+// ─── Members and accounts ────────────────────────────────────────────
+
+/**
+ * Which participant a given account is in a trip, if any.
+ *
+ * Having access to a trip and being one of the people it splits between are two
+ * different things, and until now the app only modelled the first: somebody who
+ * accepted an invitation could read the trip and add expenses, yet was in nobody's
+ * split unless the owner had separately typed their name — and then the name and the
+ * account had nothing to do with each other.
+ */
+export function memberForUser(tripId: string, userId: string): Member | null {
+  const row = db
+    .select()
+    .from(members)
+    .where(and(eq(members.tripId, tripId), eq(members.userId, userId)))
+    .get();
+  return row ? { id: row.id, name: row.name, emoji: row.emoji, userId: row.userId } : null;
+}
+
+/**
+ * Seats that are spoken for: somebody was invited by email and their link is still live.
+ *
+ * Unclaimed is not the same as free. A seat made by inviting one particular address is
+ * reserved for the person who was sent that link, and offering it to whoever opens a
+ * general invitation first is how the wrong person ends up in it — after which the one
+ * it was made for arrives, finds it taken, and has to join as a stranger.
+ */
+function reservedMembers(tripId: string): Set<string> {
+  return new Set(
+    db
+      .select({ memberId: invites.memberId })
+      .from(invites)
+      .where(and(eq(invites.tripId, tripId), gt(invites.expiresAt, Date.now())))
+      .all()
+      .map((r) => r.memberId)
+      .filter((id): id is string => Boolean(id))
+  );
+}
+
+/** Participants nobody has claimed or reserved: what "which one are you?" may offer. */
+export function unlinkedMembers(tripId: string): Member[] {
+  const reserved = reservedMembers(tripId);
+  return db
+    .select()
+    .from(members)
+    .where(and(eq(members.tripId, tripId), isNull(members.userId)))
+    .orderBy(asc(members.position))
+    .all()
+    .filter((m) => !reserved.has(m.id))
+    .map((m) => ({ id: m.id, name: m.name, emoji: m.emoji }));
+}
+
+/**
+ * Ties an existing participant to an account.
+ *
+ * Claiming rather than being assigned: the trip was written by somebody else, who typed
+ * a list of names, and only the person reading it knows which of them is them. It also
+ * covers every trip made before any of this existed, whose members are all bare text —
+ * without a claim they would stay unclaimable for good.
+ *
+ * Refuses if the member is already somebody else's, or if this account is already a
+ * participant, so one person cannot end up as two columns of the same split.
+ */
+export function claimMember(
+  tripId: string,
+  memberId: string,
+  userId: string,
+  /** Only the invitation that reserved a seat may seat somebody in it. */
+  options: { allowReserved?: boolean } = {}
+): Member | null {
+  if (!isValidId(tripId) || !isValidId(memberId)) return null;
+  if (memberForUser(tripId, userId)) return null;
+  if (!options.allowReserved && reservedMembers(tripId).has(memberId)) return null;
+
+  const result = db
+    .update(members)
+    .set({ userId })
+    .where(and(eq(members.id, memberId), eq(members.tripId, tripId), isNull(members.userId)))
+    .run();
+  if (result.changes === 0) return null;
+
+  touchTrip(db, tripId);
+  return memberForUser(tripId, userId);
+}
+
+/**
+ * Renames a participant.
+ *
+ * This is the alias: the same account is "Andoni" among friends and "Papá" in the
+ * family trip, and neither is a lie about who they are — the link to the account is
+ * what carries identity, the name is only what to call them here.
+ */
+export function renameMember(tripId: string, memberId: string, name: string): boolean {
+  if (!isValidId(tripId) || !isValidId(memberId)) return false;
+  const trimmed = name.trim().slice(0, 50);
+  if (!trimmed) return false;
+
+  const result = db
+    .update(members)
+    .set({ name: trimmed })
+    .where(and(eq(members.id, memberId), eq(members.tripId, tripId)))
+    .run();
+  if (result.changes === 0) return false;
+
+  touchTrip(db, tripId);
+  return true;
+}
+
+/** Whether a name is already taken in this trip, which the UI relies on to stay readable. */
+export function memberNameTaken(tripId: string, name: string, exceptId?: string): boolean {
+  const wanted = name.trim().toLowerCase();
+  return db
+    .select({ id: members.id, name: members.name })
+    .from(members)
+    .where(eq(members.tripId, tripId))
+    .all()
+    .some((m) => m.id !== exceptId && m.name.trim().toLowerCase() === wanted);
 }
 
 // ─── Calculations (unchanged behaviour) ──────────────────────────────
@@ -700,14 +953,24 @@ export async function findExpenseByClientId(
 const INVITE_DAYS = 7;
 
 /**
- * Creates an invitation link for an owned trip.
+ * Creates an invitation link.
  *
- * Anonymous trips do not need one — their link already lets anyone in — so this is
- * only ever reached for a trip that has an owner.
+ * The link is what gets somebody in: the trip URL on its own is not a credential, and
+ * registration is closed by default, so without this a person who was sent a trip had
+ * no way to reach it at all.
  */
 export async function createInvite(
   tripId: string,
-  role: "viewer" | "editor" = "editor"
+  role: "viewer" | "editor" = "editor",
+  /**
+   * The participant this link is for, when it was made by inviting somebody by email.
+   *
+   * Without it an invitation only ever granted access, and the person who accepted was
+   * left outside the split until somebody typed their name in separately. Naming the
+   * member here means accepting the invitation puts them in the arithmetic, under the
+   * account they signed in with.
+   */
+  memberId?: string
 ): Promise<{ token: string; expiresAt: number } | null> {
   if (!isValidId(tripId)) return null;
 
@@ -715,7 +978,9 @@ export async function createInvite(
   const now = Date.now();
   const expiresAt = now + INVITE_DAYS * 24 * 60 * 60 * 1000;
 
-  db.insert(invites).values({ token, tripId, role, createdAt: now, expiresAt }).run();
+  db.insert(invites)
+    .values({ token, tripId, role, createdAt: now, expiresAt, memberId: memberId ?? null })
+    .run();
   return { token, expiresAt };
 }
 
@@ -723,6 +988,9 @@ export interface InviteDetails {
   tripId: string;
   tripName: string;
   role: "viewer" | "editor";
+  /** The participant the link is for, when it names one. */
+  memberId?: string | null;
+  memberName?: string | null;
 }
 
 /** Looks up a token, treating an expired one as if it never existed. */
@@ -739,10 +1007,22 @@ export function readInvite(token: string): InviteDetails | null {
     .get();
   if (!trip) return null;
 
+  // A member that has since been claimed or removed makes the link a plain invitation
+  // again rather than an error: the access it grants is still worth honouring.
+  const member = invite.memberId
+    ? db
+        .select({ id: members.id, name: members.name })
+        .from(members)
+        .where(and(eq(members.id, invite.memberId), isNull(members.userId)))
+        .get()
+    : null;
+
   return {
     tripId: invite.tripId,
     tripName: trip.name,
     role: invite.role === "viewer" ? "viewer" : "editor",
+    memberId: member?.id ?? null,
+    memberName: member?.name ?? null,
   };
 }
 
@@ -756,6 +1036,12 @@ export function readInvite(token: string): InviteDetails | null {
 export async function redeemInvite(token: string, userId: string): Promise<string | null> {
   const invite = readInvite(token);
   if (!invite) return null;
+
+  // A link made for one person in particular seats them where they were expected. Any
+  // other link leaves them unseated, and the trip asks which participant they are.
+  if (invite.memberId) {
+    claimMember(invite.tripId, invite.memberId, userId, { allowReserved: true });
+  }
 
   // An invitation only ever adds access, never takes it away. The owner opening their
   // own link should not be demoted to editor, and now that read-only links can be handed

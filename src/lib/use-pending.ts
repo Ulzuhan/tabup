@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import type { Expense, Payment, Trip } from "@/lib/types";
+import { useT } from "@/i18n/provider";
 import { calculateBalances, calculateSettlements } from "@/lib/balances";
 import {
   allPending,
@@ -26,6 +28,7 @@ export interface PendingExpense extends Expense {
  */
 export function usePendingWrites(tripId: string, onDelivered: () => void) {
   const [pending, setPending] = useState<PendingWrite[]>([]);
+  const t = useT();
 
   // The callback is held in a ref updated from an effect, never during render: callers
   // pass a fresh closure each time, and depending on it directly would resubscribe and
@@ -40,12 +43,15 @@ export function usePendingWrites(tripId: string, onDelivered: () => void) {
   }, [tripId]);
 
   const attemptFlush = useCallback(async () => {
-    const { sent } = await flushQueue();
+    const { sent, dropped } = await flushQueue();
     await refresh();
     // Only refetch when something actually landed; otherwise this would hammer the
     // server every time the browser flaps between networks.
     if (sent > 0) delivered.current();
-  }, [refresh]);
+    // A write the server refused outright is gone, and it was somebody's money. It used
+    // to disappear into a console warning; whoever typed it deserves to hear about it.
+    if (dropped > 0) toast.error(t("offline.dropped", { count: dropped }));
+  }, [refresh, t]);
 
   useEffect(() => {
     // Deferred so no state is set during the render pass; both of these resolve after

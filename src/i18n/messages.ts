@@ -46,7 +46,7 @@ export const es = {
     namePlaceholder: "Fin de semana en Barcelona",
     currency: "Moneda por defecto",
     people: "Personas",
-    atLeastTwo: "mínimo 2",
+    inviteLater: "puedes invitar después",
     person: "Persona {n}",
     addMember: "Añadir persona",
     create: "Crear viaje",
@@ -175,11 +175,18 @@ export const es = {
     name: "Nombre",
     people: "Personas en este viaje",
     removeWarning: "Quitar a alguien borra también sus gastos y sus pagos.",
-    addSomeone: "Añadir a alguien",
+    addSomeone: "Nombre o correo",
+    addHint:
+      "Un correo la sienta en el reparto y le da acceso. Un nombre a secas vale para quien no tiene cuenta aquí, y podrá reclamarlo después.",
     accounts: "Cuentas con acceso",
-    inviteHint:
-      "Tienen que tener cuenta aquí. Los editores pueden añadir y editar gastos; los lectores solo mirar.",
-    invite: "Invitar",
+    accessHint:
+      "Quitar el acceso no la saca del reparto: sus gastos siguen donde están. Los editores pueden apuntar y editar gastos; los lectores solo mirar.",
+    inviteReady: "Invitación creada",
+    inviteReadyHint: "Todavía no tiene cuenta. Mándale este enlace: su sitio ya está guardado.",
+    you: "tú",
+    hasAccount: "con cuenta",
+    noAccount: "sin cuenta",
+    alias: "Cambiar el nombre",
     editor: "Editor",
     viewer: "Lector",
     owner: "Dueño",
@@ -189,6 +196,15 @@ export const es = {
     accessGranted: "Acceso concedido",
     accessRevoked: "Acceso retirado",
     failed: "No ha funcionado",
+  },
+
+  claim: {
+    title: "¿Cuál eres tú?",
+    hint: "Para que el viaje sepa qué saldo es el tuyo y no solo una lista de nombres.",
+    noneOfThese: "Ninguna, añádeme",
+    addMe: "Añadirme al reparto",
+    done: "Ya apareces como {name}",
+    failed: "No se ha podido",
   },
 
   shareTrip: {
@@ -220,6 +236,9 @@ export const es = {
     stale: "Estás viendo los últimos datos guardados en este dispositivo.",
     offline:
       "Estás sin conexión. Estas cifras son de la última vez que hubo cobertura, y todavía no se pueden guardar gastos nuevos.",
+    // Se dice en voz alta a propósito: es dinero que alguien apuntó y que no va a llegar.
+    dropped:
+      "{count} apunte(s) que tenías pendientes no se pudieron guardar y se han descartado.",
   },
 
   search: {
@@ -362,6 +381,7 @@ export const es = {
   join: {
     title: "Te han invitado a un viaje",
     subtitle: "Entra o crea una cuenta para unirte a {trip}.",
+    subtitleSeat: "Entra o crea una cuenta para unirte a {trip}. Tu sitio, «{name}», ya está reservado.",
     joinAs: "Unirte como {name}",
     joining: "Uniéndote…",
     joined: "Ya estás dentro",
@@ -435,7 +455,7 @@ export const en: Messages = {
     namePlaceholder: "Weekend in Barcelona",
     currency: "Default currency",
     people: "People",
-    atLeastTwo: "at least 2",
+    inviteLater: "you can invite people later",
     person: "Person {n}",
     addMember: "Add person",
     create: "Create trip",
@@ -564,11 +584,18 @@ export const en: Messages = {
     name: "Name",
     people: "People in this trip",
     removeWarning: "Removing someone deletes their expenses and payments too.",
-    addSomeone: "Add someone",
+    addSomeone: "Name or email",
+    addHint:
+      "An email seats them in the split and lets them in. A bare name works for anyone without an account here, and they can claim it later.",
     accounts: "Accounts with access",
-    inviteHint:
-      "They need an account here already. Editors can add and edit expenses; viewers can only look.",
-    invite: "Invite",
+    accessHint:
+      "Revoking access does not take them out of the split: their expenses stay where they are. Editors can add and edit expenses; viewers can only look.",
+    inviteReady: "Invitation created",
+    inviteReadyHint: "They have no account yet. Send them this link — their seat is already saved.",
+    you: "you",
+    hasAccount: "has an account",
+    noAccount: "no account",
+    alias: "Change the name",
     editor: "Editor",
     viewer: "Viewer",
     owner: "Owner",
@@ -577,6 +604,15 @@ export const en: Messages = {
     memberRemoved: "{name} removed",
     accessGranted: "Access granted",
     accessRevoked: "Access revoked",
+    failed: "That did not work",
+  },
+
+  claim: {
+    title: "Which one are you?",
+    hint: "So the trip knows which balance is yours, instead of showing a list of names.",
+    noneOfThese: "None of these, add me",
+    addMe: "Add me to the split",
+    done: "You now appear as {name}",
     failed: "That did not work",
   },
 
@@ -609,6 +645,7 @@ export const en: Messages = {
     stale: "Showing the last data saved on this device.",
     offline:
       "You are offline. These figures are from the last time you had signal, and new expenses cannot be saved yet.",
+    dropped: "{count} entry(s) you had pending could not be saved and were discarded.",
   },
 
   search: {
@@ -751,6 +788,7 @@ export const en: Messages = {
   join: {
     title: "You have been invited to a trip",
     subtitle: "Sign in or create an account to join {trip}.",
+    subtitleSeat: "Sign in or create an account to join {trip}. Your place, “{name}”, is already saved.",
     joinAs: "Join as {name}",
     joining: "Joining…",
     joined: "You are in",

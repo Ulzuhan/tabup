@@ -29,15 +29,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Trip name is required" }, { status: 400 });
     }
 
-    if (!members || !Array.isArray(members) || members.length < 2) {
-      return NextResponse.json({ error: "At least 2 members required" }, { status: 400 });
-    }
-    for (const m of members) {
-      if (typeof m.name !== "string" || m.name.trim().length === 0 || m.name.trim().length > 50) {
+    /**
+     * Anyone besides you, and there is no floor.
+     *
+     * Two names used to be required, which reads as sensible until people arrive by
+     * invitation: at the moment of creating the trip you do not yet know what the
+     * second person is called, and being made to invent a placeholder for them is
+     * exactly the manual naming this is moving away from. One person who invites the
+     * rest is the normal way round.
+     */
+    const extra = Array.isArray(members) ? members : [];
+    for (const m of extra) {
+      if (typeof m?.name !== "string" || m.name.trim().length === 0 || m.name.trim().length > 50) {
         return NextResponse.json({ error: "Each member name must be 1-50 characters" }, { status: 400 });
       }
     }
-    const memberNames = members.map((m: { name: string }) => m.name.trim().toLowerCase());
+    // The owner is a participant too, so their name counts in the uniqueness check.
+    const memberNames = [user.name, ...extra.map((m: { name: string }) => m.name)].map((n) =>
+      n.trim().toLowerCase()
+    );
     if (new Set(memberNames).size !== memberNames.length) {
       return NextResponse.json({ error: "Duplicate member names are not allowed" }, { status: 400 });
     }
@@ -51,11 +61,13 @@ export async function POST(request: NextRequest) {
     const trip = await createTrip({
       name: name.trim().slice(0, 100),
       currency,
-      members: members.map((m: { name: string }, i: number) => ({
+      members: extra.map((m: { name: string }, i: number) => ({
         name: m.name.trim(),
-        emoji: EMOJIS[i % EMOJIS.length],
+        // Offset by one: the owner already took the first emoji.
+        emoji: EMOJIS[(i + 1) % EMOJIS.length],
       })),
       ownerId: user.id,
+      ownerName: user.name,
     });
 
     return NextResponse.json({

@@ -261,9 +261,19 @@ export function clearAttempts(key: string): void {
   attempts.delete(key);
 }
 
-/** Cheap client identifier for throttling. Behind a proxy this is the proxy's header. */
+/**
+ * Cheap client identifier for throttling.
+ *
+ * Behind a proxy this is whatever the proxy says. When nothing says anything, every
+ * caller shares the key `local` — which is a shared counter, not an identifier, so ten
+ * attempts from anybody would lock out everybody. That is why a successful login clears
+ * it: without that, ten *correct* sign-ins in a quarter of an hour were enough to shut
+ * the whole instance out, which is a normal evening in a household.
+ */
 export function clientKey(request: Request, suffix = ""): string {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const forwarded =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip")?.trim();
   return `${forwarded || "local"}:${suffix}`;
 }
 

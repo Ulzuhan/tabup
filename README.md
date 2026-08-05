@@ -3,8 +3,10 @@
 Shared expense tracking for trips: who paid what, in which currency, and who owes whom
 at the end. Multi-currency, uneven splits, settle-up payments and CSV export.
 
-**You do not need an account to use it.** Start a trip, share the link, done. An account
-is only there to keep your trips together across devices.
+Every trip belongs to an account, and the people it splits between are `members` — which
+is a different thing. An account is who may *open* a trip; a member is a column in its
+arithmetic. Most members at a real table will never register here, and that is fine: a
+member can be a bare name, and it can be tied to an account later.
 
 ---
 
@@ -27,7 +29,11 @@ npm run start
 | `TABUP_DB` | `data/tabup.db` | SQLite database file |
 | `TABUP_DATA_DIR` | `data/` | Where the exchange-rate cache is kept |
 | `PORT` | `3000` | Port to listen on |
-| `TABUP_ALLOW_REGISTRATION` | unset | `true` opens sign-ups; otherwise only the first account is allowed |
+| `TABUP_REGISTRATION` | `closed` | `closed`, `approval` or `open`; see [Registration](#registration) |
+| `TABUP_ALLOW_REGISTRATION` | unset | Old flag, still honoured as `open` so upgrades do not change behaviour |
+| `TABUP_OLLAMA_URL` | `http://127.0.0.1:11434` | Where the receipt-reading model lives |
+| `TABUP_OCR_MODEL` | `qwen3.5:397b-cloud` | Vision model used to read receipts |
+| `TABUP_OCR_TIMEOUT` | `60000` | Milliseconds before giving up on the model |
 | `TABUP_FREE_TRIP_LIMIT` | unset | Caps how many trips an account may own; no cap by default |
 | `TABUP_BACKUP_DIR` | `~/backups/tabup` | Where `backup-db.mjs` writes snapshots |
 | `TABUP_BACKUP_KEEP` | `14` | Snapshots to keep |
@@ -59,25 +65,65 @@ to them, and every query is scoped by user id.
 
 ## Access model
 
-Three states, and the whole authorisation story fits in them:
+Every trip has an owner. Knowing a trip's URL grants nothing — there was an anonymous
+mode once, where the link was the whole credential, and it went because it needed a
+second set of rules nobody could keep straight (claiming, ownerless deletion, trips
+remembered only by one browser) and could not answer the obvious question of what
+happens when two people claim the same link.
 
-| Trip | Who can read | Who can write | Who can delete |
+| Role | Read | Add and edit expenses | Delete, invite, reshare |
 | --- | --- | --- | --- |
-| **Anonymous** (no owner) | anyone with the link | anyone with the link | anyone with the link |
-| **Owned** | owner + invited accounts | owner + editors | owner only |
-| **Owned, shared as viewer** | that account too | no | no |
+| **Owner** | yes | yes | yes |
+| **Editor** | yes | yes | no |
+| **Viewer** | yes | no | no |
 
-An anonymous trip is the default and the reason the app is usable in ten seconds at a
-restaurant table. The link *is* the credential, which is the same bargain as a shared
-Google Doc link — fine for a weekend in Lisbon, not for anything you would not put in a
-group chat.
+A trip you may not see returns 404 rather than 403, so the endpoint cannot be used to
+probe which trip ids exist.
 
-Claiming a trip closes it: once it has an owner, the link alone stops being enough.
-This is one-way on purpose — someone who claimed a trip cannot silently reopen it to
-everyone who still has the old link.
+**Ids in a request body are checked against the trip in the URL.** Authorisation is per
+trip, and an expense id, a payment id or a member id all arrive in the body — so
+without that pairing, write access to any one trip would be write access to any row
+whose id you knew, and a read-only guest is handed the ids of everything they can see.
+`npm run test:members` is what keeps that honest.
 
-Signing in sends the trip ids this browser remembers, and any that still have no owner
-become yours. Nothing is lost by having used the app anonymously first.
+### Members are not accounts
+
+The people a trip splits between and the accounts that may open it are separate on
+purpose:
+
+- A **free member** is a name with no account behind it. Most people at a table are one
+  — this instance does not even take open sign-ups — and refusing to split a taxi four
+  ways until everyone has registered would be the wrong trade. It grants nobody
+  anything: it is a column of arithmetic with a label on it.
+- A **linked member** is tied to an account. That link is what lets the app say "you owe
+  23" instead of "Andoni owes 23", and it is the only way settling up can mean anything
+  between two people rather than between two strings.
+
+Adding somebody **by email** does both at once: it seats them in the split and lets them
+in. If nobody holds that address yet, the seat is made anyway and the invitation is
+bound to it, so accepting later lands them in the right column instead of leaving them
+outside the arithmetic. Adding somebody **by name** creates a free member that an
+account can claim later.
+
+Whoever creates a trip is its first member, so a trip of one is normal — you invite the
+rest, and there is no minimum. Requiring two names up front was backwards: at the moment
+of creating a trip you do not yet know what the second person will be called.
+
+### Which one are you?
+
+Somebody who can open a trip but is in nobody's split is asked which participant they
+are, with the free members offered and "none of these, add me" as the way out. It is
+asked rather than guessed, because matching "Andoni" to an account by spelling would be
+a guess about money — and it is also how every trip made before any of this gets its
+members attached to real people, since all of theirs are bare text.
+
+A member's name is a per-trip **alias**: the same account is "Andoni" among friends and
+"Papá" in the family trip, and neither is a lie about who they are. Your own name is
+yours to change; the owner labels the free members, since somebody typed those in.
+
+Removing a member takes their expenses and payments with them, which is why a *linked*
+member can only be removed by the owner. Revoking somebody's access does not remove
+them from the split — being uninvited is not a statement that they were never there.
 
 ### Invitations
 
@@ -93,6 +139,10 @@ register**, which is what makes this work on a closed instance.
 Invitations last 7 days and are not single-use — a trip link gets forwarded around a
 group, and a one-shot invite would work for whoever tapped first and leave everyone
 else with an error they could not explain. Only the owner can create them.
+
+An invitation made by adding somebody by email carries the member it was made for, so
+accepting it seats that person. A plain invitation carries no member, and whoever
+accepts is asked which participant they are.
 
 ### Registration
 
@@ -153,25 +203,37 @@ Every write is a transaction. It either lands completely or not at all.
 
 ## Tests
 
-Both suites run against a live server, no test framework:
+No test framework. Most run against a live server:
 
 ```bash
-npm run start &
-npm run test:api     # 18 tests — splitting, balances, validation, concurrency
-npm run test:auth    # 41 tests — accounts, ownership, sharing, plan limits
+TABUP_DB=/tmp/test.db PORT=3999 TABUP_REGISTRATION=open npm run start &
+export BASE=http://127.0.0.1:3999
+
+npm run test:api        # 18 — splitting, balances, validation, concurrency
+npm run test:auth       # 51 — accounts, ownership, sharing, invitations
+npm run test:money      # 21 — currencies, whole cents, settling, CSV
+npm run test:members    # 37 — members and accounts, and isolation between trips
+npm run test:recurring  # 17 — fixed costs; pure functions, no server needed
 ```
 
-`test:api` includes the concurrency regression above. `test:auth` covers the isolation
-boundary: a stranger who knows an owned trip's id gets a 404 on read, write, export and
-delete, and an editor cannot delete or reshare a trip they do not own.
-
-Point them at a scratch database so they do not touch your real one:
+`test:admin` needs its own empty database and `TABUP_REGISTRATION=approval`, because
+what it tests starts with "whoever registers first is the admin":
 
 ```bash
-TABUP_DB=/tmp/test.db PORT=3999 npm run start &
-BASE=http://127.0.0.1:3999 npm run test:api
-BASE=http://127.0.0.1:3999 npm run test:auth
+rm -f data/test.db* && TABUP_DB=data/test.db TABUP_REGISTRATION=approval npm run start &
+npm run test:admin      # 18 — approvals, passwords, the error log
 ```
+
+Point them at a scratch database, as above, so they never touch the real one. Each suite
+creates several accounts, and the registration limiter is per IP: run two of them back
+to back against the same server and the second will start getting 429s. That is the
+limiter working — restart against a fresh database.
+
+What is worth knowing about each: `test:api` carries the concurrency regression above.
+`test:auth` covers the isolation boundary from outside — a stranger who knows a trip's
+id gets 404 on read, write, export and delete. `test:members` covers it from *inside*:
+someone with legitimate write access on one trip pointing those calls at another trip's
+ids.
 
 ---
 
@@ -181,9 +243,8 @@ Spanish and English, chosen from the header. The choice lives in a cookie; witho
 the browser's `Accept-Language` decides, falling back to Spanish.
 
 Deliberately **not** the sub-path routing Next's own guide recommends (`/es/trip/abc`).
-A trip link is the credential for an anonymous trip, people have those links saved and
-pasted into group chats, and prefixing every route would break every one of them — for
-a two-language app that is a bad trade.
+People have trip links saved and pasted into group chats, and prefixing every route
+would break every one of them — for a two-language app that is a bad trade.
 
 Spanish is the source of truth in `src/i18n/messages.ts` and its shape defines the
 type, so a key missing from English is a compile error rather than an untranslated
@@ -198,11 +259,19 @@ connection — on a plane, on a mountain, or on roaming you would rather not pay
 
 The service worker splits its rules deliberately:
 
-- **Shell and static assets** — cache first. They only change when a new build ships.
+- **Static assets** — cache first. They only change when a new build ships.
+- **Pages** — network first. What a page contains depends on who is asking, so a shared
+  cached copy would show one person another's view. The cache is the offline fallback.
 - **API reads** — network first, cache only as a fallback. Balances are the reason this
   app exists, and showing a stale figure as if it were current would be worse than
   showing nothing, so a cached response is flagged and the page says the numbers are
   from the last time it had signal.
+
+**The cache is emptied whenever the session changes** — signing out, and signing in too.
+It belongs to the browser rather than to the account, and nothing used to clear it: one
+person's trips stayed on disk after they signed out, and the next account on that device
+would be handed them the moment the network failed, labelled as offline data, which says
+nothing about *whose* it is. A phone gets passed around; that is the whole scenario.
 
 ### Writing offline
 
@@ -303,7 +372,15 @@ success.
   `sameSite=lax`, and `secure` in production.
 - **Login throttling**: per IP and per account, 10 attempts per 15 minutes. In-process,
   so it assumes a single instance — running more than one means moving it to the
-  database.
+  database. A successful sign-in clears both counters: the IP is taken from
+  `X-Forwarded-For` or `X-Real-IP`, and behind a proxy that sets neither, *every* caller
+  shares one counter — so without that clearing, ten correct sign-ins in a quarter of an
+  hour would lock out the people using it properly.
+- **Ids in request bodies** are checked against the trip in the URL, so write access to
+  one trip cannot be pointed at another trip's rows. See [Access model](#access-model).
+- **Email addresses**: the collaborator list only carries them for the owner, plus your
+  own row. Sharing a trip with somebody is not the same as handing every guest the
+  address of everyone else on it.
 - **Enumeration**: a trip you cannot see returns 404, not 403. Failed logins do not say
   which half was wrong, and a login attempt against a non-existent account still runs a
   hash so the response time does not give it away.
@@ -323,8 +400,9 @@ node scripts/migrate-json.mjs [source-directory]   # defaults to .splittrip-data
 ```
 
 Idempotent, and the JSON files are never modified or deleted. Trips whose id already
-exists in the database are skipped. Imported trips arrive without an owner, so they
-behave as anonymous trips and can be claimed.
+exists in the database are skipped. Imported trips arrive without an owner; the first
+account to exist adopts them on the next start (`adoptOrphanTrips`), and their members
+are bare names until somebody claims them.
 
 ---
 

@@ -40,7 +40,12 @@ export interface TripData {
   settlements: EnrichedSettlement[];
   totalExpenses: number;
   access: "viewer" | "editor" | "owner";
-  collaborators: { id: string; email: string; name: string; role: string }[];
+  /** Which participant the reader is, when they have said. Null asks the question. */
+  you: string | null;
+  /** The participants still free to claim, offered only while `you` is null. */
+  unclaimed: Member[];
+  /** Email only reaches the owner and each account's own row; see visibleCollaborators. */
+  collaborators: { id: string; email?: string; name: string; role: string }[];
 }
 
 /** An expense that is still sitting in the offline queue carries this. */

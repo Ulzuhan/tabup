@@ -47,15 +47,35 @@ const api = async (path, options = {}) => {
   return { status: res.status, body: await res.json().catch(() => ({})) };
 };
 
-const newTrip = (names = ["Ana", "Bea"]) =>
-  api("/api/trips", {
+/**
+ * A trip whose participants are exactly `names`.
+ *
+ * Whoever creates a trip is now one of the people it splits between — those were two
+ * separate ideas before, so an account could own a trip and appear in nobody's column
+ * of it — which means the first name here goes on that seat rather than beside it.
+ */
+const newTrip = async (names = ["Ana", "Bea"]) => {
+  const created = await api("/api/trips", {
     method: "POST",
     body: JSON.stringify({
       name: "Test trip",
       currency: "EUR",
-      members: names.map((name) => ({ name })),
+      members: names.slice(1).map((name) => ({ name })),
     }),
   });
+  if (created.status !== 200) return created;
+
+  const renamed = await api(`/api/trips/${created.body.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      renameMember: { id: created.body.members[0].id, name: names[0] },
+    }),
+  });
+  return {
+    status: created.status,
+    body: { ...created.body, members: renamed.body.members ?? created.body.members },
+  };
+};
 
 async function main() {
   console.log(`Testing against ${BASE}\n`);

@@ -44,7 +44,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "pending_approval" }, { status: 403 });
   }
 
+  // Both counters, not just the account's. The IP key is shared by everyone the server
+  // cannot tell apart — behind a proxy that sets no headers, that is every single
+  // caller — so leaving it to accumulate on success meant correct sign-ins piling up
+  // until the instance locked out the people using it properly.
   clearAttempts(accountKey);
+  clearAttempts(ipKey);
 
 
   await createSession(user.id);

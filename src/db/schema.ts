@@ -23,12 +23,15 @@ import {
  */
 
 /**
- * Accounts are optional by design.
+ * Every trip belongs to an account.
  *
- * A trip with no `ownerId` is an anonymous trip: whoever holds the link can read and
- * write it, which is how the app has always worked and what makes it usable in ten
- * seconds at a restaurant table. Registering turns that into a trip with an owner,
- * after which only the owner and the people in `tripAccess` can touch it.
+ * There was an anonymous mode once, where holding the link was the whole credential.
+ * It went because it needed a second set of rules nobody could keep straight — claiming,
+ * ownerless deletion, trips remembered only by one browser — and questions it could not
+ * answer, like what happens when two people claim the same link.
+ *
+ * Note this is about *access*, not about who is in the split: the people a trip divides
+ * its bills between are `members`, and most of them will never have an account here.
  */
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -80,7 +83,10 @@ export const trips = sqliteTable(
     updatedAt: integer("updated_at").notNull(),
     /** Bumped on every write; lets clients detect they are looking at stale data. */
     version: integer("version").notNull().default(1),
-    /** Null means anonymous: access is granted by knowing the link. */
+    /**
+     * Who the trip belongs to. Null only ever survives from before accounts existed,
+     * and `adoptOrphanTrips` clears it on the next start.
+     */
     ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
     /**
      * Optional spending target for the whole trip, in the trip's currency.
@@ -124,10 +130,24 @@ export const members = sqliteTable(
     emoji: text("emoji").notNull().default("😊"),
     /** Preserves the order they were added in, which the UI relies on. */
     position: integer("position").notNull().default(0),
-    /** Set when this participant is also a registered account. */
+    /**
+     * The account this participant is, when there is one.
+     *
+     * Null is not a gap to be filled: a trip splits a bill between the people at the
+     * table, and most of them will never have an account here. What the link buys is
+     * knowing *which* participant a given reader is — the difference between "Andoni
+     * owes 23" and "you owe 23", and the only way settling up can mean anything
+     * between accounts. Free members stay first-class; they are simply anonymous.
+     *
+     * Unique per trip, so one account can never end up as two columns of the same
+     * split.
+     */
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
   },
-  (t) => [index("members_trip_idx").on(t.tripId)]
+  (t) => [
+    index("members_trip_idx").on(t.tripId),
+    uniqueIndex("members_trip_user_idx").on(t.tripId, t.userId),
+  ]
 );
 
 export const expenses = sqliteTable(
@@ -249,6 +269,15 @@ export const invites = sqliteTable(
     role: text("role").notNull().default("editor"),
     createdAt: integer("created_at").notNull(),
     expiresAt: integer("expires_at").notNull(),
+    /**
+     * The participant this link is for, when it was made by inviting somebody by email.
+     *
+     * An invitation used to grant access and nothing else, so the person who accepted
+     * could read the trip and add expenses while being in nobody's split until the
+     * owner separately typed a name that had no connection to their account. Naming the
+     * member here closes that gap: accepting seats them.
+     */
+    memberId: text("member_id").references(() => members.id, { onDelete: "set null" }),
   },
   (t) => [index("invites_trip_idx").on(t.tripId)]
 );

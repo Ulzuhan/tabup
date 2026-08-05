@@ -17,6 +17,18 @@ export interface Member {
   id: string;
   name: string;
   emoji: string;
+  /**
+   * The account this participant is, when there is one.
+   *
+   * A member without it is a free label: a column in the arithmetic for somebody who
+   * has no account here and may never have one. Both kinds are legitimate — the point
+   * of the app is splitting a bill at a table, and half the table will not register —
+   * but only a linked member can be told apart from a name that merely looks the same,
+   * which is what lets the app say "you owe 23" instead of "Andoni owes 23".
+   */
+  userId?: string | null;
+  /** The account's own name, when linked. Shown next to a per-trip alias that differs. */
+  accountName?: string;
 }
 
 export interface Expense {

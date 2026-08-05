@@ -16,6 +16,9 @@ export async function GET(request: NextRequest) {
     role: invite.role,
     signedIn: Boolean(user),
     userName: user?.name ?? null,
+    // Set when the link was made for one person: the page can say which seat is
+    // waiting instead of only naming the trip.
+    memberName: invite.memberName ?? null,
   });
 }
 

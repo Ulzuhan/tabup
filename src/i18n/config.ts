@@ -2,10 +2,10 @@
  * Language handling.
  *
  * Deliberately NOT the sub-path routing Next's guide recommends (`/es/trip/abc`).
- * A trip link is the credential for an anonymous trip, people have those links saved
- * and pasted into group chats, and prefixing every route would break every one of them
- * — for a two-language app that is a bad trade. The locale rides in a cookie instead,
- * falling back to the browser's Accept-Language, and URLs stay exactly as they are.
+ * People have trip links saved and pasted into group chats, and prefixing every route
+ * would break every one of them — for a two-language app that is a bad trade. The
+ * locale rides in a cookie instead, falling back to the browser's Accept-Language, and
+ * URLs stay exactly as they are.
  */
 
 export const LOCALES = ["es", "en"] as const;

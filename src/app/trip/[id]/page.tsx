@@ -9,6 +9,7 @@ import type { Expense, Member } from "@/lib/types";
 import { ExpenseDialog, type ExpenseDraft } from "@/components/trip/expense-dialog";
 import { SettleDialog, type PaymentDraft } from "@/components/trip/settle-dialog";
 import { ShareDialog } from "@/components/trip/share-dialog";
+import { ClaimPrompt } from "@/components/trip/claim-prompt";
 import { ManageDialog } from "@/components/trip/manage-dialog";
 import { SpendingPace } from "@/components/trip/spending-pace";
 import { TripHeader } from "@/components/trip/trip-header";
@@ -411,6 +412,12 @@ export default function TripPage() {
       <OfflineBanner stale={stale} />
       <PendingBanner count={pending.length} onFlush={() => flushPending()} />
 
+      {/* Asked once, near the top, because until it is answered every figure below is a
+          list of other people's names rather than what you owe. */}
+      {trip.you === null && (
+        <ClaimPrompt tripId={id} candidates={trip.unclaimed} onClaimed={loadTrip} />
+      )}
+
       <TripTotal
         total={view?.totalExpenses ?? trip.totalExpenses}
         currency={trip.currency}
@@ -564,6 +571,7 @@ export default function TripPage() {
         members={trip.members}
         collaborators={trip.collaborators}
         access={trip.access}
+        you={trip.you}
         onChanged={loadTrip}
       />
 

@@ -2,14 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, users } from "@/db";
 import { normalizeEmail } from "@/lib/auth";
-import { grantAccess, listCollaborators, revokeAccess } from "@/lib/store";
+import {
+  addMember,
+  getTrip,
+  grantAccess,
+  memberForUser,
+  memberNameTaken,
+  revokeAccess,
+  visibleCollaborators,
+} from "@/lib/store";
+import { EMOJIS } from "@/lib/types";
 import { authorizeTrip } from "@/lib/authorize";
 
 /**
- * Sharing an owned trip with another account.
+ * Sharing a trip with another account.
  *
- * Anonymous trips are shared by sending the link and have no collaborator list, so
- * these endpoints only apply once a trip has an owner.
+ * Letting somebody in and seating them in the split are done together: they used to be
+ * separate lists that knew nothing of each other, so the same person could be a
+ * collaborator by email *and* a line of text in the members list, with nothing tying
+ * the two together.
  */
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/trips/[id]/share">) {
@@ -17,7 +28,12 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/trips/[
   const auth = await authorizeTrip(id, "read");
   if (!auth.ok) return auth.response;
 
-  return NextResponse.json({ collaborators: listCollaborators(id) });
+  return NextResponse.json({
+    collaborators: visibleCollaborators(id, {
+      id: auth.user?.id,
+      isOwner: auth.level === "owner",
+    }),
+  });
 }
 
 // POST — grant access by email
@@ -61,7 +77,19 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
     return NextResponse.json({ error: "Failed to share trip" }, { status: 500 });
   }
 
-  return NextResponse.json({ collaborators: listCollaborators(id) });
+  // Seated as well as let in, unless they already have a place in this trip — an
+  // existing participant they claimed earlier, for instance.
+  if (!memberForUser(id, target.id)) {
+    const trip = await getTrip(id);
+    let name = target.name.slice(0, 50);
+    for (let n = 2; memberNameTaken(id, name); n++) name = `${target.name.slice(0, 46)} ${n}`;
+    await addMember(id, name, EMOJIS[(trip?.members.length ?? 0) % EMOJIS.length], target.id);
+  }
+
+  return NextResponse.json({
+    collaborators: visibleCollaborators(id, { id: auth.user.id, isOwner: true }),
+    members: (await getTrip(id))?.members ?? [],
+  });
 }
 
 // DELETE — revoke access
@@ -84,5 +112,10 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/trips
   if (!removed) {
     return NextResponse.json({ error: "That account has no access" }, { status: 404 });
   }
-  return NextResponse.json({ collaborators: listCollaborators(id) });
+
+  // Their seat stays. Taking away someone's access is not a statement that they were
+  // never at the table, and deleting the member would take their expenses with it.
+  return NextResponse.json({
+    collaborators: visibleCollaborators(id, { id: auth.user?.id, isOwner: true }),
+  });
 }

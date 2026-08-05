@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { clearSessionCache } from "@/lib/session-cache";
 import {
   ArrowRight,
   Compass,
@@ -49,7 +50,8 @@ export function TripsView() {
   const [showCreate, setShowCreate] = useState(false);
   const [tripName, setTripName] = useState("");
   const [currency, setCurrency] = useState("EUR");
-  const [members, setMembers] = useState(["", ""]);
+  // Empty: you are already in the trip, and everyone else can arrive by invitation.
+  const [members, setMembers] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -80,6 +82,9 @@ export function TripsView() {
 
   const signOut = async () => {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    // The offline cache belongs to the browser, not to the account: leaving it behind
+    // hands your trips to whoever signs in next on this device.
+    clearSessionCache();
     window.location.reload();
   };
 
@@ -89,7 +94,7 @@ export function TripsView() {
   };
 
   const removeMember = (index: number) => {
-    if (members.length > 2) setMembers(members.filter((_, i) => i !== index));
+    setMembers(members.filter((_, i) => i !== index));
   };
 
   const updateMember = (index: number, value: string) => {
@@ -99,7 +104,16 @@ export function TripsView() {
   };
 
   const namedMembers = members.filter((m) => m.trim());
-  const canCreate = tripName.trim().length > 0 && namedMembers.length >= 2;
+  /**
+   * A name for the trip is all it takes.
+   *
+   * Two people used to be required, which is backwards once anyone can be invited: at
+   * this moment you do not know what the second person will be called, and inventing a
+   * placeholder for them is exactly the typed-in name this is moving away from. You are
+   * in the trip either way — the server seats the owner — so a trip of one that grows
+   * by invitation is the normal way round.
+   */
+  const canCreate = tripName.trim().length > 0;
 
   const createTrip = async () => {
     if (!canCreate) return;
@@ -141,6 +155,7 @@ export function TripsView() {
           setTripName={setTripName}
           currency={currency}
           setCurrency={setCurrency}
+          userName={user?.name ?? ""}
           members={members}
           addMember={addMember}
           removeMember={removeMember}
@@ -271,6 +286,7 @@ function CreateTripForm({
   setTripName,
   currency,
   setCurrency,
+  userName,
   members,
   addMember,
   removeMember,
@@ -285,6 +301,8 @@ function CreateTripForm({
   setTripName: (v: string) => void;
   currency: string;
   setCurrency: (v: string) => void;
+  /** Shown as the first participant: the owner is always in their own trip. */
+  userName: string;
   members: string[];
   addMember: () => void;
   removeMember: (i: number) => void;
@@ -352,17 +370,27 @@ function CreateTripForm({
       <div className="space-y-2">
         <div className="flex items-baseline justify-between">
           <Label>{t("createTrip.people")}</Label>
-          <span className="text-xs text-muted-foreground">{t("createTrip.atLeastTwo")}</span>
+          <span className="text-xs text-muted-foreground">{t("createTrip.inviteLater")}</span>
         </div>
 
         <div className="space-y-2">
+          {/* You are in it before anyone else is added, which is what the server does
+              too — and what makes a trip of one perfectly valid. */}
+          <div className="flex items-center gap-2 rounded-xl bg-secondary/40 px-2 py-1.5">
+            <MemberAvatar emoji={EMOJIS[0]} size="lg" />
+            <span className="min-w-0 flex-1 truncate text-sm">{userName}</span>
+            <span className="shrink-0 pr-1 text-xs text-muted-foreground">
+              {t("manage.you")}
+            </span>
+          </div>
+
           {members.map((member, i) => (
             <div key={i} className="flex items-center gap-2">
-              <MemberAvatar emoji={EMOJIS[i % EMOJIS.length]} size="lg" />
+              <MemberAvatar emoji={EMOJIS[(i + 1) % EMOJIS.length]} size="lg" />
               <Input
                 value={member}
                 onChange={(e) => updateMember(i, e.target.value)}
-                placeholder={t("createTrip.person", { n: i + 1 })}
+                placeholder={t("createTrip.person", { n: i + 2 })}
                 className="h-11 flex-1"
               />
               <Button
@@ -370,8 +398,7 @@ function CreateTripForm({
                 variant="ghost"
                 size="icon"
                 onClick={() => removeMember(i)}
-                disabled={members.length <= 2}
-                aria-label={t("createTrip.person", { n: i + 1 })}
+                aria-label={t("createTrip.person", { n: i + 2 })}
                 className="shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-30"
               >
                 <X className="size-4" />

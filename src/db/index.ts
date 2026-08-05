@@ -182,7 +182,14 @@ function migrate(sqlite: Database.Database) {
   addColumn(sqlite, "trips", "budget", "REAL");
   addColumn(sqlite, "payments", "client_id", "TEXT");
   addColumn(sqlite, "members", "user_id", "TEXT REFERENCES users(id) ON DELETE SET NULL");
+  addColumn(sqlite, "invites", "member_id", "TEXT REFERENCES members(id) ON DELETE SET NULL");
   sqlite.exec("CREATE INDEX IF NOT EXISTS trips_owner_idx ON trips(owner_id);");
+
+  // One account is at most one participant per trip. Partial, because unlinked members
+  // are the common case and SQLite would otherwise treat them as colliding on NULL.
+  sqlite.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS members_trip_user_idx ON members(trip_id, user_id) WHERE user_id IS NOT NULL;"
+  );
 
   // Unique per trip, and only where a client id was supplied: SQLite treats NULLs as
   // distinct, so every row written before this existed still fits.

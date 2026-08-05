@@ -143,10 +143,19 @@ let flushing = false;
  * Order matters less than it looks — creations commute — but sending in order keeps the
  * result predictable and makes the log readable when something goes wrong.
  *
- * A 4xx other than 408/429 means the server actively rejected the write: retrying will
- * never help, so it is dropped rather than left to retry forever. Network failures and
- * 5xx stay queued.
+ * A 4xx means the server rejected the write, and most of those are permanent — a
+ * malformed amount will be just as malformed on the tenth attempt — so they are dropped
+ * rather than retried forever. Network failures and 5xx stay queued.
+ *
+ * The exceptions in RETRYABLE are the ones that say "not now" rather than "never".
+ * **401 is the important one**: sessions last thirty days and a trip can outlast one,
+ * so an expense typed on a mountain could come back to a signed-out browser, get a 401
+ * from every queued write, and be deleted — silently, with a console warning nobody
+ * reads, in the one module that exists precisely because that data lives nowhere else.
+ * Signing in again fixes a 401; nothing fixes a discarded expense.
  */
+const RETRYABLE = new Set([401, 403, 408, 429]);
+
 export async function flushQueue(): Promise<{ sent: number; failed: number; dropped: number }> {
   if (flushing || typeof navigator === "undefined" || !navigator.onLine) {
     return { sent: 0, failed: 0, dropped: 0 };
@@ -170,10 +179,12 @@ export async function flushQueue(): Promise<{ sent: number; failed: number; drop
         if (res.ok) {
           await remove(write.clientId);
           sent++;
-        } else if (res.status >= 400 && res.status < 500 && ![408, 429].includes(res.status)) {
+        } else if (res.status >= 400 && res.status < 500 && !RETRYABLE.has(res.status)) {
           const data = await res.json().catch(() => ({}));
           await remove(write.clientId);
           dropped++;
+          // Reported to the caller as well, which surfaces it to the person who typed
+          // it. Money that will never arrive has to be said out loud.
           console.warn(`Dropped a queued write the server refused: ${data.error ?? res.status}`);
         } else {
           await recordFailure(write, `HTTP ${res.status}`);

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { clearSessionCache } from "@/lib/session-cache";
 import {
   Dialog,
   DialogContent,
@@ -64,6 +65,8 @@ export default function RecurringPage() {
 
   const signOut = async () => {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    // Same reason as on the trips screen: the cache is per browser, not per account.
+    clearSessionCache();
     window.location.reload();
   };
 

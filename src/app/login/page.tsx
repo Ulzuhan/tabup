@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { clearSessionCache } from "@/lib/session-cache";
 
 /** Sign in and registration on one screen. */
 export default function LoginPage() {
@@ -71,6 +72,10 @@ export default function LoginPage() {
         return;
       }
 
+      // Whatever the previous session left cached in this browser is not this person's.
+      // Signing out is not the only way the reader changes: a device goes straight from
+      // one account to another often enough, and offline reads would serve the old one.
+      clearSessionCache();
       router.push("/");
       router.refresh();
     } catch {

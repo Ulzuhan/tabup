@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { clearSessionCache } from "@/lib/session-cache";
 
 /**
  * Landing page for an invitation link.
@@ -28,7 +29,14 @@ export default function JoinPage() {
   const [state, setState] = useState<
     | { status: "loading" }
     | { status: "expired" }
-    | { status: "ready"; tripName: string; signedIn: boolean; userName: string | null }
+    | {
+        status: "ready";
+        tripName: string;
+        signedIn: boolean;
+        userName: string | null;
+        /** The seat this link was made for, when it was made for somebody in particular. */
+        memberName: string | null;
+      }
   >({ status: "loading" });
 
   const [mode, setMode] = useState<"register" | "login">("register");
@@ -50,6 +58,7 @@ export default function JoinPage() {
           tripName: data.tripName,
           signedIn: data.signedIn,
           userName: data.userName,
+          memberName: data.memberName ?? null,
         });
       })
       .catch(() => !cancelled && setState({ status: "expired" }));
@@ -72,6 +81,8 @@ export default function JoinPage() {
         setState({ status: "expired" });
         return;
       }
+      // Same as on the sign-in screen: this browser may have been somebody else's.
+      clearSessionCache();
       router.push(`/trip/${data.tripId}`);
     } catch {
       setError(t("common.serverUnreachable"));
@@ -143,7 +154,12 @@ export default function JoinPage() {
         </p>
         <h1 className="mt-4 text-lg font-medium">{t("join.title")}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {t("join.subtitle", { trip: state.tripName })}
+          {/* When the link was made for one person, say whose seat it is: they were
+              added to the split before they ever had an account, and landing straight
+              into the right column is the point of inviting by email. */}
+          {state.memberName
+            ? t("join.subtitleSeat", { trip: state.tripName, name: state.memberName })
+            : t("join.subtitle", { trip: state.tripName })}
         </p>
       </div>
 

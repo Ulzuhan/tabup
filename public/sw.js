@@ -17,13 +17,16 @@
  *   app exists; showing a stale figure as if it were current would be worse than
  *   showing nothing. The cached copy is a last resort and the UI says so.
  *
- * Writes are never queued or replayed. A POST that failed offline stays failed and the
- * user is told. Silently retrying an expense later — after the amounts around it have
- * moved on — is how you end up with duplicated or contradictory data in the one place
- * where people are counting on the numbers.
+ * Writes never pass through here. Queuing and replaying them is the app's job, in
+ * `lib/write-queue.ts`, where each one carries a client id the server recognises — a
+ * retry that reaches a server which already applied it is the same write, not a second
+ * charge. A service worker replaying blind POSTs could not make that promise.
+ *
+ * The cache is emptied when the session changes: it lives per browser, not per account,
+ * and a phone gets handed around.
  */
 
-const VERSION = "tabup-v2";
+const VERSION = "tabup-v3";
 const SHELL = `${VERSION}-shell`;
 const DATA = `${VERSION}-data`;
 
@@ -50,6 +53,21 @@ self.addEventListener("activate", (event) => {
       )
       .then(() => self.clients.claim())
   );
+});
+
+/**
+ * Empties everything a session put here.
+ *
+ * The Cache API belongs to the browser, not to whoever is signed in, and nothing was
+ * clearing it: one person's trips stayed on disk after they signed out, and the next
+ * account on that device would be served them the moment the network failed — flagged
+ * as offline data, which explains nothing about *whose* it is. The page shell goes too,
+ * because it is rendered per session: signed in it is the trip list, signed out it is
+ * the landing.
+ */
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "tabup-session-changed") return;
+  event.waitUntil(Promise.all([caches.delete(DATA), caches.delete(SHELL)]));
 });
 
 const isApiRead = (url) => url.pathname.startsWith("/api/") && !url.pathname.startsWith("/api/auth/");

@@ -45,8 +45,7 @@ export async function authorizeTrip(
     };
   }
 
-  // Deleting or resharing is the owner's alone. An unclaimed trip reports "owner" for
-  // anyone holding the link, which is how anonymous use keeps working.
+  // Deleting, resharing and inviting are the owner's alone.
   if (need === "own" && level !== "owner") {
     return {
       ok: false,
