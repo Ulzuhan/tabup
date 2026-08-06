@@ -344,20 +344,24 @@ async function main() {
   check("they lose sight of it", (await bob(`/api/trips/${aliceTrip.id}`)).status, 404);
 
   const afterRelease = await alice(`/api/trips/${aliceTrip.id}`);
-  check(
-    "their seat stays",
-    afterRelease.body.members.some((m) => m.id === bobMemberId),
-    true
-  );
-  check(
-    "with no account behind it any more",
-    afterRelease.body.members.find((m) => m.id === bobMemberId).userId ?? null,
-    null
-  );
+  const bobSeat = afterRelease.body.members.find((m) => m.id === bobMemberId);
+  check("their seat stays", Boolean(bobSeat), true);
+  // Still theirs, marked as out. Unlinking it would turn a person's column of money into
+  // a free name for the next stranger with a link to claim, and would give them a second
+  // empty column if they were ever invited back.
+  check("still tied to their account", Boolean(bobSeat.userId), true);
+  check("and marked as no longer in the trip", bobSeat.inTrip, false);
   check(
     "and their expense is still counted",
     afterRelease.body.expenses.some((e) => e.id === bobExpense.body.id),
     true
+  );
+  check(
+    "nobody else is offered it",
+    (await alice(`/api/trips/${aliceTrip.id}/claim`)).body.candidates.some(
+      (m) => m.id === bobMemberId
+    ),
+    false
   );
 
   const ownerSeat = afterRelease.body.members.find((m) => m.name === "Alice");
@@ -372,12 +376,19 @@ async function main() {
     400
   );
 
-  // Put Bob back for the assertions further down that expect him to be a normal
-  // account with no admin powers; they do not depend on this trip.
-  await alice(`/api/trips/${aliceTrip.id}`, {
+  // Inviting them back returns them to the column that already holds their money.
+  const backIn = await alice(`/api/trips/${aliceTrip.id}`, {
     method: "PATCH",
     body: JSON.stringify({ addByEmail: bobEmail }),
   });
+  check("inviting them back works", backIn.status, 200);
+  check(
+    "into the same column, not a second one",
+    backIn.body.members.filter((m) => m.userId === bobSeat.userId).map((m) => m.id),
+    [bobMemberId]
+  );
+  check("marked as in the trip again", backIn.body.members.find((m) => m.id === bobMemberId).inTrip, true);
+  check("and they can open it again", (await bob(`/api/trips/${aliceTrip.id}`)).status, 200);
 
   // ── Invitations ────────────────────────────────────────────────────
   console.log("\nInvitations");

@@ -151,6 +151,21 @@ async function main() {
   check("their seat is made anyway", pending.status, 200);
   check("and an invitation comes back", typeof pending.body.invite?.token, "string");
 
+  // Typing the same address twice is what people do when they are not sure the first one
+  // worked. It used to cost them a second column, one of which was then guaranteed to
+  // stay empty for good — and the name on a seat cannot tell them apart, since it is the
+  // part before the @.
+  const again = await alice(`/api/trips/${tripId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ addByEmail: stranger }),
+  });
+  check("inviting the same address again is the same invitation", again.body.invite?.token, pending.body.invite.token);
+  check(
+    "and does not make a second seat",
+    again.body.members.filter((m) => m.name.startsWith(stranger.split("@")[0])).length,
+    1
+  );
+
   const dave = client();
   const joined = await dave("/api/auth/register", {
     method: "POST",
@@ -300,14 +315,42 @@ async function main() {
   });
   check("only the owner may take anybody out", bobTriesToRemove.status, 403);
 
+  // An error must never be an error over work that already happened: a body asking for
+  // one thing they may do and one they may not has to change nothing at all.
+  const mixed = await bob(`/api/trips/${tripId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ renameMember: { id: bobMember.id, name: "Roberto" }, budget: 999 }),
+  });
+  check("a request mixing the two is refused whole", mixed.status, 403);
+  const untouched = await alice(`/api/trips/${tripId}`);
+  check(
+    "with the half they were allowed left undone",
+    untouched.body.members.find((m) => m.id === bobMember.id).name,
+    "Bob"
+  );
+  check("and the half they were not", untouched.body.budget ?? null, null);
+
   const ownerRemoves = await alice(`/api/trips/${tripId}`, {
     method: "PATCH",
     body: JSON.stringify({ removeMembers: [bobMember.id] }),
   });
   check("the owner can", ownerRemoves.status, 200);
-  check("somebody with an account keeps their column", ownerRemoves.body.members.some((m) => m.id === bobMember.id), true);
-  check("with the account let go of it", ownerRemoves.body.members.find((m) => m.id === bobMember.id).userId ?? null, null);
+  check("somebody in the trip keeps their column", ownerRemoves.body.members.some((m) => m.id === bobMember.id), true);
   check("and loses their access", (await bob(`/api/trips/${tripId}`)).status, 404);
+
+  // The seat stays theirs. Letting go of it would turn a person's money into a free name
+  // that the next stranger with a link could claim.
+  const released = ownerRemoves.body.members.find((m) => m.id === bobMember.id);
+  check("the seat is still tied to their account", Boolean(released.userId), true);
+  check("marked as out of the trip", released.inTrip, false);
+  // Asked as Heidi, who has access and no seat — the only caller the claim endpoint
+  // actually offers anything to. Frank is already seated and would be answered with his
+  // own member, so the check would pass without proving a thing.
+  check(
+    "and not offered to anybody",
+    (await heidi(`/api/trips/${tripId}/claim`)).body.candidates.some((m) => m.id === bobMember.id),
+    false
+  );
 
   const ownerRemovesAgain = await alice(`/api/trips/${tripId}`, {
     method: "PATCH",

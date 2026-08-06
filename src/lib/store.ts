@@ -59,11 +59,17 @@ export async function getTrip(id: string): Promise<Trip | null> {
   if (!trip) return null;
 
   // Joined rather than fetched per member: the account's own name is what a linked
-  // participant is called when nobody has set a different alias for this trip.
+  // participant is called when nobody has set a different alias for this trip, and
+  // whether they can still open the trip is the difference between somebody who is in it
+  // and somebody who was.
   const memberRows = db
-    .select({ member: members, accountName: users.name })
+    .select({ member: members, accountName: users.name, grant: tripAccess.userId })
     .from(members)
     .leftJoin(users, eq(members.userId, users.id))
+    .leftJoin(
+      tripAccess,
+      and(eq(tripAccess.tripId, members.tripId), eq(tripAccess.userId, members.userId))
+    )
     .where(eq(members.tripId, id))
     .orderBy(asc(members.position))
     .all();
@@ -105,12 +111,15 @@ export async function getTrip(id: string): Promise<Trip | null> {
     createdAt: trip.createdAt,
     version: trip.version,
     members: memberRows.map(
-      ({ member: m, accountName }): Member => ({
+      ({ member: m, accountName, grant }): Member => ({
         id: m.id,
         name: m.name,
         emoji: m.emoji,
         userId: m.userId,
         accountName: accountName ?? undefined,
+        // The owner holds no grant row — the trip is theirs — so they would otherwise
+        // read as somebody who had been shown the door out of their own trip.
+        inTrip: m.userId ? Boolean(grant) || m.userId === trip.ownerId : undefined,
       })
     ),
     expenses: expenseRows.map((e): Expense => {
@@ -678,51 +687,66 @@ export async function deletePayment(tripId: string, paymentId: string): Promise<
  *
  * Two different acts, chosen by what the seat is rather than by a flag on the request:
  *
- *   A free member is a label on a column of arithmetic, so it goes, and the cascade
- *   takes with it the expenses they paid for, the payments they were part of and their
- *   share of everyone else's.
+ *   Somebody still in the trip loses their access and keeps their seat, with the column
+ *   and every figure in it exactly where it was. "They have left the trip" is not a
+ *   statement that their half of the taxi never happened, and the destructive reading of
+ *   that is not one to take on a single tap.
  *
- *   Somebody with an account is a person, and the trip holds a record of their money.
- *   Removing them ends their part in it — access revoked, seat unlinked — and leaves the
- *   column and every figure in it exactly where it was. Doing it again, now that it is a
- *   free member, deletes it with the same warning as any other. "They have left the
- *   trip" is not a statement that their half of the taxi never happened, and the
- *   destructive reading of it is not one to take on a single tap.
+ *   Anything else — a free member, or an account that was already shown the door — is
+ *   deleted, and the cascade takes with it the expenses they paid for, the payments they
+ *   were part of and their share of everyone else's. So pressing it twice does both, as
+ *   two decisions.
  *
- * The owner's own seat is refused: a trip whose owner is not in it has nobody who can
- * put them back.
+ * The seat stays *linked* to the account it belongs to, which is the point: a departed
+ * person's column is not a free name for a stranger to claim, and inviting them back
+ * puts them in the column that was already theirs instead of starting a second one
+ * beside it, holding none of their money.
+ *
+ * The owner's own seat is refused, and refused before anything is written: a trip whose
+ * owner is not in it has nobody who can put them back, and a batch that fails halfway
+ * would report an error over work it had already done.
  */
 export async function removeMembers(
   tripId: string,
   memberIds: string[]
-): Promise<{ removed: number; released: number; refused: number }> {
-  const empty = { removed: 0, released: 0, refused: 0 };
+): Promise<{ removed: number; released: number; refused: boolean }> {
+  const empty = { removed: 0, released: 0, refused: false };
   if (!isValidId(tripId) || memberIds.length === 0) return empty;
 
   const trip = db.select({ ownerId: trips.ownerId }).from(trips).where(eq(trips.id, tripId)).get();
   if (!trip) return empty;
 
+  const wanted = memberIds.filter(isValidId);
+  const rows = wanted
+    .map((memberId) =>
+      db
+        .select({ id: members.id, userId: members.userId })
+        .from(members)
+        // Scoped to the trip that was authorised, not to the id alone.
+        .where(and(eq(members.id, memberId), eq(members.tripId, tripId)))
+        .get()
+    )
+    .filter((row): row is { id: string; userId: string | null } => Boolean(row));
+
+  if (rows.some((row) => row.userId && row.userId === trip.ownerId)) return { ...empty, refused: true };
+
   let removed = 0;
   let released = 0;
-  let refused = 0;
   db.transaction((tx) => {
-    for (const memberId of memberIds) {
-      if (!isValidId(memberId)) continue;
+    for (const row of rows) {
+      const scope = and(eq(members.id, row.id), eq(members.tripId, tripId));
 
-      // Scoped to the trip that was authorised, not to the id alone.
-      const scope = and(eq(members.id, memberId), eq(members.tripId, tripId));
-      const row = tx.select({ userId: members.userId }).from(members).where(scope).get();
-      if (!row) continue;
-
-      if (row.userId && row.userId === trip.ownerId) {
-        refused++;
-        continue;
-      }
-
-      if (row.userId) {
-        tx.update(members).set({ userId: null }).where(scope).run();
-        tx.delete(tripAccess)
+      const stillIn =
+        row.userId &&
+        tx
+          .select({ userId: tripAccess.userId })
+          .from(tripAccess)
           .where(and(eq(tripAccess.tripId, tripId), eq(tripAccess.userId, row.userId)))
+          .get();
+
+      if (stillIn) {
+        tx.delete(tripAccess)
+          .where(and(eq(tripAccess.tripId, tripId), eq(tripAccess.userId, row.userId!)))
           .run();
         released++;
         continue;
@@ -732,7 +756,7 @@ export async function removeMembers(
     }
     if (removed > 0 || released > 0) touchTrip(tx, tripId);
   });
-  return { removed, released, refused };
+  return { removed, released, refused: false };
 }
 
 export async function addMember(
@@ -1059,7 +1083,9 @@ export async function createInvite(
    * member here means accepting the invitation puts them in the arithmetic, under the
    * account they signed in with.
    */
-  memberId?: string
+  memberId?: string,
+  /** The address it was made for, so typing it twice does not make a second seat. */
+  email?: string
 ): Promise<{ token: string; expiresAt: number } | null> {
   if (!isValidId(tripId)) return null;
 
@@ -1068,9 +1094,47 @@ export async function createInvite(
   const expiresAt = now + INVITE_DAYS * 24 * 60 * 60 * 1000;
 
   db.insert(invites)
-    .values({ token, tripId, createdAt: now, expiresAt, memberId: memberId ?? null })
+    .values({
+      token,
+      tripId,
+      createdAt: now,
+      expiresAt,
+      memberId: memberId ?? null,
+      email: email ?? null,
+    })
     .run();
   return { token, expiresAt };
+}
+
+/**
+ * A live invitation already waiting for an address, with the seat it holds.
+ *
+ * Answers "have I already invited this person?" exactly, rather than by looking at the
+ * name on a seat — which is the part before the @, and so cannot tell carla@gmail from
+ * carla@yahoo. Null once the seat has been taken: at that point they are in the trip and
+ * there is nothing left to send.
+ */
+export function pendingInviteFor(
+  tripId: string,
+  email: string
+): { token: string; expiresAt: number; memberId: string } | null {
+  const row = db
+    .select({ token: invites.token, expiresAt: invites.expiresAt, memberId: invites.memberId })
+    .from(invites)
+    .innerJoin(members, eq(members.id, invites.memberId))
+    .where(
+      and(
+        eq(invites.tripId, tripId),
+        eq(invites.email, email),
+        gt(invites.expiresAt, Date.now()),
+        isNull(members.userId)
+      )
+    )
+    .get();
+
+  return row?.memberId
+    ? { token: row.token, expiresAt: row.expiresAt, memberId: row.memberId }
+    : null;
 }
 
 export interface InviteDetails {

@@ -34,6 +34,16 @@ export interface Member {
    * invite them; see `memberEmails`.
    */
   accountEmail?: string;
+  /**
+   * Whether the account behind this seat can still open the trip.
+   *
+   * Undefined for a free member, where the question does not arise. False means somebody
+   * who was taken out: their column and every figure in it stay — being shown the door is
+   * not a statement that their half of the taxi never happened — but the seat is still
+   * theirs, so nobody else can claim it and inviting them again puts them back in it
+   * rather than starting a second column beside the first.
+   */
+  inTrip?: boolean;
 }
 
 export interface Expense {

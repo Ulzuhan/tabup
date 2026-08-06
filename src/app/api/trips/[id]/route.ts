@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import {
+  accessLevel,
   addMember,
   authoredBy,
   calculateBalances,
@@ -12,6 +13,7 @@ import {
   memberEmails,
   memberForUser,
   memberNameTaken,
+  pendingInviteFor,
   removeMembers,
   renameMember,
   seatUser,
@@ -134,6 +136,17 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     const body = await request.json();
 
     /**
+     * Checked before anything is written, not as each branch is reached.
+     *
+     * A request carrying both an alias change and a budget used to apply the alias and
+     * then answer 403 for the budget — an error over work that had already happened,
+     * which is the one thing an error must never be. Whatever the body asks for, it
+     * either all goes through or none of it does.
+     */
+    const OWNER_ONLY = ["addByEmail", "addMembers", "removeMembers", "name", "budget"] as const;
+    if (!isOwner && OWNER_ONLY.some((key) => body[key] !== undefined)) return ownerOnly();
+
+    /**
      * Adding somebody by email.
      *
      * The two halves of this used to live in separate lists that knew nothing of each
@@ -147,8 +160,6 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
      * leaving them outside the arithmetic.
      */
     if (typeof body.addByEmail === "string") {
-      if (!isOwner) return ownerOnly();
-
       const email = normalizeEmail(body.addByEmail);
       if (!isValidEmail(email)) {
         return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
@@ -157,15 +168,33 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
       const target = db.select().from(users).where(eq(users.email, email)).get();
 
       if (target) {
-        if (memberForUser(id, target.id)) {
+        const seat = memberForUser(id, target.id);
+
+        // Somebody who was taken out keeps their seat, so inviting them back is exactly
+        // that: they return to the column that already holds their money, rather than
+        // getting a second one beside it. Having a seat is therefore not the question —
+        // whether they can still open the trip is.
+        if (seat && accessLevel(id, target.id) !== "none") {
           return NextResponse.json({ error: "They are already in this trip" }, { status: 409 });
         }
+
         await grantAccess(id, target.id);
-        const member = await seatUser(id, target);
+        const member = seat ?? (await seatUser(id, target));
         if (!member) {
           return NextResponse.json({ error: "Could not add them" }, { status: 500 });
         }
         return NextResponse.json({ members: (await getTrip(id))?.members ?? [], invite: null });
+      }
+
+      // Already invited and not yet arrived: the same link again, and the seat that is
+      // already waiting. Typing an address twice is what people do when they are not
+      // sure the first one worked, and it should not cost them a duplicate column.
+      const waiting = pendingInviteFor(id, email);
+      if (waiting) {
+        return NextResponse.json({
+          members: trip.members,
+          invite: { token: waiting.token, expiresAt: waiting.expiresAt },
+        });
       }
 
       // Nobody holds that address yet, so the seat is made anyway and the invitation is
@@ -184,7 +213,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
       return NextResponse.json({
         members: (await getTrip(id))?.members ?? [],
         // The owner sends them this; their seat is already waiting under it.
-        invite: await createInvite(id, member.id),
+        invite: await createInvite(id, member.id, email),
       });
     }
 
@@ -198,8 +227,6 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
      * by an account later.
      */
     if (body.addMembers && Array.isArray(body.addMembers)) {
-      if (!isOwner) return ownerOnly();
-
       const names = body.addMembers.filter(
         (n: unknown): n is string =>
           typeof n === "string" && n.trim().length > 0 && n.trim().length <= 50
@@ -266,14 +293,12 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     }
 
     if (body.name && typeof body.name === "string" && body.name.trim().length > 0) {
-      if (!isOwner) return ownerOnly();
       await updateTripMeta(id, { name: body.name.trim().slice(0, 100) });
     }
 
     // null clears it; a number sets it. Absent leaves it alone, so a rename does not
     // wipe the budget as a side effect.
     if (body.budget !== undefined) {
-      if (!isOwner) return ownerOnly();
       const parsed = body.budget === null ? null : Number(body.budget);
       if (parsed !== null && (!isFinite(parsed) || parsed <= 0 || parsed > 1e9)) {
         return NextResponse.json(
@@ -286,14 +311,13 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
 
     let released = 0;
     if (body.removeMembers && Array.isArray(body.removeMembers)) {
-      if (!isOwner) return ownerOnly();
-
-      // Somebody with an account keeps their column and loses their access; a free
-      // member is deleted, and the cascade takes their expenses, the payments they were
-      // part of and their share of everyone else's. See `removeMembers`.
+      // Somebody still in the trip keeps their column and loses their access; anyone
+      // else is deleted, and the cascade takes their expenses, the payments they were
+      // part of and their share of everyone else's. See `removeMembers`, which refuses
+      // the owner's own seat before writing anything rather than halfway through.
       const result = await removeMembers(id, body.removeMembers as string[]);
       released = result.released;
-      if (result.refused > 0) {
+      if (result.refused) {
         return NextResponse.json(
           { error: "A trip cannot be left without its owner" },
           { status: 400 }

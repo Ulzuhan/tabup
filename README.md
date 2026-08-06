@@ -149,14 +149,22 @@ the owner labels the free members, since somebody typed those in.
 
 One action, two outcomes, chosen by what the seat is rather than by a flag:
 
-- **Somebody with an account** loses their access and their seat is unlinked. The column
-  and every figure in it stay exactly where they were: "they have left the trip" is not a
+- **Somebody still in the trip** loses their access and keeps their seat. The column and
+  every figure in it stay exactly where they were: "they have left the trip" is not a
   statement that their half of the taxi never happened.
-- **A free member** is deleted, and the cascade takes the expenses they paid for, the
-  payments they were part of and their share of everyone else's.
+- **Anyone else** — a free member, or an account already shown the door — is deleted, and
+  the cascade takes the expenses they paid for, the payments they were part of and their
+  share of everyone else's.
 
-So removing a linked person twice does both, deliberately as two decisions. The owner's
-own seat is refused: a trip whose owner is not in it has nobody who could put them back.
+So pressing it twice does both, deliberately as two decisions. The owner's own seat is
+refused, and refused before anything is written: a batch that failed halfway would report
+an error over work it had already done.
+
+The departed seat **stays linked to its account**, and that is the point. Unlinking it
+would turn a person's column of money into a free name for the next stranger with an
+invitation to claim, and would hand them a second, empty column if they were ever invited
+back. Instead `inTrip` goes false, and inviting them again puts them where their money
+already is.
 
 ### Invitations
 
@@ -248,9 +256,9 @@ TABUP_DB=/tmp/test.db PORT=3999 TABUP_REGISTRATION=open npm run start &
 export BASE=http://127.0.0.1:3999
 
 npm run test:api        # 18 — splitting, balances, validation, concurrency
-npm run test:auth       # 51 — accounts, ownership, sharing, invitations
+npm run test:auth       # 83 — accounts, ownership, who may change what, invitations
 npm run test:money      # 21 — currencies, whole cents, settling, CSV
-npm run test:members    # 37 — members and accounts, and isolation between trips
+npm run test:members    # 50 — members and accounts, and isolation between trips
 npm run test:recurring  # 17 — fixed costs; pure functions, no server needed
 ```
 
@@ -261,6 +269,19 @@ what it tests starts with "whoever registers first is the admin":
 rm -f data/test.db* && TABUP_DB=data/test.db TABUP_REGISTRATION=approval npm run start &
 npm run test:admin      # 18 — approvals, passwords, the error log
 ```
+
+`test:restart` starts and stops its own server, so it takes no arguments and shares
+nothing:
+
+```bash
+npm run test:restart    # 6 — what a restart must not change
+```
+
+It exists because every other suite talks to one long-lived server, and so none of them
+can see a bug that only happens at boot — which is where the repairs live, and repairs
+are the most dangerous code in the app: they rewrite everybody's data with nobody
+watching. The one it was written for readmitted every person an owner had taken out of a
+trip, on every single start.
 
 Point them at a scratch database, as above, so they never touch the real one. Each suite
 creates several accounts, and the registration limiter is per IP: run two of them back

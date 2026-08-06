@@ -183,6 +183,7 @@ function migrate(sqlite: Database.Database) {
   addColumn(sqlite, "payments", "client_id", "TEXT");
   addColumn(sqlite, "members", "user_id", "TEXT REFERENCES users(id) ON DELETE SET NULL");
   addColumn(sqlite, "invites", "member_id", "TEXT REFERENCES members(id) ON DELETE SET NULL");
+  addColumn(sqlite, "invites", "email", "TEXT");
   addColumn(sqlite, "expenses", "created_by", "TEXT REFERENCES users(id) ON DELETE SET NULL");
   addColumn(sqlite, "payments", "created_by", "TEXT REFERENCES users(id) ON DELETE SET NULL");
   sqlite.exec("CREATE INDEX IF NOT EXISTS trips_owner_idx ON trips(owner_id);");
@@ -211,7 +212,7 @@ function migrate(sqlite: Database.Database) {
   adoptOrphanTrips(sqlite);
   seedFirstAdmin(sqlite);
   rebaseAmountsToTripCurrency(sqlite);
-  reconcileAccessAndSeats(sqlite);
+  once(sqlite, "access-and-seats", () => reconcileAccessAndSeats(sqlite));
 
   // Sessions and invitations are cheap to clear and there is no other moment that
   // reliably runs.
@@ -328,7 +329,36 @@ function rebaseAmountsToTripCurrency(sqlite: Database.Database) {
 }
 
 /**
+ * A repair that runs once against the data that needed it, and never again.
+ *
+ * The difference matters more than it looks. Everything else in here is a statement
+ * about the *shape* of the database, and running it a second time changes nothing — but
+ * a repair is a statement about its *contents* at one moment, and re-applying it undoes
+ * whatever people have done since. `reconcileAccessAndSeats` learnt this the hard way:
+ * it lets every linked member into their trip, which is right once, and on every
+ * subsequent boot silently readmitted everybody the owner had taken out. A restart is
+ * not a decision to reverse somebody's decision.
+ */
+function once(sqlite: Database.Database, name: string, repair: () => void) {
+  sqlite.exec(
+    `CREATE TABLE IF NOT EXISTS applied_repairs (
+       name TEXT PRIMARY KEY,
+       applied_at INTEGER NOT NULL
+     )`
+  );
+  if (sqlite.prepare("SELECT 1 FROM applied_repairs WHERE name = ?").get(name)) return;
+
+  repair();
+  sqlite
+    .prepare("INSERT INTO applied_repairs (name, applied_at) VALUES (?, ?)")
+    .run(name, Date.now());
+}
+
+/**
  * Being in a trip is one fact, applied to the trips that predate the rule.
+ *
+ * Run through `once`: this reads the state of everybody's trips at a single moment and
+ * corrects it. Repeating it would not be a no-op, it would be an undo.
  *
  * Access and a seat in the split used to be independent: a trip could let somebody in
  * without them appearing in the arithmetic, and could seat an account that could not

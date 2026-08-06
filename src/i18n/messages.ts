@@ -174,7 +174,7 @@ export const es = {
     name: "Nombre",
     people: "Personas en este viaje",
     removeWarning:
-      "A quien tiene cuenta le quitas el acceso, pero su columna y sus gastos se quedan. A quien no la tiene la borras, y sus gastos con ella.",
+      "A quien está dentro le quitas el acceso y su columna se queda con todo lo suyo. Al que ya está fuera, o a un nombre a secas, lo borras con sus gastos.",
     addSomeone: "Nombre o correo",
     addHint:
       "Un correo la mete en el viaje: sitio en el reparto y acceso, de una vez. Un nombre a secas vale para quien no tiene cuenta aquí, y podrá reclamarlo después.",
@@ -183,6 +183,7 @@ export const es = {
     you: "tú",
     hasAccount: "con cuenta",
     noAccount: "sin cuenta",
+    leftTrip: "fuera del viaje",
     alias: "Cambiar el nombre",
     removeFromTrip: "Sacar del viaje",
     owner: "Dueño",
@@ -581,7 +582,7 @@ export const en: Messages = {
     name: "Name",
     people: "People in this trip",
     removeWarning:
-      "Someone with an account loses their access, and their column and expenses stay. Someone without one is deleted, and their expenses with them.",
+      "Someone still in the trip loses their access and their column keeps everything of theirs. Someone already out, or a bare name, is deleted along with their expenses.",
     addSomeone: "Name or email",
     addHint:
       "An email puts them in the trip: a seat in the split and the access to reach it, in one go. A bare name works for anyone without an account here, and they can claim it later.",
@@ -590,6 +591,7 @@ export const en: Messages = {
     you: "you",
     hasAccount: "has an account",
     noAccount: "no account",
+    leftTrip: "no longer in the trip",
     alias: "Change the name",
     removeFromTrip: "Remove from the trip",
     owner: "Owner",

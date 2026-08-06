@@ -303,6 +303,16 @@ export const invites = sqliteTable(
      * member here closes that gap: accepting seats them.
      */
     memberId: text("member_id").references(() => members.id, { onDelete: "set null" }),
+    /**
+     * The address it was made for, lowercased, when it was made for one.
+     *
+     * Without it, an owner who typed the same address twice — because they were not sure
+     * the first one had worked, which is the normal reason anyone does — got a second
+     * seat beside the first, and one of the two was then guaranteed to stay empty
+     * forever. The name on the seat could not be used to tell: it is the part before the
+     * @, so carla@gmail and carla@yahoo produce the same one.
+     */
+    email: text("email"),
   },
   (t) => [index("invites_trip_idx").on(t.tripId)]
 );

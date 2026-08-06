@@ -13,7 +13,8 @@
     "test:recurring": "tsx scripts/test-recurring.mts",
     "test:money": "node scripts/test-money.mjs",
     "test:admin": "node scripts/test-admin.mjs",
-    "test:members": "node scripts/test-members.mjs"
+    "test:members": "node scripts/test-members.mjs",
+    "test:restart": "bash scripts/test-restart.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

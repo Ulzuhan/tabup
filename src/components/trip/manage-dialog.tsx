@@ -272,11 +272,15 @@ export function ManageDialog({
           <ul className="space-y-1">
             {members.map((m) => {
               const mine = m.id === you;
+              // Somebody the owner took out: their column and its figures stay, and it
+              // stays theirs — so nobody can claim it, and inviting them back puts them
+              // in it rather than starting a second one beside it.
+              const gone = Boolean(m.userId) && m.inTrip === false;
               // Your own name is yours to set — that is the alias, and the whole reason
-              // this dialog opens for everybody. The owner labels the free members,
-              // since somebody typed those names in the first place; nobody else
-              // renames a person who has an account.
-              const canRename = mine || (owner && !m.userId);
+              // this dialog opens for everybody. The owner labels everyone who is not
+              // here to speak for themselves; nobody else renames a person with an
+              // account who is still in the trip.
+              const canRename = mine || (owner && (!m.userId || gone));
 
               return (
                 <li key={m.id} className="flex items-center gap-2 rounded-lg bg-secondary/40 p-1.5">
@@ -322,6 +326,10 @@ export function ManageDialog({
                     <Badge variant="secondary" className="h-5 shrink-0 px-1.5 text-[11px]">
                       {t("manage.you")}
                     </Badge>
+                  ) : gone ? (
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                      {t("manage.leftTrip")}
+                    </span>
                   ) : m.userId ? (
                     <Badge variant="outline" className="h-5 shrink-0 gap-1 px-1.5 text-[11px]">
                       <Link2 className="size-3" />
@@ -335,16 +343,20 @@ export function ManageDialog({
 
                   {/* Taking somebody out of a trip is the owner's, like everything else
                       about the trip. Their own seat is not offered: a trip without its
-                      owner in it has nobody who could put them back. */}
+                      owner in it has nobody who could put them back.
+
+                      The first press on somebody who is here takes away their access and
+                      leaves everything they spent; a second one, or the only one on a
+                      name nobody is behind, deletes the column and its money with it. */}
                   {owner && !mine && (
                     <Button
                       variant="ghost"
                       size="icon"
                       className="size-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => removeMember(m.id, m.name, Boolean(m.userId))}
+                      onClick={() => removeMember(m.id, m.name, Boolean(m.userId) && !gone)}
                       disabled={busy !== null}
                       aria-label={`${
-                        m.userId ? t("manage.removeFromTrip") : t("common.delete")
+                        Boolean(m.userId) && !gone ? t("manage.removeFromTrip") : t("common.delete")
                       }: ${m.name}`}
                     >
                       {busy === `rm-${m.id}` ? (
