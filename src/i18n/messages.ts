@@ -28,6 +28,9 @@ export const es = {
   },
 
   home: {
+    settled: "en paz",
+    owedToYou: "te deben",
+    youOwe: "debes",
     tagline: "Apunta lo que paga cada uno, en cualquier moneda, y mira quién debe a quién.",
     newTrip: "Nuevo viaje",
     yourTrips: "Tus viajes",
@@ -77,6 +80,13 @@ export const es = {
   },
 
   trip: {
+    youAreOwed: "Te deben",
+    youOwe: "Debes",
+    youAreSettled: "Estás en paz",
+    activity: "Actividad",
+    enteredBy: "lo apuntó {name}",
+    noActivity: "Todavía no ha pasado nada",
+    noActivityHint: "Aquí aparece quién apunta, cambia o borra cada cosa.",
     notFound: "No se encuentra el viaje",
     notFoundHint: "Puede que el enlace esté mal, o que el viaje ya pertenezca a una cuenta.",
     goHome: "Ir al inicio",
@@ -90,7 +100,7 @@ export const es = {
     byCategory: "Por categoría",
     expenses: "Gastos",
     settleUp: "Saldar",
-    history: "Historial",
+    history: "Pagos",
     manage: "Gestionar",
     settings: "Ajustes del viaje",
     exportCsv: "Exportar CSV",
@@ -169,6 +179,10 @@ export const es = {
   },
 
   manage: {
+    makeOwner: "Hacer que lleve el viaje",
+    makeOwnerConfirm: "¿Que lo lleve {name}? Dejarás de poder cambiar los ajustes.",
+    ownerChanged: "Ahora lleva el viaje {name}",
+    settleFirst: "Antes hay que saldar cuentas con {names}.",
     title: "Ajustes del viaje",
     subtitle: "Quién está en este viaje y cómo aparece cada uno.",
     name: "Nombre",
@@ -400,6 +414,43 @@ export const es = {
     inviteAnother: "Crear otra invitación",
   },
 
+  /**
+   * The feed. One line per thing that happened, and the actor's name comes from the
+   * record rather than from the account, so it stays readable after they leave.
+   */
+  activity: {
+    expenseAdded: "{actor} apuntó «{subject}»",
+    expenseEdited: "{actor} cambió «{subject}»",
+    expenseDeleted: "{actor} borró «{subject}»",
+    paymentAdded: "{actor} apuntó un pago: {subject}",
+    paymentDeleted: "{actor} deshizo un pago: {subject}",
+    commentAdded: "{actor} comentó: «{subject}»",
+    memberAdded: "{actor} añadió a {subject}",
+    memberInvited: "{actor} invitó a {subject}",
+    memberReturned: "{actor} volvió a meter a {subject}",
+    memberJoined: "{actor} entró en el viaje",
+    memberClaimed: "{actor} dijo que es {subject}",
+    memberLeft: "{actor} sacó del viaje a {subject}",
+    memberDeleted: "{actor} borró a {subject} y sus gastos",
+    memberRenamed: "{actor} cambió un nombre a «{subject}»",
+    tripRenamed: "{actor} llamó al viaje «{subject}»",
+    tripBudget: "{actor} puso un presupuesto",
+    tripBudgetCleared: "{actor} quitó el presupuesto",
+    tripOwner: "{actor} dejó el viaje en manos de {subject}",
+    unknown: "{actor} hizo algo",
+  },
+
+  comments: {
+    title: "Comentarios",
+    open: "Comentarios de {name}",
+    placeholder: "Si un número no cuadra, dilo aquí",
+    send: "Enviar",
+    empty: "Nadie ha dicho nada todavía",
+    emptyHint: "Comentar es la alternativa a cambiar lo que apuntó otro.",
+    deleted: "Comentario borrado",
+    failed: "No se ha podido guardar",
+  },
+
   language: "Idioma",
 } as const;
 
@@ -436,6 +487,9 @@ export const en: Messages = {
   },
 
   home: {
+    settled: "settled up",
+    owedToYou: "you are owed",
+    youOwe: "you owe",
     tagline: "Track what everyone paid, in any currency, and see who owes whom.",
     newTrip: "New trip",
     yourTrips: "Your trips",
@@ -485,6 +539,13 @@ export const en: Messages = {
   },
 
   trip: {
+    youAreOwed: "You are owed",
+    youOwe: "You owe",
+    youAreSettled: "You are settled up",
+    activity: "Activity",
+    enteredBy: "entered by {name}",
+    noActivity: "Nothing has happened yet",
+    noActivityHint: "Who added, changed or deleted what shows up here.",
     notFound: "Trip not found",
     notFoundHint: "The link may be wrong, or this trip now belongs to an account.",
     goHome: "Go home",
@@ -498,7 +559,7 @@ export const en: Messages = {
     byCategory: "By category",
     expenses: "Expenses",
     settleUp: "Settle up",
-    history: "History",
+    history: "Payments",
     manage: "Manage",
     settings: "Trip settings",
     exportCsv: "Export CSV",
@@ -577,6 +638,10 @@ export const en: Messages = {
   },
 
   manage: {
+    makeOwner: "Put them in charge",
+    makeOwnerConfirm: "Hand the trip to {name}? You will stop being able to change its settings.",
+    ownerChanged: "{name} is in charge of the trip now",
+    settleFirst: "Settle up with {names} first.",
     title: "Trip settings",
     subtitle: "Who is in this trip, and what each of them is called here.",
     name: "Name",
@@ -804,6 +869,39 @@ export const en: Messages = {
     ownerInvites: "Only whoever created the trip can invite people.",
     inviteExpires: "Expires on {date}",
     inviteAnother: "Create another invitation",
+  },
+
+  activity: {
+    expenseAdded: "{actor} added “{subject}”",
+    expenseEdited: "{actor} changed “{subject}”",
+    expenseDeleted: "{actor} deleted “{subject}”",
+    paymentAdded: "{actor} recorded a payment: {subject}",
+    paymentDeleted: "{actor} undid a payment: {subject}",
+    commentAdded: "{actor} commented: “{subject}”",
+    memberAdded: "{actor} added {subject}",
+    memberInvited: "{actor} invited {subject}",
+    memberReturned: "{actor} brought {subject} back in",
+    memberJoined: "{actor} joined the trip",
+    memberClaimed: "{actor} said they are {subject}",
+    memberLeft: "{actor} took {subject} out of the trip",
+    memberDeleted: "{actor} deleted {subject} and their expenses",
+    memberRenamed: "{actor} changed a name to “{subject}”",
+    tripRenamed: "{actor} named the trip “{subject}”",
+    tripBudget: "{actor} set a budget",
+    tripBudgetCleared: "{actor} cleared the budget",
+    tripOwner: "{actor} put {subject} in charge of the trip",
+    unknown: "{actor} did something",
+  },
+
+  comments: {
+    title: "Comments",
+    open: "Comments on {name}",
+    placeholder: "If a figure looks wrong, say so here",
+    send: "Send",
+    empty: "Nobody has said anything yet",
+    emptyHint: "Commenting is the alternative to changing what somebody else entered.",
+    deleted: "Comment deleted",
+    failed: "Could not save that",
   },
 
   language: "Language",

@@ -6,10 +6,13 @@ import {
   authoredBy,
   calculateBalances,
   calculateSettlements,
+  commentCounts,
   createInvite,
   deleteTrip,
+  expenseAuthors,
   getTrip,
   grantAccess,
+  logActivity,
   memberEmails,
   memberForUser,
   memberNameTaken,
@@ -17,6 +20,7 @@ import {
   removeMembers,
   renameMember,
   seatUser,
+  transferOwnership,
   unlinkedMembers,
   updateTripMeta,
 } from "@/lib/store";
@@ -72,17 +76,34 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/trips/[
   const written = auth.user
     ? authoredBy(id, auth.user.id)
     : { expenses: new Set<string>(), payments: new Set<string>() };
-  const mine = (set: Set<string>, rowId: string) => isOwner || set.has(rowId);
+
+  // Whoever typed it, and whoever it says paid — those are different people, and the
+  // second has as much standing over the record of their own money as the first.
+  const mineExpense = (e: { id: string; paidBy: string }) =>
+    isOwner || written.expenses.has(e.id) || (you ? e.paidBy === you.id : false);
+  const minePayment = (p: { id: string; from: string; to: string }) =>
+    isOwner || written.payments.has(p.id) || (you ? p.from === you.id || p.to === you.id : false);
 
   // The address behind a seat is the owner's to see: they typed it in order to invite
   // the person. Nobody else on the trip needs it, so nobody else is given it.
   const emails = isOwner ? memberEmails(id) : {};
+  const authors = expenseAuthors(id);
+  const comments = commentCounts(id);
 
   return NextResponse.json({
     ...trip,
     members: trip.members.map((m) => ({ ...m, accountEmail: emails[m.id] })),
-    expenses: trip.expenses.map((e) => ({ ...e, mine: mine(written.expenses, e.id) })),
-    payments: trip.payments.map((p) => ({ ...p, mine: mine(written.payments, p.id) })),
+    expenses: trip.expenses.map((e) => ({
+      ...e,
+      mine: mineExpense(e),
+      // Only when it differs from the payer: "Ana paid, entered by Ana" is noise, and
+      // the line it sits on is already dense.
+      by: authors[e.id] && authors[e.id] !== trip.members.find((m) => m.id === e.paidBy)?.name
+        ? authors[e.id]
+        : undefined,
+      comments: comments[e.id] ?? 0,
+    })),
+    payments: trip.payments.map((p) => ({ ...p, mine: minePayment(p) })),
     balances: enrichedBalances,
     settlements: enrichedSettlements,
     totalExpenses: Math.round(totalExpenses * 100) / 100,
@@ -143,8 +164,39 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
      * which is the one thing an error must never be. Whatever the body asks for, it
      * either all goes through or none of it does.
      */
-    const OWNER_ONLY = ["addByEmail", "addMembers", "removeMembers", "name", "budget"] as const;
+    const OWNER_ONLY = [
+      "addByEmail",
+      "addMembers",
+      "removeMembers",
+      "transferOwner",
+      "name",
+      "budget",
+    ] as const;
     if (!isOwner && OWNER_ONLY.some((key) => body[key] !== undefined)) return ownerOnly();
+
+    /**
+     * Handing the trip to somebody else in it.
+     *
+     * Until now the owner was a single point of failure with no way out of it: only they
+     * could invite, rename or take anybody out, and an owner who left the group or lost
+     * their account took the trip's administration with them.
+     */
+    if (typeof body.transferOwner === "string") {
+      const target = trip.members.find((m) => m.id === body.transferOwner);
+      const result = await transferOwnership(id, body.transferOwner);
+      if (result === "missing") {
+        return NextResponse.json({ error: "No such member" }, { status: 404 });
+      }
+      if (result === "not-an-account") {
+        return NextResponse.json(
+          { error: "Only somebody with an account, still in the trip, can be given it" },
+          { status: 400 }
+        );
+      }
+
+      logActivity(id, auth.user, "tripOwner", target?.name);
+      return NextResponse.json({ members: (await getTrip(id))?.members ?? [] });
+    }
 
     /**
      * Adding somebody by email.
@@ -183,6 +235,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
         if (!member) {
           return NextResponse.json({ error: "Could not add them" }, { status: 500 });
         }
+        logActivity(id, auth.user, seat ? "memberReturned" : "memberAdded", member.name);
         return NextResponse.json({ members: (await getTrip(id))?.members ?? [], invite: null });
       }
 
@@ -210,6 +263,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
         return NextResponse.json({ error: "Could not add them" }, { status: 500 });
       }
 
+      logActivity(id, auth.user, "memberInvited", member.name);
       return NextResponse.json({
         members: (await getTrip(id))?.members ?? [],
         // The owner sends them this; their seat is already waiting under it.
@@ -255,6 +309,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
           names[i].trim(),
           EMOJIS[(trip.members.length + i) % EMOJIS.length]
         );
+        logActivity(id, auth.user, "memberAdded", names[i].trim());
       }
     }
 
@@ -290,10 +345,14 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
       }
 
       renameMember(id, memberId, name);
+      // Only worth a line when it is not simply somebody setting their own alias, which
+      // is nobody else's business and would fill the feed on the first day.
+      if (!isMine) logActivity(id, auth.user, "memberRenamed", name.trim());
     }
 
     if (body.name && typeof body.name === "string" && body.name.trim().length > 0) {
       await updateTripMeta(id, { name: body.name.trim().slice(0, 100) });
+      logActivity(id, auth.user, "tripRenamed", body.name.trim().slice(0, 100));
     }
 
     // null clears it; a number sets it. Absent leaves it alone, so a rename does not
@@ -307,6 +366,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
         );
       }
       await updateTripMeta(id, { budget: parsed });
+      logActivity(id, auth.user, parsed === null ? "tripBudgetCleared" : "tripBudget");
     }
 
     let released = 0;
@@ -314,14 +374,32 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
       // Somebody still in the trip keeps their column and loses their access; anyone
       // else is deleted, and the cascade takes their expenses, the payments they were
       // part of and their share of everyone else's. See `removeMembers`, which refuses
-      // the owner's own seat before writing anything rather than halfway through.
+      // both the owner's own seat and anybody the money still has something to say about,
+      // before writing anything rather than halfway through.
+      const going = (body.removeMembers as string[])
+        .map((memberId) => trip.members.find((m) => m.id === memberId))
+        .filter((m): m is NonNullable<typeof m> => Boolean(m));
+
       const result = await removeMembers(id, body.removeMembers as string[]);
       released = result.released;
-      if (result.refused) {
+
+      if (result.refused?.reason === "owner") {
         return NextResponse.json(
           { error: "A trip cannot be left without its owner" },
           { status: 400 }
         );
+      }
+      if (result.refused?.reason === "balance") {
+        // Named, because "somebody has a balance" leaves the owner hunting for who.
+        return NextResponse.json(
+          { error: "settle_first", names: result.refused.names },
+          { status: 409 }
+        );
+      }
+
+      for (const member of going) {
+        const stepped = Boolean(member.userId) && member.inTrip !== false;
+        logActivity(id, auth.user, stepped ? "memberLeft" : "memberDeleted", member.name);
       }
     }
 

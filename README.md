@@ -71,10 +71,10 @@ second set of rules nobody could keep straight (claiming, ownerless deletion, tr
 remembered only by one browser) and could not answer the obvious question of what
 happens when two people claim the same link.
 
-|  | Read | Add expenses and payments | Change one | Rename, budget, add or remove people, invite, delete |
+|  | Read | Add expenses and payments | Change one | Rename, budget, add or remove people, invite, hand over, delete |
 | --- | --- | --- | --- | --- |
 | **Owner** | yes | yes | any | yes |
-| **Member** | yes | yes | the ones they entered | no |
+| **Member** | yes | yes | the ones they entered, and the ones that say they paid | no |
 
 There used to be a third row, and two of these used to be four. "Editor" and "viewer"
 answered a different question from the one anybody asks: being an editor said nothing
@@ -90,6 +90,16 @@ expenses, and each may change the ones they entered. `expenses.created_by` and
 `payments.created_by` are what that last rule reads; a row with no author — anything
 written before the column existed, or left behind by a deleted account — belongs to
 nobody and only the owner may touch it.
+
+**Whoever it says paid may change it too**, even if somebody else typed it. Those are
+different people — one person usually holds the phone at the table — and a rule that
+follows only the typist means you cannot correct the record of your own money without
+asking them. A settle-up works the same way: it is a statement about two people, and
+either of them may take it back.
+
+The trip can be **handed to somebody else in it**, which is the way out of the owner
+being a single point of failure. The outgoing owner stays in as an ordinary member,
+keeping their seat and every figure in it.
 
 A trip you may not see returns 404 rather than 403, so the endpoint cannot be used to
 probe which trip ids exist. An expense id from another trip gets the same 404, for the
@@ -160,11 +170,38 @@ So pressing it twice does both, deliberately as two decisions. The owner's own s
 refused, and refused before anything is written: a batch that failed halfway would report
 an error over work it had already done.
 
+**Nobody is deleted while the money still says something about them**, which is
+Splitwise's rule and the right one: deleting a participant takes their expenses with
+them, so everyone else's share of a bill they were part of silently changes. If they are
+owed twelve euros, that is a fact about other people's pockets, and it does not stop
+being true because somebody tapped an X. Settle up first — a recorded cash payment is
+enough — and then there is nothing to lose. Only the deletions are checked; stepping out
+of a trip changes no figure at all.
+
 The departed seat **stays linked to its account**, and that is the point. Unlinking it
 would turn a person's column of money into a free name for the next stranger with an
 invitation to claim, and would hand them a second, empty column if they were ever invited
 back. Instead `inTrip` goes false, and inviting them again puts them where their money
 already is.
+
+### Saying so, instead of changing it
+
+Every expense carries **who entered it**, shown on the row whenever that is not the
+person who paid, and **comments**, open to everyone in the trip. The two exist together
+on purpose: a permission model that only lets some people change a figure has to give
+everyone else a way to say it looks wrong, or the app becomes one where people quietly
+overwrite each other — which is the complaint Splitwise collects daily for having no
+permissions at all.
+
+The **activity feed** is the other half. The model promises that each person answers for
+what they entered and the owner may change anything; neither half means much while it
+leaves no trace, and the owner's power to rewrite anybody's figures is exactly the thing
+that should not be silent. Names are copied into each entry as text rather than read back
+through the account, so a line stays legible after the person has left the trip, renamed
+themselves or deleted their account.
+
+Setting your own alias is deliberately not recorded: it is nobody else's business and
+would fill the feed on the first day of any trip.
 
 ### Invitations
 
@@ -259,6 +296,7 @@ npm run test:api        # 18 — splitting, balances, validation, concurrency
 npm run test:auth       # 83 — accounts, ownership, who may change what, invitations
 npm run test:money      # 21 — currencies, whole cents, settling, CSV
 npm run test:members    # 50 — members and accounts, and isolation between trips
+npm run test:social     # 42 — balances on the list, authorship, comments, the feed
 npm run test:recurring  # 17 — fixed costs; pure functions, no server needed
 ```
 

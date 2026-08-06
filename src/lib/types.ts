@@ -70,6 +70,17 @@ export interface Expense {
    * offline queue, for instance, which is by definition the reader's own.
    */
   mine?: boolean;
+  /**
+   * What the person who entered it is called in this trip, when that is not the payer.
+   *
+   * Shown because the rule about who may change it is otherwise invisible: somebody
+   * looking at a line with no edit button is told neither whose it is nor who to ask.
+   * Omitted when the payer entered it themselves, which is most of the time and would
+   * otherwise repeat a name already on the row.
+   */
+  by?: string;
+  /** How many comments it has, so the list can show it without loading them. */
+  comments?: number;
 }
 
 export interface Payment {

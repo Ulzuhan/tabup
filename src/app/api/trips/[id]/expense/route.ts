@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   addExpense,
   authorRule,
+  logActivity,
   convertTo,
   deleteExpense,
   getTrip,
@@ -22,9 +23,14 @@ import { logError } from "@/lib/errors";
  */
 
 /** Checks the caller may write, then loads the trip, or returns the response to send. */
-async function loadTrip(
-  id: string
-): Promise<{ trip: Trip; caller: { id?: string; isOwner: boolean } } | { error: NextResponse }> {
+async function loadTrip(id: string): Promise<
+  | {
+      trip: Trip;
+      caller: { id?: string; isOwner: boolean };
+      user: { id: string; name: string } | null;
+    }
+  | { error: NextResponse }
+> {
   const auth = await authorizeTrip(id, "write");
   if (!auth.ok) return { error: auth.response };
 
@@ -32,7 +38,11 @@ async function loadTrip(
   if (!trip) {
     return { error: NextResponse.json({ error: "Trip not found" }, { status: 404 }) };
   }
-  return { trip, caller: { id: auth.user?.id, isOwner: auth.level === "owner" } };
+  return {
+    trip,
+    caller: { id: auth.user?.id, isOwner: auth.level === "owner" },
+    user: auth.user,
+  };
 }
 
 /**
@@ -106,7 +116,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
   const { id } = await ctx.params;
   const loaded = await loadTrip(id);
   if ("error" in loaded) return loaded.error;
-  const { trip, caller } = loaded;
+  const { trip, caller, user } = loaded;
 
   try {
     const body = await request.json();
@@ -187,6 +197,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
     if (!expense) {
       return NextResponse.json({ error: "Failed to add expense" }, { status: 500 });
     }
+    logActivity(id, user, "expenseAdded", expense.description);
     return NextResponse.json(expense);
   } catch (error) {
     logError("POST /api/trips/[id]/expense", error);
@@ -199,7 +210,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
   const { id } = await ctx.params;
   const loaded = await loadTrip(id);
   if ("error" in loaded) return loaded.error;
-  const { trip, caller } = loaded;
+  const { trip, caller, user } = loaded;
 
   try {
     const body = await request.json();
@@ -288,6 +299,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     if (!updated) {
       return NextResponse.json({ error: "Failed to edit expense" }, { status: 500 });
     }
+    logActivity(id, user, "expenseEdited", updated.description);
     return NextResponse.json(updated);
   } catch (error) {
     logError("PATCH /api/trips/[id]/expense", error);
@@ -323,14 +335,15 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/trips
   // Looked up first: once the row is gone there is nothing left pointing at the file,
   // and it would sit on disk until the nightly sweep noticed it.
   const trip = await getTrip(id);
-  const receipt = trip?.expenses.find((e) => e.id === expenseId)?.receipt;
+  const gone = trip?.expenses.find((e) => e.id === expenseId);
 
   const removed = await deleteExpense(id, expenseId);
   if (!removed) {
     return NextResponse.json({ error: "Expense not found" }, { status: 404 });
   }
 
-  if (receipt) await deleteReceipt(id, receipt);
+  logActivity(id, auth.user, "expenseDeleted", gone?.description);
+  if (gone?.receipt) await deleteReceipt(id, gone.receipt);
 
   return NextResponse.json({ success: true });
 }

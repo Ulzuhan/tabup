@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { claimMember, memberForUser, seatUser, unlinkedMembers } from "@/lib/store";
+import { claimMember, logActivity, memberForUser, seatUser, unlinkedMembers } from "@/lib/store";
 import { authorizeTrip } from "@/lib/authorize";
 import { logError } from "@/lib/errors";
 
@@ -61,6 +61,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
       const alias = typeof body.name === "string" ? body.name.trim().slice(0, 50) : "";
       const member = await seatUser(id, { id: auth.user.id, name: alias || auth.user.name });
       if (!member) return NextResponse.json({ error: "Could not add you" }, { status: 500 });
+      logActivity(id, auth.user, "memberJoined", member.name);
       return NextResponse.json({ member });
     }
 
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
       // Somebody else got there first, or the name is not free any more.
       return NextResponse.json({ error: "That person is already taken" }, { status: 409 });
     }
+    logActivity(id, auth.user, "memberClaimed", member.name);
     return NextResponse.json({ member });
   } catch (error) {
     logError("POST /api/trips/[id]/claim", error);

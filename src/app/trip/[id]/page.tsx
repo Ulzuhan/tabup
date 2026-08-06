@@ -10,6 +10,8 @@ import { ExpenseDialog, type ExpenseDraft } from "@/components/trip/expense-dial
 import { SettleDialog, type PaymentDraft } from "@/components/trip/settle-dialog";
 import { ShareDialog } from "@/components/trip/share-dialog";
 import { ClaimPrompt } from "@/components/trip/claim-prompt";
+import { ActivityFeed } from "@/components/trip/activity-feed";
+import { CommentsDialog } from "@/components/trip/comments-dialog";
 import { ManageDialog } from "@/components/trip/manage-dialog";
 import { SpendingPace } from "@/components/trip/spending-pace";
 import { TripHeader } from "@/components/trip/trip-header";
@@ -108,6 +110,8 @@ export default function TripPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
+  /** The expense whose comments are open, if any. */
+  const [commenting, setCommenting] = useState<Expense | null>(null);
 
   const [confirm, setConfirm] = useState<{
     type: "expense" | "payment" | "trip";
@@ -424,6 +428,13 @@ export default function TripPage() {
         currency={trip.currency}
         expenseCount={view?.expenses.length ?? 0}
         memberCount={trip.members.length}
+        // From the merged view, so an expense typed with no signal moves it straight
+        // away. Null until they have said which participant they are.
+        yourBalance={
+          trip.you
+            ? (view?.balances ?? []).find((b) => b.memberId === trip.you)?.balance ?? 0
+            : null
+        }
       />
 
       {(view?.expenses.length ?? 0) > 0 && (
@@ -458,6 +469,9 @@ export default function TripPage() {
           <TabsTrigger value="history" className="flex-1">
             {t("trip.history")}
           </TabsTrigger>
+          <TabsTrigger value="activity" className="flex-1">
+            {t("trip.activity")}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="expenses" className="mt-4 space-y-3">
@@ -485,6 +499,7 @@ export default function TripPage() {
             totalCount={trip.expenses.length}
             onEdit={openEditExpense}
             onDuplicate={duplicateExpense}
+            onComment={setCommenting}
             onDelete={(expenseId) => setConfirm({ type: "expense", id: expenseId })}
             onViewReceipt={setViewingReceipt}
           />
@@ -506,6 +521,12 @@ export default function TripPage() {
             currency={trip.currency}
             onDelete={(paymentId) => setConfirm({ type: "payment", id: paymentId })}
           />
+        </TabsContent>
+
+        <TabsContent value="activity" className="mt-4">
+          {/* Keyed on the trip's version so it refetches after anything is written,
+              rather than showing a feed that stops at whatever was true on arrival. */}
+          <ActivityFeed key={trip.version} tripId={id} />
         </TabsContent>
       </Tabs>
 
@@ -531,6 +552,14 @@ export default function TripPage() {
             amount: s.amount,
           })),
         }}
+      />
+
+      <CommentsDialog
+        open={commenting !== null}
+        onOpenChange={(open) => !open && setCommenting(null)}
+        tripId={id}
+        expense={commenting}
+        onChanged={loadTrip}
       />
 
       <ExpenseDialog

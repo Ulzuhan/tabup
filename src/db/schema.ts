@@ -318,6 +318,70 @@ export const invites = sqliteTable(
 );
 
 /**
+ * What happened in a trip, and who did it.
+ *
+ * The model says everyone answers for what they entered, and the owner can change
+ * anything. Neither half means much unless it can be seen: a rule about responsibility
+ * that leaves no trace is a promise, not a record. This is the trace.
+ *
+ * The actor's name is copied in as text rather than read through the account. A feed is
+ * read months later, by which time the person may have been taken out of the trip,
+ * renamed themselves, or deleted their account — and "somebody deleted your expense" is
+ * exactly the line that must still be legible then.
+ */
+export const activity = sqliteTable(
+  "activity",
+  {
+    id: text("id").primaryKey(),
+    tripId: text("trip_id")
+      .notNull()
+      .references(() => trips.id, { onDelete: "cascade" }),
+    /** Null once the account is gone; `actorName` is what the feed actually shows. */
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    /** What they were called in this trip at the moment they did it. */
+    actorName: text("actor_name").notNull(),
+    /** A key the UI translates, e.g. "expense.added". Never a sentence. */
+    action: text("action").notNull(),
+    /** What it was done to: an expense's description, a person's name, a trip's name. */
+    subject: text("subject"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("activity_trip_idx").on(t.tripId, t.createdAt)]
+);
+
+/**
+ * What people say about an expense, as opposed to what they do to it.
+ *
+ * The point of these is that they are the alternative to editing. Somebody who thinks a
+ * figure is wrong has two ways to act on it: change it, which rewrites what another
+ * person recorded about their own money, or say so. Only one of those needs permission,
+ * and the app that offers only the first is the app where people quietly overwrite each
+ * other.
+ */
+export const comments = sqliteTable(
+  "comments",
+  {
+    id: text("id").primaryKey(),
+    expenseId: text("expense_id")
+      .notNull()
+      .references(() => expenses.id, { onDelete: "cascade" }),
+    /**
+     * Denormalised from the expense so a comment can be authorised against the trip in
+     * the URL without a join — the same pairing every other id in this app goes through.
+     */
+    tripId: text("trip_id")
+      .notNull()
+      .references(() => trips.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    /** Copied in for the same reason as `activity.actorName`. */
+    authorName: text("author_name").notNull(),
+    body: text("body").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("comments_expense_idx").on(t.expenseId)]
+);
+
+/**
  * Recurring expenses: subscriptions, insurance, rent.
  *
  * A rule, not a ledger. Storing the norm plus when it started and stopped means any

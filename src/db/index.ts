@@ -157,6 +157,28 @@ function migrate(sqlite: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS recurring_user_idx ON recurring(user_id);
 
+    CREATE TABLE IF NOT EXISTS activity (
+      id TEXT PRIMARY KEY,
+      trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      actor_name TEXT NOT NULL,
+      action TEXT NOT NULL,
+      subject TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS activity_trip_idx ON activity(trip_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS comments (
+      id TEXT PRIMARY KEY,
+      expense_id TEXT NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+      trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      author_name TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS comments_expense_idx ON comments(expense_id);
+
     CREATE TABLE IF NOT EXISTS error_log (
       id TEXT PRIMARY KEY,
       context TEXT NOT NULL,

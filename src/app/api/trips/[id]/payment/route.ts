@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addPayment, authorRule, deletePayment, getTrip } from "@/lib/store";
+import { addPayment, authorRule, deletePayment, getTrip, logActivity } from "@/lib/store";
 import { authorizeTrip } from "@/lib/authorize";
 import { logError } from "@/lib/errors";
 
@@ -68,6 +68,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
     if (!payment) {
       return NextResponse.json({ error: "Failed to record payment" }, { status: 500 });
     }
+    const name = (memberId: string) => trip.members.find((m) => m.id === memberId)?.name ?? "?";
+    logActivity(id, auth.user, "paymentAdded", `${name(payment.from)} → ${name(payment.to)}`);
     return NextResponse.json(payment);
   } catch (error) {
     logError("POST /api/trips/[id]/payment", error);
@@ -107,9 +109,15 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/trips
     );
   }
 
+  const trip = await getTrip(id);
+  const gone = trip?.payments.find((p) => p.id === paymentId);
+
   const removed = await deletePayment(id, paymentId);
   if (!removed) {
     return NextResponse.json({ error: "Payment not found" }, { status: 404 });
   }
+
+  const name = (memberId?: string) => trip?.members.find((m) => m.id === memberId)?.name ?? "?";
+  logActivity(id, auth.user, "paymentDeleted", `${name(gone?.from)} → ${name(gone?.to)}`);
   return NextResponse.json({ success: true });
 }

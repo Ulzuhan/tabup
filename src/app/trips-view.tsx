@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { CURRENCIES, EMOJIS } from "@/lib/types";
 import { useT } from "@/i18n/provider";
+import { Money } from "@/components/money";
+import { cn } from "@/lib/utils";
 import { AppHeader, Wordmark, type SessionUser } from "@/components/app-header";
 import { SectionTabs, SectionTabsSpacer } from "@/components/section-tabs";
 import { MemberAvatar } from "@/components/member-avatar";
@@ -38,6 +40,8 @@ interface TripSummary {
   expenseCount: number;
   createdAt: number;
   owned?: boolean;
+  /** Where the reader stands, in the trip's currency. Null when they are in no split. */
+  balance: number | null;
 }
 
 export function TripsView() {
@@ -252,8 +256,43 @@ function TripRow({ trip }: { trip: TripSummary }) {
         </p>
       </div>
 
+      {/* The only figure anybody opens this list for. It used to say "3 people ·
+          5 expenses", which is true and answers nobody's question. */}
+      <TripBalance balance={trip.balance} currency={trip.currency} />
+
       <ArrowRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
     </Link>
+  );
+}
+
+/**
+ * Where you stand in one trip, on the row for it.
+ *
+ * Three states, and the third is not a number: somebody who has not said which
+ * participant they are has no balance to show, and printing a zero would be a lie about
+ * their money rather than an absence of one.
+ */
+function TripBalance({ balance, currency }: { balance: number | null; currency: string }) {
+  const t = useT();
+  if (balance === null) return null;
+
+  if (Math.abs(balance) < 0.01) {
+    return (
+      <span className="shrink-0 text-[13px] text-muted-foreground">{t("home.settled")}</span>
+    );
+  }
+
+  return (
+    <span className="shrink-0 text-right">
+      <span className="block text-[11px] text-muted-foreground">
+        {balance > 0 ? t("home.owedToYou") : t("home.youOwe")}
+      </span>
+      <Money
+        amount={Math.abs(balance)}
+        currency={currency}
+        className={cn("text-sm font-medium", balance > 0 ? "text-success" : "text-destructive")}
+      />
+    </span>
   );
 }
 

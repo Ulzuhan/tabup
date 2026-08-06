@@ -17,7 +17,7 @@ import { randomBytes } from "crypto";
 import { existsSync } from "fs";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { join } from "path";
-import { eq, asc, and, gt, isNull, sql } from "drizzle-orm";
+import { eq, asc, desc, and, gt, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   trips,
@@ -29,6 +29,8 @@ import {
   tripAccess,
   invites,
   recurring,
+  activity,
+  comments,
 } from "@/db/schema";
 import { EMOJIS } from "./types";
 import type { Trip, Member, Expense, Payment } from "./types";
@@ -39,6 +41,8 @@ const CACHE_FILE = join(DATA_DIR, ".exchange-rates-cache.json");
 // The maths lives in balances.ts because the browser needs it as well; re-exported here
 // so every existing importer keeps working unchanged.
 export { calculateBalances, calculateSettlements } from "./balances";
+// Re-exporting does not bind them here, and the list of trips needs the balances itself.
+import { calculateBalances } from "./balances";
 
 export function generateId(): string {
   return randomBytes(16).toString("hex");
@@ -156,9 +160,32 @@ export async function getTrip(id: string): Promise<Trip | null> {
   };
 }
 
-/** Lightweight listing: the user's own trips plus the ones shared with them. */
+/**
+ * The trips a person is in, each with the only figure they opened the app for.
+ *
+ * The list used to say "3 people · 5 expenses", which is true and answers nobody's
+ * question. What anyone wants from a list of trips is whether they owe money or are owed
+ * it, and the app has known which participant each reader is since members became
+ * accounts — it simply was not using it here.
+ *
+ * The balance comes from `calculateBalances` over the whole trip rather than from a
+ * cheaper aggregate query, on purpose: the maths is integer cents with a largest-
+ * remainder apportionment, and a second implementation in SQL would be a second answer
+ * about money, drifting quietly from the first. A handful of trips is a handful of local
+ * SQLite reads.
+ */
 export async function listTrips(userId: string): Promise<
-  { id: string; name: string; currency: string; createdAt: number; memberCount: number; expenseCount: number; owned: boolean }[]
+  {
+    id: string;
+    name: string;
+    currency: string;
+    createdAt: number;
+    memberCount: number;
+    expenseCount: number;
+    owned: boolean;
+    /** In the trip's currency. Null when the reader is in nobody's split yet. */
+    balance: number | null;
+  }[]
 > {
   const owned = db.select().from(trips).where(eq(trips.ownerId, userId)).all();
   const sharedIds = db
@@ -174,17 +201,28 @@ export async function listTrips(userId: string): Promise<
     .map((id) => db.select().from(trips).where(eq(trips.id, id)).get())
     .filter((t): t is NonNullable<typeof t> => Boolean(t));
 
-  return [...owned, ...shared]
-    .map((t) => ({
-      id: t.id,
-      name: t.name,
-      currency: t.currency,
-      createdAt: t.createdAt,
-      memberCount: db.select().from(members).where(eq(members.tripId, t.id)).all().length,
-      expenseCount: db.select().from(expenses).where(eq(expenses.tripId, t.id)).all().length,
-      owned: t.ownerId === userId,
-    }))
-    .sort((a, b) => b.createdAt - a.createdAt);
+  const rows = await Promise.all(
+    [...owned, ...shared].map(async (t) => {
+      const trip = await getTrip(t.id);
+      const you = trip?.members.find((m) => m.userId === userId);
+      const balance = you
+        ? calculateBalances(trip!).find((b) => b.memberId === you.id)?.balance ?? 0
+        : null;
+
+      return {
+        id: t.id,
+        name: t.name,
+        currency: t.currency,
+        createdAt: t.createdAt,
+        memberCount: trip?.members.length ?? 0,
+        expenseCount: trip?.expenses.length ?? 0,
+        owned: t.ownerId === userId,
+        balance,
+      };
+    })
+  );
+
+  return rows.sort((a, b) => b.createdAt - a.createdAt);
 }
 
 // ─── Ownership and access ────────────────────────────────────────────
@@ -369,15 +407,36 @@ export function authorRule(
 ): AuthorCheck {
   if (!isValidId(tripId) || !isValidId(rowId)) return "missing";
 
-  const table = kind === "expense" ? expenses : payments;
+  const seat = caller.id ? memberForUser(tripId, caller.id) : null;
+
+  if (kind === "expense") {
+    const row = db
+      .select({ createdBy: expenses.createdBy, paidBy: expenses.paidBy })
+      .from(expenses)
+      .where(and(eq(expenses.id, rowId), eq(expenses.tripId, tripId)))
+      .get();
+    if (!row) return "missing";
+    if (caller.isOwner) return "ok";
+    // Whoever typed it, and whoever it says paid.
+    //
+    // Those are not the same person, and the rule used to look only at the first: if I
+    // entered "Andoni paid 40" and got the figure wrong, Andoni could not correct the
+    // record of his own money — he had to ask me. The person the expense is *about* has
+    // at least as much standing over it as the person who happened to hold the phone.
+    if (row.createdBy && row.createdBy === caller.id) return "ok";
+    return seat && row.paidBy === seat.id ? "ok" : "forbidden";
+  }
+
   const row = db
-    .select({ createdBy: table.createdBy })
-    .from(table)
-    .where(and(eq(table.id, rowId), eq(table.tripId, tripId)))
+    .select({ createdBy: payments.createdBy, from: payments.fromMember, to: payments.toMember })
+    .from(payments)
+    .where(and(eq(payments.id, rowId), eq(payments.tripId, tripId)))
     .get();
   if (!row) return "missing";
   if (caller.isOwner) return "ok";
-  return row.createdBy && row.createdBy === caller.id ? "ok" : "forbidden";
+  if (row.createdBy && row.createdBy === caller.id) return "ok";
+  // A settle-up is a statement about two people, and either of them may take it back.
+  return seat && (row.from === seat.id || row.to === seat.id) ? "ok" : "forbidden";
 }
 
 /** Which rows of a trip one account wrote, so the UI can offer editing only on those. */
@@ -395,6 +454,190 @@ export function authoredBy(
         .map((r) => r.id as string)
     );
   return { expenses: mineIn(expenses), payments: mineIn(payments) };
+}
+
+/**
+ * Who entered each expense, by the name they go by in this trip.
+ *
+ * Shown next to the expense because the rule about who may change it is otherwise
+ * invisible: somebody looking at a line with no edit button is told neither whose it is
+ * nor who to ask. Resolved to their seat's name rather than their account's, so it
+ * matches every other name on the screen — a person is "Papá" in the family trip whoever
+ * their account says they are.
+ */
+export function expenseAuthors(tripId: string): Record<string, string> {
+  const rows = db
+    .select({ id: expenses.id, seatName: members.name, accountName: users.name })
+    .from(expenses)
+    .leftJoin(users, eq(users.id, expenses.createdBy))
+    .leftJoin(
+      members,
+      and(eq(members.tripId, expenses.tripId), eq(members.userId, expenses.createdBy))
+    )
+    .where(eq(expenses.tripId, tripId))
+    .all();
+
+  const byId: Record<string, string> = {};
+  for (const row of rows) {
+    const name = row.seatName ?? row.accountName;
+    if (name) byId[row.id] = name;
+  }
+  return byId;
+}
+
+// ─── What happened, and who did it ───────────────────────────────────
+
+/**
+ * Records something worth telling the others about.
+ *
+ * Called from the routes rather than from the writes themselves: the store has no idea
+ * who is asking, and threading a user id through every function so it could log would
+ * put identity into places that are better off not knowing about it.
+ *
+ * Never throws into the caller's path. A trip whose expense was saved but whose feed
+ * entry was not is a trip with a gap in its history; one that refuses the expense because
+ * the history failed is worse.
+ */
+export function logActivity(
+  tripId: string,
+  /** Resolved to what they are called *in this trip*, which is what the feed shows. */
+  user: { id: string; name: string } | null,
+  action: string,
+  subject?: string | null
+): void {
+  try {
+    const seatName = user ? memberForUser(tripId, user.id)?.name : null;
+    db.insert(activity)
+      .values({
+        id: generateId(),
+        tripId,
+        userId: user?.id ?? null,
+        actorName: (seatName ?? user?.name ?? "?").slice(0, 50),
+        action,
+        subject: subject?.slice(0, 100) ?? null,
+        createdAt: Date.now(),
+      })
+      .run();
+  } catch (error) {
+    console.error("Could not record activity:", error);
+  }
+}
+
+export interface ActivityEntry {
+  id: string;
+  actorName: string;
+  action: string;
+  subject: string | null;
+  createdAt: number;
+}
+
+/** The feed, newest first. Capped: nobody scrolls to the beginning of a trip. */
+export function readActivity(tripId: string, limit = 100): ActivityEntry[] {
+  if (!isValidId(tripId)) return [];
+  return db
+    .select({
+      id: activity.id,
+      actorName: activity.actorName,
+      action: activity.action,
+      subject: activity.subject,
+      createdAt: activity.createdAt,
+    })
+    .from(activity)
+    .where(eq(activity.tripId, tripId))
+    .orderBy(desc(activity.createdAt))
+    .limit(Math.min(limit, 200))
+    .all();
+}
+
+// ─── Comments ────────────────────────────────────────────────────────
+
+export interface Comment {
+  id: string;
+  authorName: string;
+  body: string;
+  createdAt: number;
+  /** Whether the reader may delete it: their own, or the owner's prerogative. */
+  mine: boolean;
+}
+
+export function readComments(
+  tripId: string,
+  expenseId: string,
+  reader: { id?: string; isOwner: boolean }
+): Comment[] {
+  if (!isValidId(tripId) || !isValidId(expenseId)) return [];
+  return db
+    .select()
+    .from(comments)
+    .where(and(eq(comments.tripId, tripId), eq(comments.expenseId, expenseId)))
+    .orderBy(asc(comments.createdAt))
+    .all()
+    .map((c) => ({
+      id: c.id,
+      authorName: c.authorName,
+      body: c.body,
+      createdAt: c.createdAt,
+      mine: reader.isOwner || (Boolean(c.userId) && c.userId === reader.id),
+    }));
+}
+
+export function addComment(input: {
+  tripId: string;
+  expenseId: string;
+  userId: string;
+  authorName: string;
+  body: string;
+}): Comment | null {
+  const body = input.body.trim().slice(0, 500);
+  if (!body) return null;
+  // Scoped to the trip that was authorised, like every other id arriving in a body.
+  if (!belongsToTrip(expenses, input.expenseId, input.tripId)) return null;
+
+  const id = generateId();
+  const createdAt = Date.now();
+  db.insert(comments)
+    .values({
+      id,
+      expenseId: input.expenseId,
+      tripId: input.tripId,
+      userId: input.userId,
+      authorName: input.authorName.slice(0, 50),
+      body,
+      createdAt,
+    })
+    .run();
+
+  return { id, authorName: input.authorName, body, createdAt, mine: true };
+}
+
+export function deleteComment(
+  tripId: string,
+  commentId: string,
+  reader: { id?: string; isOwner: boolean }
+): "ok" | "missing" | "forbidden" {
+  if (!isValidId(tripId) || !isValidId(commentId)) return "missing";
+
+  const row = db
+    .select({ userId: comments.userId })
+    .from(comments)
+    .where(and(eq(comments.id, commentId), eq(comments.tripId, tripId)))
+    .get();
+  if (!row) return "missing";
+  if (!reader.isOwner && !(row.userId && row.userId === reader.id)) return "forbidden";
+
+  db.delete(comments).where(eq(comments.id, commentId)).run();
+  return "ok";
+}
+
+/** How many comments each expense has, so the list can show it without loading them. */
+export function commentCounts(tripId: string): Record<string, number> {
+  const rows = db
+    .select({ expenseId: comments.expenseId, count: sql<number>`count(*)` })
+    .from(comments)
+    .where(eq(comments.tripId, tripId))
+    .groupBy(comments.expenseId)
+    .all();
+  return Object.fromEntries(rows.map((r) => [r.expenseId, Number(r.count)]));
 }
 
 export interface CreateTripInput {
@@ -706,29 +949,72 @@ export async function deletePayment(tripId: string, paymentId: string): Promise<
  * owner is not in it has nobody who can put them back, and a batch that fails halfway
  * would report an error over work it had already done.
  */
+export type RemovalRefusal = { reason: "owner" | "balance"; names: string[] };
+
 export async function removeMembers(
   tripId: string,
   memberIds: string[]
-): Promise<{ removed: number; released: number; refused: boolean }> {
-  const empty = { removed: 0, released: 0, refused: false };
+): Promise<{ removed: number; released: number; refused: RemovalRefusal | null }> {
+  const empty = { removed: 0, released: 0, refused: null };
   if (!isValidId(tripId) || memberIds.length === 0) return empty;
 
-  const trip = db.select({ ownerId: trips.ownerId }).from(trips).where(eq(trips.id, tripId)).get();
-  if (!trip) return empty;
+  const owner = db
+    .select({ ownerId: trips.ownerId })
+    .from(trips)
+    .where(eq(trips.id, tripId))
+    .get();
+  if (!owner) return empty;
 
   const wanted = memberIds.filter(isValidId);
   const rows = wanted
     .map((memberId) =>
       db
-        .select({ id: members.id, userId: members.userId })
+        .select({ id: members.id, userId: members.userId, name: members.name })
         .from(members)
         // Scoped to the trip that was authorised, not to the id alone.
         .where(and(eq(members.id, memberId), eq(members.tripId, tripId)))
         .get()
     )
-    .filter((row): row is { id: string; userId: string | null } => Boolean(row));
+    .filter((row): row is { id: string; userId: string | null; name: string } => Boolean(row));
 
-  if (rows.some((row) => row.userId && row.userId === trip.ownerId)) return { ...empty, refused: true };
+  const ownerRow = rows.find((row) => row.userId && row.userId === owner.ownerId);
+  if (ownerRow) return { ...empty, refused: { reason: "owner", names: [ownerRow.name] } };
+
+  const stillIn = (userId: string | null) =>
+    Boolean(
+      userId &&
+        db
+          .select({ userId: tripAccess.userId })
+          .from(tripAccess)
+          .where(and(eq(tripAccess.tripId, tripId), eq(tripAccess.userId, userId)))
+          .get()
+    );
+
+  /**
+   * Nobody is deleted while the money still says something.
+   *
+   * Splitwise refuses this outright and it is the right call: deleting a participant
+   * takes their expenses with them, so everyone else's share of a bill they were part of
+   * silently changes. If they are owed twelve euros, that is a fact about other people's
+   * pockets, and it does not stop being true because somebody tapped an X. Settle first,
+   * then there is nothing to lose.
+   *
+   * Only the deletions are checked. Stepping out of a trip changes no figure at all, and
+   * making somebody settle up before they can be shown the door would be a rule with
+   * nothing behind it.
+   */
+  const doomed = rows.filter((row) => !stillIn(row.userId));
+  if (doomed.length > 0) {
+    const trip = await getTrip(tripId);
+    const balances = trip ? calculateBalances(trip) : [];
+    const owing = doomed.filter((row) => {
+      const balance = balances.find((b) => b.memberId === row.id)?.balance ?? 0;
+      return Math.round(balance * 100) !== 0;
+    });
+    if (owing.length > 0) {
+      return { ...empty, refused: { reason: "balance", names: owing.map((row) => row.name) } };
+    }
+  }
 
   let removed = 0;
   let released = 0;
@@ -736,15 +1022,7 @@ export async function removeMembers(
     for (const row of rows) {
       const scope = and(eq(members.id, row.id), eq(members.tripId, tripId));
 
-      const stillIn =
-        row.userId &&
-        tx
-          .select({ userId: tripAccess.userId })
-          .from(tripAccess)
-          .where(and(eq(tripAccess.tripId, tripId), eq(tripAccess.userId, row.userId)))
-          .get();
-
-      if (stillIn) {
+      if (stillIn(row.userId)) {
         tx.delete(tripAccess)
           .where(and(eq(tripAccess.tripId, tripId), eq(tripAccess.userId, row.userId!)))
           .run();
@@ -756,7 +1034,64 @@ export async function removeMembers(
     }
     if (removed > 0 || released > 0) touchTrip(tx, tripId);
   });
-  return { removed, released, refused: false };
+  return { removed, released, refused: null };
+}
+
+/**
+ * Hands a trip to somebody else in it.
+ *
+ * Without this the owner is a single point of failure: only they can invite, rename or
+ * take anybody out, and there was no way to move that — so an owner who left the group,
+ * lost their phone or deleted their account took the trip's administration with them.
+ *
+ * The old owner stays in the trip as an ordinary member. They keep their seat and every
+ * figure in it; what they lose is the trip's settings, which is the whole point.
+ */
+export async function transferOwnership(
+  tripId: string,
+  memberId: string
+): Promise<"ok" | "missing" | "not-an-account"> {
+  if (!isValidId(tripId) || !isValidId(memberId)) return "missing";
+
+  const trip = db.select({ ownerId: trips.ownerId }).from(trips).where(eq(trips.id, tripId)).get();
+  if (!trip) return "missing";
+
+  const target = db
+    .select({ userId: members.userId })
+    .from(members)
+    .where(and(eq(members.id, memberId), eq(members.tripId, tripId)))
+    .get();
+  if (!target) return "missing";
+  // A name with nobody behind it cannot be handed a trip, and neither can somebody who
+  // is no longer in it.
+  if (!target.userId || !stillInTrip(tripId, target.userId)) return "not-an-account";
+
+  const previous = trip.ownerId;
+  db.transaction((tx) => {
+    tx.update(trips).set({ ownerId: target.userId }).where(eq(trips.id, tripId)).run();
+    // The outgoing owner held no grant row, because owning the trip was their way in.
+    if (previous) {
+      tx.insert(tripAccess)
+        .values({ tripId, userId: previous, createdAt: Date.now() })
+        .onConflictDoNothing({ target: [tripAccess.tripId, tripAccess.userId] })
+        .run();
+    }
+    touchTrip(tx, tripId);
+  });
+  return "ok";
+}
+
+/** Whether an account can still open a trip, without going through `accessLevel`. */
+function stillInTrip(tripId: string, userId: string): boolean {
+  const trip = db.select({ ownerId: trips.ownerId }).from(trips).where(eq(trips.id, tripId)).get();
+  if (trip?.ownerId === userId) return true;
+  return Boolean(
+    db
+      .select({ userId: tripAccess.userId })
+      .from(tripAccess)
+      .where(and(eq(tripAccess.tripId, tripId), eq(tripAccess.userId, userId)))
+      .get()
+  );
 }
 
 export async function addMember(

@@ -48,31 +48,66 @@ export function PendingBanner({ count, onFlush }: { count: number; onFlush: () =
   );
 }
 
+/**
+ * The band above the tabs.
+ *
+ * The big number is *your* balance, not the trip's total. Nobody opens an app about
+ * shared expenses to find out what a holiday cost in aggregate; they open it to find out
+ * whether they owe money or are owed it. The total is still here, one line down, because
+ * it is worth knowing — just not worth the largest type on the screen.
+ *
+ * Falls back to the total when the reader is in nobody's split, which is the one case
+ * where there is no personal answer to give.
+ */
 export function TripTotal({
   total,
   currency,
   expenseCount,
   memberCount,
+  yourBalance,
 }: {
   total: number;
   currency: string;
   expenseCount: number;
   memberCount: number;
+  /** Null while the reader has not said which participant they are. */
+  yourBalance: number | null;
 }) {
   const t = useT();
   const plural = usePlural();
+
+  // Below a cent it is not a debt, it is a rounding artefact, and calling it one sends
+  // somebody chasing a transfer that cannot be made.
+  const settled = yourBalance !== null && Math.abs(yourBalance) < 0.01;
+  const personal = yourBalance !== null && !settled;
 
   return (
     <Card className="edge-light mb-4">
       <CardContent className="py-1 text-center">
         <p className="text-xs tracking-wider text-muted-foreground uppercase">
-          {t("trip.totalSpent")}
+          {personal
+            ? yourBalance > 0
+              ? t("trip.youAreOwed")
+              : t("trip.youOwe")
+            : settled
+              ? t("trip.youAreSettled")
+              : t("trip.totalSpent")}
         </p>
-        <p className="mt-1.5 text-4xl font-semibold tracking-tight">
-          <Money amount={total} currency={currency} />
+        <p
+          className={cn(
+            "mt-1.5 text-4xl font-semibold tracking-tight",
+            personal && (yourBalance > 0 ? "text-success" : "text-destructive")
+          )}
+        >
+          <Money amount={personal ? Math.abs(yourBalance) : total} currency={currency} />
         </p>
         {expenseCount > 0 && (
           <p className="tabular mt-1 text-sm text-muted-foreground">
+            {yourBalance !== null && (
+              <>
+                {t("trip.totalSpent")} <Money amount={total} currency={currency} /> ·{" "}
+              </>
+            )}
             {t("trip.expenseCount", {
               expenses: plural("trip.nExpenses", expenseCount),
               people: plural("trip.nPeople", memberCount),

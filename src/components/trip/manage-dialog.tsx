@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Link2, Loader2, Mail, UserPlus, X } from "lucide-react";
+import { Crown, Link2, Loader2, Mail, UserPlus, X } from "lucide-react";
 import type { Member } from "@/lib/types";
 import { MemberAvatar } from "@/components/member-avatar";
 import { currencySymbol } from "@/components/money";
@@ -172,14 +172,54 @@ export function ManageDialog({
    * does the destructive half, deliberately as a separate decision.
    */
   const removeMember = async (id: string, memberName: string, linked: boolean) => {
-    await call(
-      `rm-${id}`,
+    setBusy(`rm-${id}`);
+    try {
+      const res = await fetch(`/api/trips/${tripId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ removeMembers: [id] }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        // Deleting somebody takes their expenses with them, so everyone else's share of
+        // a bill they were part of would silently change. Named, because "somebody has a
+        // balance" leaves you hunting for who.
+        toast.error(
+          data.error === "settle_first"
+            ? t("manage.settleFirst", { names: (data.names ?? []).join(", ") })
+            : data.error || t("manage.failed")
+        );
+        return;
+      }
+
+      await onChanged();
+      toast.success(
+        linked
+          ? t("manage.memberReleased", { name: memberName })
+          : t("manage.memberRemoved", { name: memberName })
+      );
+    } catch {
+      toast.error(t("common.serverUnreachable"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Handing the trip over. Two taps, because it cannot be taken back by the giver. */
+  const [handingTo, setHandingTo] = useState<string | null>(null);
+
+  const makeOwner = async (id: string, memberName: string) => {
+    const ok = await call(
+      `own-${id}`,
       `/api/trips/${tripId}`,
-      { method: "PATCH", body: JSON.stringify({ removeMembers: [id] }) },
-      linked
-        ? t("manage.memberReleased", { name: memberName })
-        : t("manage.memberRemoved", { name: memberName })
+      { method: "PATCH", body: JSON.stringify({ transferOwner: id }) },
+      t("manage.ownerChanged", { name: memberName })
     );
+    if (ok) {
+      setHandingTo(null);
+      onOpenChange(false);
+    }
   };
 
   const saveRename = async () => {
@@ -282,6 +322,43 @@ export function ManageDialog({
               // account who is still in the trip.
               const canRename = mine || (owner && (!m.userId || gone));
 
+              // Somebody with an account who is still here can be handed the trip, which
+              // is the only way out of the owner being a single point of failure.
+              const canTakeOver = owner && !mine && Boolean(m.userId) && !gone;
+
+              if (handingTo === m.id) {
+                return (
+                  <li
+                    key={m.id}
+                    className="space-y-2 rounded-lg border border-primary/30 bg-primary/[0.06] p-2.5"
+                  >
+                    <p className="text-sm">{t("manage.makeOwnerConfirm", { name: m.name })}</p>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="h-8 flex-1"
+                        disabled={busy !== null}
+                        onClick={() => makeOwner(m.id, m.name)}
+                      >
+                        {busy === `own-${m.id}` ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          t("manage.makeOwner")
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 flex-1"
+                        onClick={() => setHandingTo(null)}
+                      >
+                        {t("common.cancel")}
+                      </Button>
+                    </div>
+                  </li>
+                );
+              }
+
               return (
                 <li key={m.id} className="flex items-center gap-2 rounded-lg bg-secondary/40 p-1.5">
                   <MemberAvatar emoji={m.emoji} size="sm" />
@@ -348,6 +425,20 @@ export function ManageDialog({
                       The first press on somebody who is here takes away their access and
                       leaves everything they spent; a second one, or the only one on a
                       name nobody is behind, deletes the column and its money with it. */}
+                  {canTakeOver && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 text-muted-foreground hover:text-foreground"
+                      onClick={() => setHandingTo(m.id)}
+                      disabled={busy !== null}
+                      aria-label={`${t("manage.makeOwner")}: ${m.name}`}
+                      title={t("manage.makeOwner")}
+                    >
+                      <Crown className="size-3.5" />
+                    </Button>
+                  )}
+
                   {owner && !mine && (
                     <Button
                       variant="ghost"

@@ -1,6 +1,14 @@
 "use client";
 
-import { CloudOff, CopyPlus, Pencil, Receipt, Trash2, TriangleAlert } from "lucide-react";
+import {
+  CloudOff,
+  CopyPlus,
+  MessageCircle,
+  Pencil,
+  Receipt,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 import type { Expense, Member } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { CategoryBadge } from "@/components/category-icon";
@@ -27,6 +35,7 @@ export function ExpenseList({
   totalCount,
   onEdit,
   onDuplicate,
+  onComment,
   onDelete,
   onViewReceipt,
 }: {
@@ -38,6 +47,7 @@ export function ExpenseList({
   totalCount: number;
   onEdit: (expense: Expense) => void;
   onDuplicate: (expense: Expense) => void;
+  onComment: (expense: Expense) => void;
   onDelete: (expenseId: string) => void;
   onViewReceipt: (file: string) => void;
 }) {
@@ -121,6 +131,10 @@ export function ExpenseList({
                       {payer?.emoji} {t("trip.paidBy", { name: payer?.name ?? "" })} ·{" "}
                       {plural("trip.ways", expense.splitAmong.length)}
                       {expense.splitShares && ` · ${t("trip.uneven")}`}
+                      {/* Who typed it, when that is somebody other than who paid. The
+                          rule about who may change it is invisible otherwise: a line
+                          with no edit button says neither whose it is nor who to ask. */}
+                      {expense.by && ` · ${t("trip.enteredBy", { name: expense.by })}`}
                     </p>
                   </div>
 
@@ -146,6 +160,25 @@ export function ExpenseList({
 
                   {!queued && (
                     <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-100">
+                      {/* Open to everyone, and the counterweight to the edit rule: the
+                          person who may not change a figure is exactly the one who needs
+                          a way to say it looks wrong. Stays visible once there are any,
+                          because a conversation nobody can see is not one. */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "size-8 text-muted-foreground",
+                          expense.comments ? "opacity-100" : ""
+                        )}
+                        onClick={() => onComment(expense)}
+                        aria-label={`${t("comments.title")}: ${expense.description}`}
+                      >
+                        <MessageCircle className="size-3.5" />
+                        {expense.comments ? (
+                          <span className="tabular -ml-0.5 text-[11px]">{expense.comments}</span>
+                        ) : null}
+                      </Button>
                       {/* Duplicating is adding one of your own, which everybody in a
                           trip may do — including from somebody else's line. */}
                       <Button
