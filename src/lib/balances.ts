@@ -90,9 +90,11 @@ export function calculateBalances(trip: Trip): Balance[] {
     }
   }
 
-  // Payments: "from" settles part of their debt, "to" is owed less.
+  // Payments: "from" settles part of their debt, "to" is owed less. In the trip's
+  // currency like everything else here — a settle-up can be handed over in any currency,
+  // and `amountBase` is that amount brought into the unit the balances are kept in.
   for (const payment of trip.payments || []) {
-    const cents = toCents(payment.amount);
+    const cents = toCents(payment.amountBase);
     if (balances[payment.from]) balances[payment.from].share -= cents;
     if (balances[payment.to]) balances[payment.to].paid -= cents;
   }

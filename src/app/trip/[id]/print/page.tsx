@@ -131,10 +131,17 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
                       {e.note && <span className="block text-[11px] text-[#6b6f80]">{e.note}</span>}
                     </td>
                     <td>{name(e.paidBy)}</td>
+                    {/* Always the trip's currency, so the column adds up to the total
+                        at the top and to the share columns beside it. What was actually
+                        paid goes underneath when it was something else — the column used
+                        to hold one or the other with only the code to tell them apart. */}
                     <td className="num">
-                      {e.currency === trip.currency
-                        ? money(e.amount)
-                        : `${e.amount.toFixed(2)} ${e.currency}`}
+                      {money(e.amountBase)}
+                      {e.currency !== trip.currency && (
+                        <span className="block text-[11px] text-[#6b6f80]">
+                          {e.amount.toFixed(2)} {e.currency}
+                        </span>
+                      )}
                     </td>
                     {trip.members.map((m) => (
                       <td key={m.id} className="num">

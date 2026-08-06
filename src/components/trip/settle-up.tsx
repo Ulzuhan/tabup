@@ -122,11 +122,21 @@ export function PaymentHistory({
                 </p>
               </div>
 
-              <Money
-                amount={payment.amount}
-                currency={currency}
-                className="shrink-0 text-sm font-medium"
-              />
+              {/* What was handed over, in the currency it was handed over in — and what
+                  that came to in the trip's, when they differ. Labelling a euro transfer
+                  with a peso symbol was the bug this replaces. */}
+              <div className="shrink-0 text-right">
+                <Money
+                  amount={payment.amount}
+                  currency={payment.currency ?? currency}
+                  className="text-sm font-medium"
+                />
+                {payment.currency && payment.currency !== currency && (
+                  <p className="text-xs text-muted-foreground">
+                    ≈ <Money amount={payment.amountBase} currency={currency} />
+                  </p>
+                )}
+              </div>
 
               {/* Undoing a settle-up is rewriting what somebody says they were paid, so
                   it stays with whoever recorded it — and with the owner. */}

@@ -109,21 +109,30 @@ export function mergePending(
         amount,
         currency: String(body.currency ?? trip.currency),
         // No conversion is possible without the network, so a foreign-currency expense
-        // counts at face value until it syncs. Flagged in the UI as approximate.
+        // counts at face value until it syncs — and says so, which is the half that was
+        // missing: the flag below was hardcoded true, so the warning the comment
+        // promised never appeared and the balances looked exact while they were not.
         amountBase: Number(body.amountBase ?? amount),
         paidBy: String(body.paidBy ?? ""),
         splitAmong: (body.splitAmong as string[] | undefined) ?? trip.members.map((m) => m.id),
         splitShares: body.splitShares as Record<string, number> | undefined,
         category: String(body.category ?? "other"),
         date: Number(body.date ?? write.createdAt),
-        rateAvailable: true,
+        rateAvailable: String(body.currency ?? trip.currency) === trip.currency,
       });
     } else {
+      const paid = Number(body.amount) || 0;
+      const payCurrency = String(body.currency ?? trip.currency);
       pendingPayments.push({
         id: `pending-${write.clientId}`,
         from: String(body.from ?? ""),
         to: String(body.to ?? ""),
-        amount: Number(body.amount) || 0,
+        amount: paid,
+        currency: payCurrency,
+        // Same as an expense: no conversion is possible without the network, so it
+        // counts at face value and says so until it syncs.
+        amountBase: paid,
+        rateAvailable: payCurrency === trip.currency,
         date: Number(body.date ?? write.createdAt),
         note: body.note as string | undefined,
       });

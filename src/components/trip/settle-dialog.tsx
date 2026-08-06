@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDown, Loader2 } from "lucide-react";
+import { CURRENCIES } from "@/lib/types";
 import type { Member } from "@/lib/types";
 import { MemberAvatar } from "@/components/member-avatar";
 import { currencySymbol } from "@/components/money";
@@ -28,6 +29,8 @@ export interface PaymentDraft {
   from: string;
   to: string;
   amount: string;
+  /** What was actually handed over. Usually the trip's, but a transfer is a transfer. */
+  currency: string;
   note: string;
   date: string;
 }
@@ -134,21 +137,46 @@ export function SettleDialog({
 
           <div className="space-y-2">
             <Label htmlFor="settle-amount">{t("settle.amount")}</Label>
-            <div className="relative">
-              <span className="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground">
-                {currencySymbol(currency)}
-              </span>
-              <Input
-                id="settle-amount"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={draft.amount}
-                onChange={(e) => setDraft({ amount: e.target.value })}
-                placeholder="0.00"
-                className="tabular h-11 pl-8 text-base"
-              />
+            {/* With its own currency, because a peso debt is often cleared by a euro
+                transfer — and pretending otherwise means somebody converts by hand and
+                the trip records a figure nobody actually paid. */}
+            <div className="flex gap-2">
+              <div className="relative min-w-0 flex-1">
+                <span className="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground">
+                  {currencySymbol(draft.currency || currency)}
+                </span>
+                <Input
+                  id="settle-amount"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={draft.amount}
+                  onChange={(e) => setDraft({ amount: e.target.value })}
+                  placeholder="0,00"
+                  className="tabular h-11 pl-8 text-base"
+                />
+              </div>
+              <Select
+                value={draft.currency || currency}
+                onValueChange={(v) => setDraft({ currency: String(v) })}
+              >
+                <SelectTrigger className="h-11 w-28">
+                  <SelectValue>
+                    {(value) => {
+                      const c = CURRENCIES.find((x) => x.code === value);
+                      return c ? `${c.symbol} ${c.code}` : String(value ?? "");
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.symbol} {c.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

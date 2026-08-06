@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addPayment, authorRule, deletePayment, getTrip, logActivity } from "@/lib/store";
+import {
+  addPayment,
+  authorRule,
+  convertTo,
+  deletePayment,
+  getTrip,
+  logActivity,
+} from "@/lib/store";
+import { CURRENCIES } from "@/lib/types";
 import { authorizeTrip } from "@/lib/authorize";
 import { notify, othersInTrip } from "@/lib/push";
 import { logError } from "@/lib/errors";
@@ -55,10 +63,47 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       );
     }
 
+    /**
+     * A settle-up can be handed over in any currency.
+     *
+     * It used to be assumed to be the trip's, which is wrong the moment somebody clears
+     * a peso debt with a euro transfer — the commonest way a trip actually ends. Same
+     * rules as an expense: converted as of the day it happened, and refused rather than
+     * guessed if there is no rate at all.
+     */
+    const payCurrency =
+      typeof body.currency === "string" && CURRENCIES.find((c) => c.code === body.currency)
+        ? body.currency
+        : trip.currency;
+
+    const rounded = Math.round(parsedAmount * 100) / 100;
+    let amountBase = rounded;
+    let rateUsed = true;
+    try {
+      ({ amount: amountBase, rateUsed } = await convertTo(
+        rounded,
+        payCurrency,
+        trip.currency,
+        parsedDate
+      ));
+    } catch (err) {
+      return NextResponse.json(
+        {
+          error: `Cannot convert ${payCurrency} to ${trip.currency}: ${
+            err instanceof Error ? err.message : "Rate unavailable"
+          }`,
+        },
+        { status: 502 }
+      );
+    }
+
     const payment = await addPayment(id, {
       from,
       to,
-      amount: Math.round(parsedAmount * 100) / 100,
+      amount: rounded,
+      currency: payCurrency,
+      amountBase,
+      rateAvailable: rateUsed,
       date: parsedDate,
       note: typeof note === "string" && note.trim() ? note.trim().slice(0, 200) : undefined,
       clientId: typeof body.clientId === "string" ? body.clientId.slice(0, 64) : undefined,

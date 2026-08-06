@@ -94,7 +94,12 @@ export interface Payment {
   id: string;
   from: string; // member id who paid
   to: string; // member id who received
-  amount: number; // in trip's default currency
+  amount: number; // as handed over, in `currency`
+  currency: string;
+  /** The same amount in the trip's currency; what the balances are computed from. */
+  amountBase: number;
+  /** False when the rate used was approximate; see `Expense.mine` for the display rule. */
+  rateAvailable?: boolean;
   date: number;
   note?: string;
   /** Whether the reader may undo it; see `Expense.mine`. */

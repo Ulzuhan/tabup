@@ -129,8 +129,22 @@ export async function PATCH(request: NextRequest) {
   const parsed = await parseBody(body);
   if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
+  /**
+   * Re-priced only when the money itself moved.
+   *
+   * `parseBody` converts unconditionally, so renaming a subscription used to re-value it
+   * at today's rate — the same silent rewrite the trip expenses had, with no guard at
+   * all. The stored figure is converted once, at the moment it is stated, and stays put
+   * until somebody restates it.
+   */
+  const existing = (await listRecurring(user.id)).find((item) => item.id === id);
+  const value =
+    existing && existing.amount === parsed.value.amount && existing.currency === parsed.value.currency
+      ? { ...parsed.value, amountBase: existing.amountBase }
+      : parsed.value;
+
   // The user id in the WHERE clause is what stops anyone editing someone else's row.
-  const updated = await updateRecurring(user.id, id, parsed.value);
+  const updated = await updateRecurring(user.id, id, value);
   if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ success: true });
 }

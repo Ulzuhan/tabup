@@ -148,14 +148,22 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
     const invalid = validateSplit(trip, splitIds, body.splitShares);
     if (invalid) return invalid;
 
+    const spentOn = parsedDate ?? Date.now();
     const expCurrency = currency || trip.currency;
     let amountBase: number;
     let rateUsed: boolean;
     try {
-      // Into the trip's currency, which is the unit every balance is kept and shown in.
-      // When the expense is already in it — the usual case — no rate is consulted at all,
-      // so a trip run entirely in pesos never depends on the network.
-      ({ amount: amountBase, rateUsed } = await convertTo(parsedAmount, expCurrency, trip.currency));
+      // Into the trip's currency, which is the unit every balance is kept and shown in,
+      // and as of the day it was spent rather than the day it was typed — last month's
+      // dinner entered today belongs at last month's rate. When the expense is already
+      // in the trip's currency — the usual case — no rate is consulted at all, so a trip
+      // run entirely in pesos never depends on the network.
+      ({ amount: amountBase, rateUsed } = await convertTo(
+        parsedAmount,
+        expCurrency,
+        trip.currency,
+        spentOn
+      ));
     } catch (err) {
       // Refusing beats guessing: a made-up 1:1 rate would corrupt every balance.
       return NextResponse.json(
@@ -178,7 +186,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       splitShares:
         body.splitShares && Object.keys(body.splitShares).length > 0 ? body.splitShares : undefined,
       category: CATEGORIES.find((c) => c.id === category) ? category : "other",
-      date: parsedDate ?? Date.now(),
+      date: spentOn,
       exchangeRate:
         expCurrency !== trip.currency && amountBase > 0 ? parsedAmount / amountBase : undefined,
       rateAvailable: rateUsed,
@@ -265,12 +273,26 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
       newAmount = parsed;
     }
 
+    /**
+     * Re-priced only when the money itself moved.
+     *
+     * The test used to be `currency !== undefined`, and the form sends the currency on
+     * every save — so correcting a typo in the description of a three-month-old expense
+     * silently reconverted it at today's rate, moving its share of the trip and every
+     * balance with it. An edit that does not touch the amount, the currency or the date
+     * must leave the figures exactly as they were, including whether they were exact.
+     */
+    const newDate = parsedDate ?? existing.date;
+    const moneyMoved =
+      newAmount !== existing.amount ||
+      newCurrency !== existing.currency ||
+      newDate !== existing.date;
+
     let newAmountBase = existing.amountBase;
-    let rateUsed = true;
-    const amountChanged = newAmount !== existing.amount || currency !== undefined;
-    if (amountChanged) {
+    let rateUsed = existing.rateAvailable ?? true;
+    if (moneyMoved) {
       try {
-        const result = await convertTo(newAmount, newCurrency, trip.currency);
+        const result = await convertTo(newAmount, newCurrency, trip.currency, newDate);
         newAmountBase = result.amount;
         rateUsed = result.rateUsed;
       } catch (err) {
@@ -300,7 +322,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
           : existing.splitShares,
       category:
         category && CATEGORIES.find((c) => c.id === category) ? category : existing.category,
-      date: parsedDate ?? existing.date,
+      date: newDate,
       exchangeRate:
         newCurrency !== trip.currency && newAmountBase > 0 ? newAmount / newAmountBase : undefined,
       rateAvailable: rateUsed,

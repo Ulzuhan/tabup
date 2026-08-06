@@ -100,7 +100,19 @@ export async function GET(
   // ── Payments ───────────────────────────────────────────────────────
   if (trip.payments.length > 0) {
     section("Payments");
-    lines.push([safe("Date"), safe("From"), safe("To"), safe("Amount"), safe("Note")].join(","));
+    // Two amount columns, like the expenses above: what changed hands, and what that
+    // came to in the currency the balances are kept in. One column could not do both.
+    lines.push(
+      [
+        safe("Date"),
+        safe("From"),
+        safe("To"),
+        safe("Amount"),
+        safe("Currency"),
+        safe(`Amount (${trip.currency})`),
+        safe("Note"),
+      ].join(",")
+    );
     for (const payment of [...trip.payments].sort((a, b) => a.date - b.date)) {
       lines.push(
         [
@@ -108,6 +120,8 @@ export async function GET(
           safe(memberName(payment.from)),
           safe(memberName(payment.to)),
           num(payment.amount),
+          safe(payment.currency),
+          num(payment.amountBase),
           safe(payment.note ?? ""),
         ].join(",")
       );

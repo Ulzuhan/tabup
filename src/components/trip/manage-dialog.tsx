@@ -303,6 +303,20 @@ export function ManageDialog({
               <p className="text-xs text-muted-foreground">{t("pace.budgetHint")}</p>
             </div>
 
+            {/* Read-only, and said out loud rather than left to be discovered. Every
+                expense stores its amount converted into this currency at the rate of the
+                day it was spent; changing it later would mean re-pricing all of them at
+                today's rate, which is a rewrite of everyone's history, not a setting. */}
+            <div className="space-y-1.5">
+              <Label>{t("createTrip.currency")}</Label>
+              <div className="flex items-center gap-2 rounded-lg bg-secondary/40 px-3 py-2">
+                <span className="text-sm font-medium">
+                  {currencySymbol(currency)} {currency}
+                </span>
+                <span className="text-xs text-muted-foreground">{t("manage.currencyFixed")}</span>
+              </div>
+            </div>
+
             <Separator />
           </>
         )}

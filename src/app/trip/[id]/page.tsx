@@ -112,6 +112,7 @@ export default function TripPage() {
     from: "",
     to: "",
     amount: "",
+    currency: "",
     note: "",
     date: today(),
   });
@@ -142,7 +143,12 @@ export default function TripPage() {
    */
   const openSettle = () => {
     if (seeded) {
-      setPaymentDraft((d) => ({ ...d, from: d.from || seeded.from, to: d.to || seeded.to }));
+      setPaymentDraft((d) => ({
+        ...d,
+        from: d.from || seeded.from,
+        to: d.to || seeded.to,
+        currency: d.currency || trip?.currency || "EUR",
+      }));
     }
     setSettleOpen(true);
   };
@@ -230,6 +236,7 @@ export default function TripPage() {
       from: paymentDraft.from,
       to: paymentDraft.to,
       amount: parseFloat(paymentDraft.amount),
+      currency: paymentDraft.currency || trip?.currency,
       note: paymentDraft.note.trim() || undefined,
       date: paymentDraft.date ? new Date(paymentDraft.date).getTime() : Date.now(),
     };

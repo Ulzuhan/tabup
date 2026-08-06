@@ -64,6 +64,51 @@ A week is 52 charges a year, not 48, so weekly items convert at ×52/12. A charg
 Fixed costs require an account and are never shared: there is no link that grants access
 to them, and every query is scoped by user id.
 
+## Money in more than one currency
+
+A trip is kept in **one currency**, chosen when it is created and fixed afterwards. Every
+expense stores two figures: `amount` in whatever was typed, and `amountBase` in the trip's
+currency. Everything that is arithmetic — balances, settlements, totals, the spending
+pace, the category breakdown, the CSV — reads only `amountBase`. Nothing anywhere sums an
+unconverted amount.
+
+Rates come from [Frankfurter](https://frankfurter.app), which serves the European Central
+Bank's daily reference rates against the euro; a conversion between any two currencies
+goes through the euro on the way past. The list of currencies offered is exactly the set
+the ECB publishes, so a currency that cannot be converted cannot be chosen.
+
+Four rules, each of which was once broken:
+
+- **Converted as of the day it was spent**, not the day it was typed. Expenses carry a
+  date and can be backdated, and historical rates never change — which is what makes them
+  worth keeping for good once fetched.
+- **Converted once, then left alone.** An edit that does not change the amount, the
+  currency or the date does not reconvert. The test used to be "did the request mention a
+  currency", and the form mentions it on every save, so correcting a typo in a
+  three-month-old expense silently repriced it and moved everybody's balance.
+- **It says when it is guessing.** A rate that is not the one that applied — a cache that
+  has gone a day without contact, or today's table standing in for a day that could not
+  be fetched — still converts, because refusing would leave somebody unable to record what
+  they spent, but the expense is marked and the screen shows it. The same goes for an
+  expense typed with no connection at all: it counts at face value and says so until it
+  syncs.
+- **It never invents one.** With no table at all the write is refused with a 502. There is
+  no path that falls back to 1:1.
+
+**A settle-up carries its own currency too.** A peso debt is often cleared by a euro
+transfer, which is the commonest way a trip actually ends; recording that as if the number
+were pesos is wrong by a factor of sixty. Splid supports this and calls it a feature;
+Splitwise does not.
+
+For comparison: [Splitwise does not convert at all by
+default](https://feedback.splitwise.com/knowledgebase/articles/301146-can-splitwise-do-currency-conversion-between-multi)
+— it keeps a separate balance per currency, and conversion is a paid extra that rewrites
+past expenses at today's rate. Splid converts automatically, as this does.
+
+Fixed costs are the one place with a different base: they are one person's, are shown as a
+monthly figure in euros, and so are stored in euros. Same rule about not reconverting on
+an edit.
+
 ## Access model
 
 Every trip has an owner. Knowing a trip's URL grants nothing — there was an anonymous
@@ -332,7 +377,7 @@ export BASE=http://127.0.0.1:3999
 
 npm run test:api        # 18 — splitting, balances, validation, concurrency
 npm run test:auth       # 83 — accounts, ownership, who may change what, invitations
-npm run test:money      # 21 — currencies, whole cents, settling, CSV
+npm run test:money      # 40 — currencies, rates, whole cents, settling, CSV
 npm run test:members    # 50 — members and accounts, and isolation between trips
 npm run test:social     # 57 — balances, authorship, comments, the feed, kinds, push
 npm run test:recurring  # 17 — fixed costs; pure functions, no server needed

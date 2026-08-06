@@ -10,6 +10,8 @@
  * depend on what the page happens to look like at that moment.
  */
 
+import { currencySymbol } from "@/components/money";
+
 interface SummaryInput {
   tripName: string;
   currency: string;
@@ -33,12 +35,11 @@ const MUTED = "#9a9db0";
 const PRIMARY = "#3ddc97";
 const DANGER = "#f2645a";
 
-const SYMBOLS: Record<string, string> = {
-  EUR: "€", USD: "$", GBP: "£", JPY: "¥", CHF: "CHF", MXN: "$", BRL: "R$",
-};
 
 export function renderSummary(input: SummaryInput): HTMLCanvasElement {
-  const symbol = SYMBOLS[input.currency] ?? input.currency;
+  // From the one list the rest of the app uses. This file kept its own table of
+  // seven, so a trip in bahts was shared as "THB" and shown as "฿" everywhere else.
+  const symbol = currencySymbol(input.currency);
   const money = (n: number) =>
     `${symbol}${new Intl.NumberFormat(input.locale, {
       minimumFractionDigits: 2,

@@ -14,9 +14,6 @@
  * arrives with its members, expenses and payments nested.
  */
 import { randomBytes } from "crypto";
-import { existsSync } from "fs";
-import { mkdir, readFile, writeFile } from "fs/promises";
-import { join } from "path";
 import { eq, asc, desc, and, gt, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -35,12 +32,12 @@ import {
 import { EMOJIS, isTripKind } from "./types";
 import type { Trip, Member, Expense, Payment, TripKind } from "./types";
 
-const DATA_DIR = process.env.TABUP_DATA_DIR?.trim() || join(process.cwd(), "data");
-const CACHE_FILE = join(DATA_DIR, ".exchange-rates-cache.json");
-
 // The maths lives in balances.ts because the browser needs it as well; re-exported here
 // so every existing importer keeps working unchanged.
 export { calculateBalances, calculateSettlements } from "./balances";
+// Rates live in rates.ts for the same reason they are worth separating at all: they are
+// the one part of this file that talks to the outside world.
+export { convertTo, convertToSafe, fetchExchangeRates, isoDay } from "./rates";
 // Re-exporting does not bind them here, and the list of trips needs the balances itself.
 import { calculateBalances } from "./balances";
 
@@ -155,6 +152,9 @@ export async function getTrip(id: string): Promise<Trip | null> {
       from: p.fromMember,
       to: p.toMember,
       amount: p.amount,
+      currency: p.currency,
+      amountBase: p.amountBase,
+      rateAvailable: p.rateAvailable,
       date: p.date,
       note: p.note ?? undefined,
     })),
@@ -871,6 +871,11 @@ export interface AddPaymentInput {
   from: string;
   to: string;
   amount: number;
+  /** What it was handed over in. Defaults to the trip's currency at the call site. */
+  currency: string;
+  /** The same amount in the trip's currency, converted by the caller. */
+  amountBase: number;
+  rateAvailable?: boolean;
   date?: number;
   note?: string;
   /** The account recording it, which is who may undo it afterwards. */
@@ -892,6 +897,9 @@ export async function addPayment(tripId: string, input: AddPaymentInput): Promis
         from: existing.fromMember,
         to: existing.toMember,
         amount: existing.amount,
+        currency: existing.currency,
+        amountBase: existing.amountBase,
+        rateAvailable: existing.rateAvailable,
         date: existing.date,
         note: existing.note ?? undefined,
       };
@@ -909,6 +917,9 @@ export async function addPayment(tripId: string, input: AddPaymentInput): Promis
         fromMember: input.from,
         toMember: input.to,
         amount: input.amount,
+        currency: input.currency,
+        amountBase: input.amountBase,
+        rateAvailable: input.rateAvailable ?? true,
         date,
         note: input.note ?? null,
         clientId: input.clientId ?? null,
@@ -918,7 +929,17 @@ export async function addPayment(tripId: string, input: AddPaymentInput): Promis
     touchTrip(tx, tripId);
   });
 
-  return { id, from: input.from, to: input.to, amount: input.amount, date, note: input.note };
+  return {
+    id,
+    from: input.from,
+    to: input.to,
+    amount: input.amount,
+    currency: input.currency,
+    amountBase: input.amountBase,
+    rateAvailable: input.rateAvailable ?? true,
+    date,
+    note: input.note,
+  };
 }
 
 export async function deletePayment(tripId: string, paymentId: string): Promise<boolean> {
@@ -1276,88 +1297,6 @@ export function memberNameTaken(tripId: string, name: string, exceptId?: string)
 
 
 // ─── Exchange rates ──────────────────────────────────────────────────
-interface CachedRates {
-  timestamp: number;
-  base: string;
-  rates: Record<string, number>;
-}
-
-async function readCachedRates(): Promise<CachedRates | null> {
-  try {
-    return JSON.parse(await readFile(CACHE_FILE, "utf-8"));
-  } catch {
-    return null;
-  }
-}
-
-async function writeCachedRates(cache: CachedRates): Promise<void> {
-  if (!existsSync(DATA_DIR)) await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(CACHE_FILE, JSON.stringify(cache, null, 2));
-}
-
-export async function fetchExchangeRates(base: string = "EUR"): Promise<Record<string, number> | null> {
-  try {
-    const res = await fetch(`https://api.frankfurter.app/latest?from=${base}`, {
-      next: { revalidate: 3600 },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      await writeCachedRates({ timestamp: Date.now(), base, rates: data.rates });
-      return data.rates;
-    }
-  } catch {
-    // Falls through to the cache below.
-  }
-
-  const cached = await readCachedRates();
-  return cached && cached.base === base ? cached.rates : null;
-}
-
-/**
- * Converts between any two currencies.
- *
- * Rates are quoted against the euro, so anything else goes through it: pesos to euros,
- * euros to pounds. That is arithmetic on the way past, not a claim that euros are the
- * unit anything is stored in — a trip in pesos stores pesos.
- *
- * Throws when no rate is available rather than falling back to 1:1, which would quietly
- * corrupt everyone's balances.
- */
-export async function convertTo(
-  amount: number,
-  fromCurrency: string,
-  toCurrency: string
-): Promise<{ amount: number; rateUsed: boolean }> {
-  const round = (n: number) => Math.round(n * 100) / 100;
-  if (fromCurrency === toCurrency) return { amount: round(amount), rateUsed: true };
-
-  const rates = await fetchExchangeRates("EUR");
-  // The base of the table is not listed in it, so euros are added here rather than
-  // special-cased at every use.
-  const rate = (code: string) => (code === "EUR" ? 1 : rates?.[code]);
-
-  const from = rate(fromCurrency);
-  const to = rate(toCurrency);
-  if (from && to) return { amount: round((amount / from) * to), rateUsed: true };
-
-  throw new Error(`No exchange rate available for ${fromCurrency} → ${toCurrency}.`);
-}
-
-/** Display-only variant: returns null instead of throwing. */
-export async function convertToSafe(
-  amount: number,
-  fromCurrency: string,
-  toCurrency: string
-): Promise<{ amount: number; rateUsed: boolean } | null> {
-  try {
-    return await convertTo(amount, fromCurrency, toCurrency);
-  } catch {
-    return null;
-  }
-}
-
-
-
 /**
  * Finds an expense already written under a given client id.
  *

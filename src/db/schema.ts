@@ -272,7 +272,20 @@ export const payments = sqliteTable(
     toMember: text("to_member")
       .notNull()
       .references(() => members.id, { onDelete: "cascade" }),
+    /** Amount as entered, in `currency`. */
     amount: real("amount").notNull(),
+    /**
+     * The currency it was actually handed over in.
+     *
+     * A settle-up used to be assumed to be in the trip's currency, which is wrong the
+     * moment anybody pays a peso debt with a bank transfer in euros — the commonest way
+     * a trip ends. Splid supports exactly this and calls it out as a feature.
+     */
+    currency: text("currency").notNull().default("EUR"),
+    /** The same amount in the trip's currency; what the balances are computed from. */
+    amountBase: real("amount_base").notNull().default(0),
+    /** False when the rate used was approximate. Same meaning as on an expense. */
+    rateAvailable: integer("rate_available", { mode: "boolean" }).notNull().default(true),
     date: integer("date").notNull(),
     note: text("note"),
     /** Same idempotency guarantee as expenses. */

@@ -232,6 +232,19 @@ function migrate(sqlite: Database.Database) {
   addColumn(sqlite, "invites", "email", "TEXT");
   addColumn(sqlite, "expenses", "created_by", "TEXT REFERENCES users(id) ON DELETE SET NULL");
   addColumn(sqlite, "payments", "created_by", "TEXT REFERENCES users(id) ON DELETE SET NULL");
+  addColumn(sqlite, "payments", "currency", "TEXT");
+  addColumn(sqlite, "payments", "amount_base", "REAL");
+  addColumn(sqlite, "payments", "rate_available", "INTEGER NOT NULL DEFAULT 1");
+
+  // Every payment written before a settle-up could name its own currency was, by
+  // definition, in the trip's. Cheap, idempotent and self-limiting: it only ever touches
+  // rows that have not been given one.
+  sqlite.exec(
+    `UPDATE payments
+        SET currency = COALESCE(currency, (SELECT currency FROM trips WHERE trips.id = payments.trip_id)),
+            amount_base = COALESCE(amount_base, amount)
+      WHERE currency IS NULL OR amount_base IS NULL`
+  );
   sqlite.exec("CREATE INDEX IF NOT EXISTS trips_owner_idx ON trips(owner_id);");
 
   // Roles are gone: being in a trip is one fact now, not two with a permission attached.

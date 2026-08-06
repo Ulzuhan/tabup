@@ -142,6 +142,113 @@ async function main() {
   state = await read(euros.id);
   check("a euro trip is unchanged", state.totalExpenses, 100);
 
+  // ── The rate of the day it was spent ────────────────────────────────
+  //
+  // An expense carries a date and can be backdated. Converting last year's dinner at
+  // today's rate is a different number, and over a year the euro and the peso have
+  // certainly moved — which is what makes this assertable without pinning a figure.
+  console.log("\nThe rate of the day it happened");
+  const lastYear = new Date();
+  lastYear.setFullYear(lastYear.getFullYear() - 1);
+
+  const todayEuros = await spend(pesos.id, pesos.members[0], 100, "EUR");
+  const thenEuros = await spend(pesos.id, pesos.members[0], 100, "EUR", {
+    date: lastYear.getTime(),
+  });
+  const now = todayEuros.body.expense?.amountBase ?? todayEuros.body.amountBase;
+  const then = thenEuros.body.expense?.amountBase ?? thenEuros.body.amountBase;
+  check("the same amount on two different days", [typeof now, typeof then], ["number", "number"]);
+  check("converts to two different figures", now !== then, true);
+  check("both of them plausible pesos", now > 1000 && then > 1000, true);
+
+  const rates = await api("/api/rates");
+  check("the rates endpoint says when it last fetched", typeof rates.body.fetchedAt, "number");
+  check("and whether that is the real thing", rates.body.exact, true);
+
+  // ── An edit that touches no money touches no figure ─────────────────
+  //
+  // The guard used to be "did the request mention a currency", and the form mentions it
+  // on every save — so correcting a typo in the description of an old expense silently
+  // reconverted it at today's rate, moving its share of the trip and every balance with
+  // it. Rates barely move in the seconds this test takes, so what is pinned is the rule
+  // rather than a number: the stored figure must come back byte for byte.
+  console.log("\nEditing without touching the money");
+  const pinned = foreign.body.expense?.id ?? foreign.body.id;
+  const beforeEdit = (await read(pesos.id)).expenses.find((e) => e.id === pinned);
+  const renamed = await api(`/api/trips/${pesos.id}/expense`, {
+    method: "PATCH",
+    // Exactly the body the form sends: everything, including the unchanged currency.
+    body: JSON.stringify({
+      expenseId: pinned,
+      description: "Vuelo de ida",
+      amount: beforeEdit.amount,
+      currency: beforeEdit.currency,
+      paidBy: beforeEdit.paidBy,
+    }),
+  });
+  check("renaming an expense works", renamed.status, 200);
+  check("and leaves its converted amount alone", renamed.body.amountBase, beforeEdit.amountBase);
+  check(
+    "so the trip total does not move",
+    (await read(pesos.id)).totalExpenses,
+    (await read(pesos.id)).totalExpenses
+  );
+
+  const afterEdit = (await read(pesos.id)).expenses.find((e) => e.id === pinned);
+  check("nor the rate that was used", afterEdit.rateAvailable, beforeEdit.rateAvailable);
+  check("nor the exchange rate stored with it", afterEdit.amountBase, beforeEdit.amountBase);
+
+  // Changing the amount, on the other hand, must reconvert.
+  const repriced = await api(`/api/trips/${pesos.id}/expense`, {
+    method: "PATCH",
+    body: JSON.stringify({ expenseId: pinned, amount: 100, currency: "EUR" }),
+  });
+  check("changing the amount does reconvert", repriced.body.amountBase > beforeEdit.amountBase * 1.9, true);
+
+  // ── A settle-up can be handed over in any currency ───────────────────
+  //
+  // A peso debt cleared by a euro transfer is the commonest way a trip ends. It used to
+  // be recorded as if the number typed were pesos, which is off by a factor of sixty.
+  console.log("\nSettling up in another currency");
+  // Measured as the movement it causes rather than by rebuilding the whole ledger: the
+  // question is whether the balance shifts by the converted figure or by the typed one.
+  const owedBefore = (await read(pesos.id)).balances.find(
+    (b) => b.memberId === pesos.members[1]
+  ).balance;
+
+  const inEuros = await api(`/api/trips/${pesos.id}/payment`, {
+    method: "POST",
+    body: JSON.stringify({
+      from: pesos.members[1],
+      to: pesos.members[0],
+      amount: 10,
+      currency: "EUR",
+    }),
+  });
+  check("a payment in euros is accepted", inEuros.status, 200);
+  check("keeping the amount that changed hands", inEuros.body.amount, 10);
+  check("and converting it into pesos", inEuros.body.amountBase > 100, true);
+
+  const withPayment = await read(pesos.id);
+  const settled = withPayment.payments.find((p) => p.id === inEuros.body.id);
+  check("the trip carries both figures", [settled.currency, settled.amount], ["EUR", 10]);
+  const moved =
+    withPayment.balances.find((b) => b.memberId === pesos.members[1]).balance - owedBefore;
+  check(
+    "the balance moved by the converted amount, not the typed one",
+    Math.abs(moved - settled.amountBase) < 0.02,
+    true
+  );
+  check("which is nothing like the ten that was typed", moved > 100, true);
+
+  // A payment in the trip's own currency needs no rate at all.
+  const inPesos = await api(`/api/trips/${pesos.id}/payment`, {
+    method: "POST",
+    body: JSON.stringify({ from: pesos.members[1], to: pesos.members[0], amount: 25 }),
+  });
+  check("a payment in the trip's currency is untouched", inPesos.body.amountBase, 25);
+  check("and is marked exact", inPesos.body.rateAvailable, true);
+
   // ── Not a cent goes missing ─────────────────────────────────────────
   console.log("\nCents");
   const three = await trip("EUR", ["A", "B", "C"]);
