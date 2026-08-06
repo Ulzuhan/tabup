@@ -93,7 +93,8 @@ export async function POST(request: NextRequest) {
   // Redeemed after the account exists, so the invited person lands already inside.
   let joinedTripId: string | null = null;
   if (invite && typeof body.inviteToken === "string") {
-    joinedTripId = await redeemInvite(body.inviteToken, user.id);
+    const joined = await redeemInvite(body.inviteToken, user);
+    joinedTripId = joined?.tripId ?? null;
   }
 
   return NextResponse.json({ user: publicUser(user), tripId: joinedTripId });

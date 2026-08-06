@@ -39,13 +39,18 @@ export interface TripData {
   balances: EnrichedBalance[];
   settlements: EnrichedSettlement[];
   totalExpenses: number;
-  access: "viewer" | "editor" | "owner";
+  /**
+   * Owner or one of the people in it — there is no third thing.
+   *
+   * "viewer" and "editor" were a second answer to "who is in this trip", parallel to the
+   * member list and disagreeing with it: an editor could run the trip and still appear
+   * in nobody's balance. Now the two are one, and what anyone may do follows from it.
+   */
+  access: "member" | "owner";
   /** Which participant the reader is, when they have said. Null asks the question. */
   you: string | null;
   /** The participants still free to claim, offered only while `you` is null. */
   unclaimed: Member[];
-  /** Email only reaches the owner and each account's own row; see visibleCollaborators. */
-  collaborators: { id: string; email?: string; name: string; role: string }[];
 }
 
 /** An expense that is still sitting in the offline queue carries this. */

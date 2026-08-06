@@ -71,14 +71,29 @@ second set of rules nobody could keep straight (claiming, ownerless deletion, tr
 remembered only by one browser) and could not answer the obvious question of what
 happens when two people claim the same link.
 
-| Role | Read | Add and edit expenses | Delete, invite, reshare |
-| --- | --- | --- | --- |
-| **Owner** | yes | yes | yes |
-| **Editor** | yes | yes | no |
-| **Viewer** | yes | no | no |
+|  | Read | Add expenses and payments | Change one | Rename, budget, add or remove people, invite, delete |
+| --- | --- | --- | --- | --- |
+| **Owner** | yes | yes | any | yes |
+| **Member** | yes | yes | the ones they entered | no |
+
+There used to be a third row, and two of these used to be four. "Editor" and "viewer"
+answered a different question from the one anybody asks: being an editor said nothing
+about being in the split, so inviting a friend as one gave them the run of the trip while
+leaving them out of every balance in it — and the owner then had to add them a second
+time, by hand, as a name with no connection to their account. Two ideas of "who is in
+this trip", disagreeing with each other.
+
+There is one now. **A row in `trip_access` means a seat in `members`, and a seat linked to
+an account means a row in `trip_access`.** What anyone may do follows from the trip
+itself, so nothing is stored per person: the owner keeps the trip, everyone in it adds
+expenses, and each may change the ones they entered. `expenses.created_by` and
+`payments.created_by` are what that last rule reads; a row with no author — anything
+written before the column existed, or left behind by a deleted account — belongs to
+nobody and only the owner may touch it.
 
 A trip you may not see returns 404 rather than 403, so the endpoint cannot be used to
-probe which trip ids exist.
+probe which trip ids exist. An expense id from another trip gets the same 404, for the
+same reason.
 
 **Ids in a request body are checked against the trip in the URL.** Authorisation is per
 trip, and an expense id, a payment id or a member id all arrive in the body — so
@@ -109,21 +124,39 @@ Whoever creates a trip is its first member, so a trip of one is normal — you i
 rest, and there is no minimum. Requiring two names up front was backwards: at the moment
 of creating a trip you do not yet know what the second person will be called.
 
-### Which one are you?
+### Joining a trip
 
-Somebody who can open a trip but is in nobody's split is asked which participant they
-are, with the free members offered and "none of these, add me" as the way out. It is
-asked rather than guessed, because matching "Andoni" to an account by spelling would be
-a guess about money — and it is also how every trip made before any of this gets its
-members attached to real people, since all of theirs are bare text.
+Accepting an invitation puts you in the split. Which of two things happens depends on
+whether the trip still holds names somebody typed before you arrived:
+
+- **Nothing free to claim** — you are seated on the way in, under your account's name,
+  and never see a question.
+- **Free members exist** — one of them may well be you, and matching "Andoni" to an
+  account by spelling would be a guess about money, so the trip asks: the free names are
+  offered, and "none of these, I am new" lets you join as yourself under a name you type.
+  This is also how every trip made before any of this gets its members attached to real
+  people, since all of theirs are bare text.
+
+A link made for one address in particular is different again: it seats that person in the
+seat kept for them, and that seat is offered to nobody else while the link is live.
 
 A member's name is a per-trip **alias**: the same account is "Andoni" among friends and
 "Papá" in the family trip, and neither is a lie about who they are. Your own name is
-yours to change; the owner labels the free members, since somebody typed those in.
+yours to change — it is the one thing in the trip settings that is not the owner's — and
+the owner labels the free members, since somebody typed those in.
 
-Removing a member takes their expenses and payments with them, which is why a *linked*
-member can only be removed by the owner. Revoking somebody's access does not remove
-them from the split — being uninvited is not a statement that they were never there.
+### Taking somebody out
+
+One action, two outcomes, chosen by what the seat is rather than by a flag:
+
+- **Somebody with an account** loses their access and their seat is unlinked. The column
+  and every figure in it stay exactly where they were: "they have left the trip" is not a
+  statement that their half of the taxi never happened.
+- **A free member** is deleted, and the cascade takes the expenses they paid for, the
+  payments they were part of and their share of everyone else's.
+
+So removing a linked person twice does both, deliberately as two decisions. The owner's
+own seat is refused: a trip whose owner is not in it has nobody who could put them back.
 
 ### Invitations
 
@@ -139,6 +172,11 @@ register**, which is what makes this work on a closed instance.
 Invitations last 7 days and are not single-use — a trip link gets forwarded around a
 group, and a one-shot invite would work for whoever tapped first and leave everyone
 else with an error they could not explain. Only the owner can create them.
+
+They no longer carry a role, because there is none to carry: whoever opens one joins the
+trip. A QR code looks identical whether it hands over the trip or not, and the version
+that only granted access was the one that left people running a trip they appeared
+nowhere in.
 
 An invitation made by adding somebody by email carries the member it was made for, so
 accepting it seats that person. A plain invitation carries no member, and whoever
@@ -378,9 +416,9 @@ success.
   hour would lock out the people using it properly.
 - **Ids in request bodies** are checked against the trip in the URL, so write access to
   one trip cannot be pointed at another trip's rows. See [Access model](#access-model).
-- **Email addresses**: the collaborator list only carries them for the owner, plus your
-  own row. Sharing a trip with somebody is not the same as handing every guest the
-  address of everyone else on it.
+- **Email addresses**: only the owner is sent them, and only for the seats that have an
+  account behind them. They typed those addresses in order to invite people; putting
+  somebody in a trip is not the same as handing everyone else in it their address.
 - **Enumeration**: a trip you cannot see returns 404, not 403. Failed logins do not say
   which half was wrong, and a login attempt against a non-existent account still runs a
   hash so the response time does not give it away.

@@ -1,6 +1,6 @@
 "use client";
 
-import { CloudOff, Eye } from "lucide-react";
+import { CloudOff } from "lucide-react";
 import type { Balance, Member } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { CategoryIcon, categoryTint, useCategoryName } from "@/components/category-icon";
@@ -81,16 +81,6 @@ export function TripTotal({
         )}
       </CardContent>
     </Card>
-  );
-}
-
-export function ReadOnlyNotice() {
-  const t = useT();
-  return (
-    <div className="mb-4 flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-muted-foreground">
-      <Eye className="size-4 shrink-0" />
-      {t("trip.readOnly")}
-    </div>
   );
 }
 

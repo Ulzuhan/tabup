@@ -2,7 +2,9 @@ import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { join } from "path";
 import { mkdirSync } from "fs";
+import { randomBytes } from "crypto";
 import * as schema from "./schema";
+import { EMOJIS } from "../lib/types";
 
 /**
  * Database connection.
@@ -124,7 +126,6 @@ function migrate(sqlite: Database.Database) {
     CREATE TABLE IF NOT EXISTS trip_access (
       trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      role TEXT NOT NULL DEFAULT 'editor',
       created_at INTEGER NOT NULL,
       PRIMARY KEY (trip_id, user_id)
     );
@@ -133,7 +134,6 @@ function migrate(sqlite: Database.Database) {
     CREATE TABLE IF NOT EXISTS invites (
       token TEXT PRIMARY KEY,
       trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
-      role TEXT NOT NULL DEFAULT 'editor',
       created_at INTEGER NOT NULL,
       expires_at INTEGER NOT NULL
     );
@@ -183,7 +183,15 @@ function migrate(sqlite: Database.Database) {
   addColumn(sqlite, "payments", "client_id", "TEXT");
   addColumn(sqlite, "members", "user_id", "TEXT REFERENCES users(id) ON DELETE SET NULL");
   addColumn(sqlite, "invites", "member_id", "TEXT REFERENCES members(id) ON DELETE SET NULL");
+  addColumn(sqlite, "expenses", "created_by", "TEXT REFERENCES users(id) ON DELETE SET NULL");
+  addColumn(sqlite, "payments", "created_by", "TEXT REFERENCES users(id) ON DELETE SET NULL");
   sqlite.exec("CREATE INDEX IF NOT EXISTS trips_owner_idx ON trips(owner_id);");
+
+  // Roles are gone: being in a trip is one fact now, not two with a permission attached.
+  // Dropped rather than ignored — a column called `role` that nothing reads is an
+  // invitation for the next person to trust it.
+  dropColumn(sqlite, "trip_access", "role");
+  dropColumn(sqlite, "invites", "role");
 
   // One account is at most one participant per trip. Partial, because unlinked members
   // are the common case and SQLite would otherwise treat them as colliding on NULL.
@@ -203,6 +211,7 @@ function migrate(sqlite: Database.Database) {
   adoptOrphanTrips(sqlite);
   seedFirstAdmin(sqlite);
   rebaseAmountsToTripCurrency(sqlite);
+  reconcileAccessAndSeats(sqlite);
 
   // Sessions and invitations are cheap to clear and there is no other moment that
   // reliably runs.
@@ -318,11 +327,100 @@ function rebaseAmountsToTripCurrency(sqlite: Database.Database) {
   sqlite.exec("ALTER TABLE expenses DROP COLUMN amount_eur");
 }
 
+/**
+ * Being in a trip is one fact, applied to the trips that predate the rule.
+ *
+ * Access and a seat in the split used to be independent: a trip could let somebody in
+ * without them appearing in the arithmetic, and could seat an account that could not
+ * open the trip. Both halves are repaired here so nobody has to notice the change.
+ *
+ * The one case deliberately left alone is a trip that still has unlinked members: one
+ * of those typed names may well *be* the person waiting, and joining them to a new seat
+ * would split one participant into two columns and quietly rewrite what they owe. Those
+ * are asked instead, by the same prompt that has always asked.
+ */
+function reconcileAccessAndSeats(sqlite: Database.Database) {
+  // Seated and linked, but never let in: under the old rules, adding somebody by email
+  // and granting them access were separate acts, and only one of them had happened.
+  const letIn = sqlite
+    .prepare(
+      `INSERT OR IGNORE INTO trip_access (trip_id, user_id, created_at)
+         SELECT m.trip_id, m.user_id, ?
+           FROM members m
+           JOIN trips t ON t.id = m.trip_id
+          WHERE m.user_id IS NOT NULL
+            AND m.user_id <> COALESCE(t.owner_id, '')`
+    )
+    .run(Date.now());
+
+  // Let in, but in nobody's split — the shape the old editor role always produced.
+  const unseated = sqlite
+    .prepare(
+      `SELECT a.trip_id AS tripId, a.user_id AS userId, u.name AS name
+         FROM trip_access a
+         JOIN users u ON u.id = a.user_id
+        WHERE NOT EXISTS (
+                SELECT 1 FROM members m
+                 WHERE m.trip_id = a.trip_id AND m.user_id = a.user_id)`
+    )
+    .all() as { tripId: string; userId: string; name: string }[];
+
+  const hasFreeMember = sqlite.prepare(
+    "SELECT 1 FROM members WHERE trip_id = ? AND user_id IS NULL LIMIT 1"
+  );
+  const seatCount = sqlite.prepare("SELECT COUNT(*) AS count FROM members WHERE trip_id = ?");
+  const nameTaken = sqlite.prepare(
+    "SELECT 1 FROM members WHERE trip_id = ? AND lower(name) = lower(?) LIMIT 1"
+  );
+  const nextPosition = sqlite.prepare(
+    "SELECT COALESCE(MAX(position), -1) + 1 AS next FROM members WHERE trip_id = ?"
+  );
+  const insertMember = sqlite.prepare(
+    "INSERT INTO members (id, trip_id, name, emoji, position, user_id) VALUES (?, ?, ?, ?, ?, ?)"
+  );
+
+  let seated = 0;
+  let asked = 0;
+  for (const row of unseated) {
+    if (hasFreeMember.get(row.tripId)) {
+      asked++;
+      continue;
+    }
+    const { count } = seatCount.get(row.tripId) as { count: number };
+    let name = row.name.slice(0, 50);
+    for (let n = 2; nameTaken.get(row.tripId, name); n++) name = `${row.name.slice(0, 46)} ${n}`;
+    const { next } = nextPosition.get(row.tripId) as { next: number };
+    insertMember.run(
+      randomBytes(16).toString("hex"),
+      row.tripId,
+      name,
+      EMOJIS[count % EMOJIS.length],
+      next,
+      row.userId
+    );
+    seated++;
+  }
+
+  if (letIn.changes > 0 || seated > 0 || asked > 0) {
+    console.log(
+      `Access and seats reconciled: ${letIn.changes} granted access, ${seated} seated, ` +
+        `${asked} left for the trip to ask about.`
+    );
+  }
+}
+
 /** ALTER TABLE ADD COLUMN is not idempotent, so check the table shape first. */
 function addColumn(sqlite: Database.Database, table: string, column: string, definition: string) {
   const columns = sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
   if (columns.some((c) => c.name === column)) return;
   sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+
+/** The same, in reverse: dropping a column that is not there is an error. */
+function dropColumn(sqlite: Database.Database, table: string, column: string) {
+  const columns = sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!columns.some((c) => c.name === column)) return;
+  sqlite.exec(`ALTER TABLE ${table} DROP COLUMN ${column}`);
 }
 
 export const db = globalThis.__tabup_db__ ?? create();

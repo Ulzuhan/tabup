@@ -9,10 +9,10 @@
  *
  * The first is isolation. Every id below arrives in a request *body*, while the
  * authorisation comes from the *URL* — so write access to any one trip used to be write
- * access to any row in the database whose id you knew, and a read-only guest is handed
- * the ids of everything they can see. A viewer could delete another trip's expenses,
- * its payments, and its members, taking their whole history with them, by routing the
- * call through a trip of their own.
+ * access to any row in the database whose id you knew, and everybody in a trip is handed
+ * the ids of everything in it. One person could delete another trip's expenses, its
+ * payments, and its members, taking their whole history with them, by routing the call
+ * through a trip of their own.
  *
  * The second is identity. A member was a line of text with no connection to any
  * account, so the app could not tell that the column called "Andoni" was the person
@@ -167,20 +167,27 @@ async function main() {
   const daveSees = await dave(`/api/trips/${tripId}`);
   const seat = pending.body.members.find((m) => m.name === stranger.split("@")[0]);
   check("and lands in the seat that was waiting", daveSees.body.you, seat.id);
+  // The seat was labelled from the address, because that was all anybody knew. Once
+  // there is an account behind it, "nobody-a1b2c3d4" stops being anyone's name.
+  check(
+    "which stops being labelled with their address",
+    daveSees.body.members.find((m) => m.id === seat.id).name,
+    "Dave"
+  );
 
   // ── Claiming ───────────────────────────────────────────────────────
   console.log("\nA guest says which participant they are");
   const erin = client();
   const erinReg = await register(erin, "Erin");
   assertNotThrottled(erinReg);
-  await alice(`/api/trips/${tripId}/share`, {
-    method: "POST",
-    body: JSON.stringify({ email: erinReg.body.user.email, role: "viewer" }),
+  await alice(`/api/trips/${tripId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ addByEmail: erinReg.body.user.email }),
   });
 
-  // Sharing seats them under their own name, so they have nothing to claim.
+  // Adding an address seats them under their own name, so they have nothing to claim.
   const erinSees = await erin(`/api/trips/${tripId}`);
-  check("sharing seats them too", erinSees.body.you != null, true);
+  check("being added by email seats them too", erinSees.body.you != null, true);
 
   // Carla was typed by hand and belongs to nobody, which is what a claim is for.
   const frank = client();
@@ -203,6 +210,15 @@ async function main() {
     body: JSON.stringify({ memberId: carla.id }),
   });
   check("claiming works", claimed.body.member?.id, carla.id);
+
+  // Frank took the only free name, and a trip with nothing free seats whoever joins it
+  // on the way in — so the question below could not be reached at all without one. That
+  // is the rule working, not an accident: being asked is what happens when there is
+  // something to ask about.
+  await alice(`/api/trips/${tripId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ addMembers: ["Libre"] }),
+  });
 
   const grace = client();
   const graceReg = await register(grace, "Grace");
@@ -272,31 +288,43 @@ async function main() {
   check("while the invited person lands in it", seated.body.you, reservedSeat.id);
 
   // ── Removing ───────────────────────────────────────────────────────
-  console.log("\nRemoving somebody who has an account");
+  //
+  // Two different acts behind one button, chosen by what the seat is. Somebody with an
+  // account steps out and their figures stay; a name typed by hand is deleted outright,
+  // and its expenses go with it.
+  console.log("\nTaking somebody out of a trip");
   const bobMember = invited.body.members.find((m) => m.name === "Bob");
   const bobTriesToRemove = await bob(`/api/trips/${tripId}`, {
     method: "PATCH",
     body: JSON.stringify({ removeMembers: [bobMember.id] }),
   });
-  check("an editor cannot remove a linked member", bobTriesToRemove.status, 403);
+  check("only the owner may take anybody out", bobTriesToRemove.status, 403);
 
   const ownerRemoves = await alice(`/api/trips/${tripId}`, {
     method: "PATCH",
     body: JSON.stringify({ removeMembers: [bobMember.id] }),
   });
   check("the owner can", ownerRemoves.status, 200);
-  check("and they are gone", ownerRemoves.body.members.some((m) => m.name === "Bob"), false);
+  check("somebody with an account keeps their column", ownerRemoves.body.members.some((m) => m.id === bobMember.id), true);
+  check("with the account let go of it", ownerRemoves.body.members.find((m) => m.id === bobMember.id).userId ?? null, null);
+  check("and loses their access", (await bob(`/api/trips/${tripId}`)).status, 404);
+
+  const ownerRemovesAgain = await alice(`/api/trips/${tripId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ removeMembers: [bobMember.id] }),
+  });
+  check("a second time deletes the seat itself", ownerRemovesAgain.body.members.some((m) => m.id === bobMember.id), false);
 
   // ── Isolation between trips ────────────────────────────────────────
   //
-  // The whole point: Frank can only *read* this trip, and holds write access on a trip
-  // of his own. Every id he needs is in the response he is allowed to see.
+  // The whole point: Frank is in this trip and owns another. Every id he needs is in a
+  // response he is entitled to see, and none of them may be spent on the wrong trip.
   console.log("\nWrite access to one trip is not write access to another");
-  const viewerTrip = await frank("/api/trips", {
+  const frankTrip = await frank("/api/trips", {
     method: "POST",
     body: JSON.stringify({ name: "Frank's own", currency: "EUR" }),
   });
-  const own = viewerTrip.body.id;
+  const own = frankTrip.body.id;
 
   const before = await alice(`/api/trips/${tripId}`);
   const targetExpense = await alice(`/api/trips/${tripId}/expense`, {
@@ -351,15 +379,14 @@ async function main() {
   const asGuest = await frank(`/api/trips/${tripId}`);
   check(
     "the owner sees the addresses they typed",
-    asOwner.body.collaborators.every((c) => typeof c.email === "string"),
+    asOwner.body.members.filter((m) => m.userId).every((m) => typeof m.accountEmail === "string"),
     true
   );
   check(
-    "a guest sees only their own",
-    asGuest.body.collaborators.filter((c) => c.email).length,
-    1
+    "and nobody else sees any of them",
+    asGuest.body.members.some((m) => m.accountEmail),
+    false
   );
-  check("which is theirs", asGuest.body.collaborators.find((c) => c.email)?.email, frankReg.body.user.email);
 
   // Alice's own trip is untouched by any of this.
   const stillOwner = await alice(`/api/trips/${solo.body.id}`);

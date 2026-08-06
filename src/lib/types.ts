@@ -29,6 +29,11 @@ export interface Member {
   userId?: string | null;
   /** The account's own name, when linked. Shown next to a per-trip alias that differs. */
   accountName?: string;
+  /**
+   * The account's address. Only ever sent to the trip's owner, who typed it in order to
+   * invite them; see `memberEmails`.
+   */
+  accountEmail?: string;
 }
 
 export interface Expense {
@@ -46,6 +51,15 @@ export interface Expense {
   rateAvailable?: boolean; // false if no live/cached rate was found
   note?: string; // free text, for what the description has no room for
   receipt?: string; // filename of the attached receipt photo
+  /**
+   * Whether the reader may change this one.
+   *
+   * Attached per reader by the API rather than stored: everyone in a trip adds
+   * expenses, each answers for the ones they added, and the owner can fix any of them.
+   * Absent on an expense that has not been through the API — one still sitting in the
+   * offline queue, for instance, which is by definition the reader's own.
+   */
+  mine?: boolean;
 }
 
 export interface Payment {
@@ -55,6 +69,8 @@ export interface Payment {
   amount: number; // in trip's default currency
   date: number;
   note?: string;
+  /** Whether the reader may undo it; see `Expense.mine`. */
+  mine?: boolean;
 }
 
 export interface Settlement {

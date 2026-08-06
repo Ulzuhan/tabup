@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addMember, claimMember, memberForUser, unlinkedMembers } from "@/lib/store";
+import { claimMember, memberForUser, seatUser, unlinkedMembers } from "@/lib/store";
 import { authorizeTrip } from "@/lib/authorize";
-import { EMOJIS } from "@/lib/types";
-import { getTrip } from "@/lib/store";
 import { logError } from "@/lib/errors";
 
 /**
@@ -44,7 +42,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     return NextResponse.json({ error: "Sign in first" }, { status: 401 });
   }
 
-  let body: { memberId?: string; create?: boolean };
+  let body: { memberId?: string; create?: boolean; name?: string };
   try {
     body = await request.json();
   } catch {
@@ -57,22 +55,11 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
   try {
     if (body.create) {
-      const trip = await getTrip(id);
-      if (!trip) return NextResponse.json({ error: "Trip not found" }, { status: 404 });
-
-      // Nobody on the list is them, so they join as themselves. The name is theirs to
-      // change afterwards; what matters is that the column belongs to an account.
-      let name = auth.user.name.slice(0, 50);
-      const taken = (n: string) =>
-        trip.members.some((m) => m.name.trim().toLowerCase() === n.trim().toLowerCase());
-      for (let n = 2; taken(name); n++) name = `${auth.user.name.slice(0, 46)} ${n}`;
-
-      const member = await addMember(
-        id,
-        name,
-        EMOJIS[trip.members.length % EMOJIS.length],
-        auth.user.id
-      );
+      // Nobody on the list is them, so they join as themselves — under the name they
+      // chose for this trip, or their account's if they did not bother. Either way the
+      // column belongs to an account, which is the part that matters.
+      const alias = typeof body.name === "string" ? body.name.trim().slice(0, 50) : "";
+      const member = await seatUser(id, { id: auth.user.id, name: alias || auth.user.name });
       if (!member) return NextResponse.json({ error: "Could not add you" }, { status: 500 });
       return NextResponse.json({ member });
     }

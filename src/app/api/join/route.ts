@@ -13,7 +13,6 @@ export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
   return NextResponse.json({
     tripName: invite.tripName,
-    role: invite.role,
     signedIn: Boolean(user),
     userName: user?.name ?? null,
     // Set when the link was made for one person: the page can say which seat is
@@ -36,10 +35,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const tripId = await redeemInvite(token, user.id);
-  if (!tripId) {
+  const joined = await redeemInvite(token, user);
+  if (!joined) {
     return NextResponse.json({ error: "expired" }, { status: 404 });
   }
 
-  return NextResponse.json({ tripId });
+  // `memberId` is null only when the trip still holds names typed before they arrived
+  // and one of them may be theirs; the trip screen asks. Otherwise they are already in.
+  return NextResponse.json(joined);
 }

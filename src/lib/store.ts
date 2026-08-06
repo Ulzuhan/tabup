@@ -180,16 +180,25 @@ export async function listTrips(userId: string): Promise<
 
 // ─── Ownership and access ────────────────────────────────────────────
 
-export type Access = "none" | "viewer" | "editor" | "owner";
+export type Access = "none" | "member" | "owner";
 
 /**
  * What a given visitor may do with a trip.
  *
+ * Two levels, because there are two honest answers. The owner keeps the trip itself —
+ * its name, its budget, who is in it, who may come in, whether it goes on existing.
+ * Everyone else in it keeps their own share of the record: they add expenses and
+ * payments, and may change the ones they entered.
+ *
+ * There were four, with "editor" and "viewer" in between, and they answered a different
+ * question from the one anybody actually asks. Being an editor said nothing about being
+ * in the split, so inviting a friend as one gave them the run of the trip while leaving
+ * them out of every balance in it, and the owner then had to add them a second time, by
+ * hand, as a name with no connection to their account. Two ideas of "who is in this
+ * trip", disagreeing.
+ *
  * Every trip belongs to an account. There is no anonymous mode: holding a link is not
- * access, and someone who has been given one joins through an invitation instead. That
- * removed a whole second set of rules — claiming, ownerless deletion, trips remembered
- * only by one browser — and with it the questions they raised, like what happens when
- * two people claim the same link.
+ * access, and someone who has been given one joins through an invitation instead.
  */
 export function accessLevel(tripId: string, userId?: string): Access {
   if (!userId) return "none";
@@ -203,30 +212,31 @@ export function accessLevel(tripId: string, userId?: string): Access {
   if (trip.ownerId === userId) return "owner";
 
   const grant = db
-    .select({ role: tripAccess.role })
+    .select({ userId: tripAccess.userId })
     .from(tripAccess)
     .where(and(eq(tripAccess.tripId, tripId), eq(tripAccess.userId, userId)))
     .get();
-  if (!grant) return "none";
-  return grant.role === "viewer" ? "viewer" : "editor";
+  return grant ? "member" : "none";
 }
 
 export const canRead = (level: Access) => level !== "none";
-export const canWrite = (level: Access) => level === "editor" || level === "owner";
 
-/** Gives another account access to an owned trip. Idempotent. */
-export async function grantAccess(
-  tripId: string,
-  userId: string,
-  role: "viewer" | "editor" = "editor"
-): Promise<boolean> {
+/**
+ * Whether they may add to the trip.
+ *
+ * The same answer as reading it, and deliberately so: everybody in a trip is one of the
+ * people its bills are split between, and a participant who cannot enter what they paid
+ * is not one. Changing something that is already there is a different question, asked
+ * per row rather than per person — see `authorRule`.
+ */
+export const canWrite = (level: Access) => level !== "none";
+
+/** Lets another account into a trip. Idempotent. */
+export async function grantAccess(tripId: string, userId: string): Promise<boolean> {
   try {
     db.insert(tripAccess)
-      .values({ tripId, userId, role, createdAt: Date.now() })
-      .onConflictDoUpdate({
-        target: [tripAccess.tripId, tripAccess.userId],
-        set: { role },
-      })
+      .values({ tripId, userId, createdAt: Date.now() })
+      .onConflictDoNothing({ target: [tripAccess.tripId, tripAccess.userId] })
       .run();
     return true;
   } catch {
@@ -234,56 +244,26 @@ export async function grantAccess(
   }
 }
 
-export async function revokeAccess(tripId: string, userId: string): Promise<boolean> {
-  const result = db
-    .delete(tripAccess)
-    .where(and(eq(tripAccess.tripId, tripId), eq(tripAccess.userId, userId)))
-    .run();
-  return result.changes > 0;
-}
-
-/** Everyone who can open an owned trip, the owner included. */
-export function listCollaborators(
-  tripId: string
-): { id: string; email: string; name: string; role: Access }[] {
-  const trip = db.select({ ownerId: trips.ownerId }).from(trips).where(eq(trips.id, tripId)).get();
-  if (!trip?.ownerId) return [];
-
-  const result: { id: string; email: string; name: string; role: Access }[] = [];
-  const owner = db.select().from(users).where(eq(users.id, trip.ownerId)).get();
-  if (owner) result.push({ id: owner.id, email: owner.email, name: owner.name, role: "owner" });
-
-  const grants = db.select().from(tripAccess).where(eq(tripAccess.tripId, tripId)).all();
-  for (const g of grants) {
-    const u = db.select().from(users).where(eq(users.id, g.userId)).get();
-    if (u) {
-      result.push({
-        id: u.id,
-        email: u.email,
-        name: u.name,
-        role: g.role === "viewer" ? "viewer" : "editor",
-      });
-    }
-  }
-  return result;
-}
-
 /**
- * The collaborator list as a given reader is allowed to see it.
+ * The address behind each seat that has an account, keyed by member id.
  *
- * Email addresses belong to the owner, who typed them in order to share the trip.
- * Handing every guest the address of everyone else on it is a different act from
- * sharing a trip, and nothing on screen needs them: the list shows a name and a role.
- * The owner keeps the full view, and everyone can see their own.
+ * For the owner only, and asked for separately rather than carried on the trip: an email
+ * address is what the owner typed in order to invite somebody, and handing every guest
+ * the address of everyone else at the table is a different act from splitting a bill
+ * with them. Nothing else on screen needs it — a name and "has an account" is what the
+ * list shows.
+ *
+ * This used to be a whole parallel list of "collaborators", which is what made the trip
+ * appear to have two sets of people in it. There is one set; this is a detail of it.
  */
-export function visibleCollaborators(
-  tripId: string,
-  viewer: { id?: string; isOwner: boolean }
-): { id: string; email?: string; name: string; role: Access }[] {
-  return listCollaborators(tripId).map((c) => ({
-    ...c,
-    email: viewer.isOwner || c.id === viewer.id ? c.email : undefined,
-  }));
+export function memberEmails(tripId: string): Record<string, string> {
+  const rows = db
+    .select({ memberId: members.id, email: users.email })
+    .from(members)
+    .innerJoin(users, eq(members.userId, users.id))
+    .where(eq(members.tripId, tripId))
+    .all();
+  return Object.fromEntries(rows.map((r) => [r.memberId, r.email]));
 }
 
 /** How many trips an account owns; the free plan is capped on this. */
@@ -353,6 +333,59 @@ function belongsToTrip(
       .where(and(eq(table.id, rowId), eq(table.tripId, tripId)))
       .get()
   );
+}
+
+export type AuthorCheck = "ok" | "missing" | "forbidden";
+
+/**
+ * Whether this caller may change a row that somebody else may have written.
+ *
+ * Everyone in a trip can add expenses, and each answers for what they added. The owner
+ * can change anything, because it is their trip and somebody has to be able to fix a
+ * figure left behind by a person who has gone.
+ *
+ * A row with no author — everything written before this was recorded, and anything left
+ * by a deleted account — belongs to nobody, so only the owner may touch it. Guessing
+ * would mean handing a stranger's expense to whoever asked.
+ *
+ * "missing" rather than "forbidden" when the row is not in this trip: authorisation is
+ * per trip and the id arrives in a request body, so an id from somewhere else must look
+ * exactly like an id that does not exist.
+ */
+export function authorRule(
+  kind: "expense" | "payment",
+  rowId: string,
+  tripId: string,
+  caller: { id?: string; isOwner: boolean }
+): AuthorCheck {
+  if (!isValidId(tripId) || !isValidId(rowId)) return "missing";
+
+  const table = kind === "expense" ? expenses : payments;
+  const row = db
+    .select({ createdBy: table.createdBy })
+    .from(table)
+    .where(and(eq(table.id, rowId), eq(table.tripId, tripId)))
+    .get();
+  if (!row) return "missing";
+  if (caller.isOwner) return "ok";
+  return row.createdBy && row.createdBy === caller.id ? "ok" : "forbidden";
+}
+
+/** Which rows of a trip one account wrote, so the UI can offer editing only on those. */
+export function authoredBy(
+  tripId: string,
+  userId: string
+): { expenses: Set<string>; payments: Set<string> } {
+  const mineIn = <T extends typeof expenses | typeof payments>(table: T) =>
+    new Set(
+      db
+        .select({ id: table.id })
+        .from(table)
+        .where(and(eq(table.tripId, tripId), eq(table.createdBy, userId)))
+        .all()
+        .map((r) => r.id as string)
+    );
+  return { expenses: mineIn(expenses), payments: mineIn(payments) };
 }
 
 export interface CreateTripInput {
@@ -448,6 +481,8 @@ export interface AddExpenseInput {
   receipt?: string;
   /** Idempotency key from the client; see the schema for why. */
   clientId?: string;
+  /** The account entering it, which is who may edit it afterwards. */
+  createdBy?: string;
 }
 
 /**
@@ -489,6 +524,7 @@ export async function addExpense(tripId: string, input: AddExpenseInput): Promis
         note: input.note ?? null,
         receipt: input.receipt ?? null,
         clientId: input.clientId ?? null,
+        createdBy: input.createdBy ?? null,
       })
       .run();
 
@@ -579,6 +615,8 @@ export interface AddPaymentInput {
   amount: number;
   date?: number;
   note?: string;
+  /** The account recording it, which is who may undo it afterwards. */
+  createdBy?: string;
 }
 
 export async function addPayment(tripId: string, input: AddPaymentInput): Promise<Payment | null> {
@@ -616,6 +654,7 @@ export async function addPayment(tripId: string, input: AddPaymentInput): Promis
         date,
         note: input.note ?? null,
         clientId: input.clientId ?? null,
+        createdBy: input.createdBy ?? null,
       })
       .run();
     touchTrip(tx, tripId);
@@ -635,28 +674,36 @@ export async function deletePayment(tripId: string, paymentId: string): Promise<
 }
 
 /**
- * Removes members from a trip.
+ * Takes somebody out of a trip. The owner's alone to do.
  *
- * Cascades handle the rest: expenses they paid for, payments they took part in, and
- * their share rows all go with them. Note this is better than the previous
- * behaviour, which left dangling member ids inside other people's splits — those
- * expenses now simply get shared among whoever is left.
+ * Two different acts, chosen by what the seat is rather than by a flag on the request:
+ *
+ *   A free member is a label on a column of arithmetic, so it goes, and the cascade
+ *   takes with it the expenses they paid for, the payments they were part of and their
+ *   share of everyone else's.
+ *
+ *   Somebody with an account is a person, and the trip holds a record of their money.
+ *   Removing them ends their part in it — access revoked, seat unlinked — and leaves the
+ *   column and every figure in it exactly where it was. Doing it again, now that it is a
+ *   free member, deletes it with the same warning as any other. "They have left the
+ *   trip" is not a statement that their half of the taxi never happened, and the
+ *   destructive reading of it is not one to take on a single tap.
+ *
+ * The owner's own seat is refused: a trip whose owner is not in it has nobody who can
+ * put them back.
  */
 export async function removeMembers(
   tripId: string,
-  memberIds: string[],
-  /**
-   * Whether members tied to an account may go.
-   *
-   * A free member is a label on a column of arithmetic and anyone who can write may
-   * remove it. One tied to an account is a person who can open the trip, and removing
-   * them takes their expenses with it — so that is the owner's call alone.
-   */
-  options: { allowLinked?: boolean } = {}
-): Promise<{ removed: number; refused: number }> {
-  if (!isValidId(tripId) || memberIds.length === 0) return { removed: 0, refused: 0 };
+  memberIds: string[]
+): Promise<{ removed: number; released: number; refused: number }> {
+  const empty = { removed: 0, released: 0, refused: 0 };
+  if (!isValidId(tripId) || memberIds.length === 0) return empty;
+
+  const trip = db.select({ ownerId: trips.ownerId }).from(trips).where(eq(trips.id, tripId)).get();
+  if (!trip) return empty;
 
   let removed = 0;
+  let released = 0;
   let refused = 0;
   db.transaction((tx) => {
     for (const memberId of memberIds) {
@@ -666,16 +713,26 @@ export async function removeMembers(
       const scope = and(eq(members.id, memberId), eq(members.tripId, tripId));
       const row = tx.select({ userId: members.userId }).from(members).where(scope).get();
       if (!row) continue;
-      if (row.userId && !options.allowLinked) {
+
+      if (row.userId && row.userId === trip.ownerId) {
         refused++;
+        continue;
+      }
+
+      if (row.userId) {
+        tx.update(members).set({ userId: null }).where(scope).run();
+        tx.delete(tripAccess)
+          .where(and(eq(tripAccess.tripId, tripId), eq(tripAccess.userId, row.userId)))
+          .run();
+        released++;
         continue;
       }
 
       removed += tx.delete(members).where(scope).run().changes;
     }
-    if (removed > 0) touchTrip(tx, tripId);
+    if (removed > 0 || released > 0) touchTrip(tx, tripId);
   });
-  return { removed, refused };
+  return { removed, released, refused };
 }
 
 export async function addMember(
@@ -693,6 +750,39 @@ export async function addMember(
     .run();
   touchTrip(db, tripId);
   return { id, name, emoji, userId };
+}
+
+/**
+ * Gives an account its own place in a trip.
+ *
+ * What happens whenever somebody joins and there is nothing of theirs to claim: an
+ * invitation accepted, an address added by the owner. Their account name is the starting
+ * point and the alias is theirs to change afterwards — the seat is the thing that has to
+ * exist, because a person in a trip who is in nobody's split is the shape this whole
+ * model was built to get rid of.
+ *
+ * Idempotent: joining twice, or from two devices, still means one column.
+ */
+export async function seatUser(
+  tripId: string,
+  user: { id: string; name: string }
+): Promise<Member | null> {
+  if (!isValidId(tripId)) return null;
+
+  const existing = memberForUser(tripId, user.id);
+  if (existing) return existing;
+
+  const count = db
+    .select({ id: members.id })
+    .from(members)
+    .where(eq(members.tripId, tripId))
+    .all().length;
+
+  const base = user.name.trim().slice(0, 50) || "?";
+  let name = base;
+  for (let n = 2; memberNameTaken(tripId, name); n++) name = `${base.slice(0, 46)} ${n}`;
+
+  return addMember(tripId, name, EMOJIS[count % EMOJIS.length], user.id);
 }
 
 // ─── Members and accounts ────────────────────────────────────────────
@@ -961,7 +1051,6 @@ const INVITE_DAYS = 7;
  */
 export async function createInvite(
   tripId: string,
-  role: "viewer" | "editor" = "editor",
   /**
    * The participant this link is for, when it was made by inviting somebody by email.
    *
@@ -979,7 +1068,7 @@ export async function createInvite(
   const expiresAt = now + INVITE_DAYS * 24 * 60 * 60 * 1000;
 
   db.insert(invites)
-    .values({ token, tripId, role, createdAt: now, expiresAt, memberId: memberId ?? null })
+    .values({ token, tripId, createdAt: now, expiresAt, memberId: memberId ?? null })
     .run();
   return { token, expiresAt };
 }
@@ -987,7 +1076,6 @@ export async function createInvite(
 export interface InviteDetails {
   tripId: string;
   tripName: string;
-  role: "viewer" | "editor";
   /** The participant the link is for, when it names one. */
   memberId?: string | null;
   memberName?: string | null;
@@ -1020,7 +1108,6 @@ export function readInvite(token: string): InviteDetails | null {
   return {
     tripId: invite.tripId,
     tripName: trip.name,
-    role: invite.role === "viewer" ? "viewer" : "editor",
     memberId: member?.id ?? null,
     memberName: member?.name ?? null,
   };
@@ -1033,27 +1120,51 @@ export function readInvite(token: string): InviteDetails | null {
  * and a single-use invite would work for whoever tapped first and leave everyone else
  * with an error they cannot explain. The expiry is what bounds it.
  */
-export async function redeemInvite(token: string, userId: string): Promise<string | null> {
+export async function redeemInvite(
+  token: string,
+  user: { id: string; name: string; email: string }
+): Promise<{ tripId: string; memberId: string | null } | null> {
   const invite = readInvite(token);
   if (!invite) return null;
 
-  // A link made for one person in particular seats them where they were expected. Any
-  // other link leaves them unseated, and the trip asks which participant they are.
-  if (invite.memberId) {
-    claimMember(invite.tripId, invite.memberId, userId, { allowReserved: true });
+  // The owner opening their own link is already in; anyone else is let in now.
+  if (accessLevel(invite.tripId, user.id) === "none") {
+    const granted = await grantAccess(invite.tripId, user.id);
+    if (!granted) return null;
   }
 
-  // An invitation only ever adds access, never takes it away. The owner opening their
-  // own link should not be demoted to editor, and now that read-only links can be handed
-  // out, an editor who taps one must not silently lose the ability to add expenses —
-  // they were given it deliberately, and a link forwarded round a group is not a
-  // decision to take it back.
-  const current = accessLevel(invite.tripId, userId);
-  if (current === "owner") return invite.tripId;
-  if (current === "editor" && invite.role === "viewer") return invite.tripId;
+  // Accepting an invitation puts you in the split. It used to grant access and nothing
+  // else, which is how somebody could be in a trip, adding expenses, and appear in
+  // nobody's balance — including their own.
+  //
+  // Three cases, and only one of them is a question:
+  let seat = memberForUser(invite.tripId, user.id);
 
-  const granted = await grantAccess(invite.tripId, userId, invite.role);
-  return granted ? invite.tripId : null;
+  // A link made for one person seats them where they were expected.
+  if (!seat && invite.memberId) {
+    seat = claimMember(invite.tripId, invite.memberId, user.id, { allowReserved: true });
+
+    // The seat was labelled from the address, because at the time that was all anybody
+    // knew about them — "carla-1785940262", which is nobody's name. Now that there is an
+    // account behind it, use the name on it. Narrow on purpose: only a label that is
+    // still exactly the local part of *their own* address is replaced, so a name the
+    // owner typed deliberately is never overwritten.
+    const fromAddress = user.email.split("@")[0];
+    if (seat && seat.name === fromAddress && !memberNameTaken(invite.tripId, user.name)) {
+      renameMember(invite.tripId, seat.id, user.name);
+      seat = memberForUser(invite.tripId, user.id);
+    }
+  }
+
+  // Nothing free that could be theirs, so there is nothing to ask about: they join as
+  // themselves, under their own name, and can rename it once inside.
+  if (!seat && unlinkedMembers(invite.tripId).length === 0) {
+    seat = await seatUser(invite.tripId, user);
+  }
+
+  // Otherwise the trip still holds names somebody typed before they arrived, one of
+  // which may be them — and that is a guess about money, so the trip asks.
+  return { tripId: invite.tripId, memberId: seat?.id ?? null };
 }
 
 // ─── Recurring expenses ──────────────────────────────────────────────

@@ -25,7 +25,6 @@ export function ExpenseList({
   members,
   currency,
   totalCount,
-  readOnly,
   onEdit,
   onDuplicate,
   onDelete,
@@ -37,7 +36,6 @@ export function ExpenseList({
   currency: string;
   /** Everything the trip has, before filtering — tells apart "none" from "none shown". */
   totalCount: number;
-  readOnly: boolean;
   onEdit: (expense: Expense) => void;
   onDuplicate: (expense: Expense) => void;
   onDelete: (expenseId: string) => void;
@@ -53,7 +51,7 @@ export function ExpenseList({
       <EmptyPanel
         icon={<Receipt className="size-5 text-muted-foreground" />}
         title={t("trip.noExpenses")}
-        hint={readOnly ? undefined : t("trip.noExpensesHint")}
+        hint={t("trip.noExpensesHint")}
       />
     );
   }
@@ -146,8 +144,10 @@ export function ExpenseList({
                     )}
                   </div>
 
-                  {!readOnly && !queued && (
+                  {!queued && (
                     <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-100">
+                      {/* Duplicating is adding one of your own, which everybody in a
+                          trip may do — including from somebody else's line. */}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -157,24 +157,30 @@ export function ExpenseList({
                       >
                         <CopyPlus className="size-3.5" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8 text-muted-foreground"
-                        onClick={() => onEdit(expense)}
-                        aria-label={`${t("common.edit")}: ${expense.description}`}
-                      >
-                        <Pencil className="size-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => onDelete(expense.id)}
-                        aria-label={`${t("common.delete")}: ${expense.description}`}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
+                      {/* Changing one is not: it is somebody's record of their money,
+                          and only they — or the owner — get to rewrite it. */}
+                      {expense.mine && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground"
+                            onClick={() => onEdit(expense)}
+                            aria-label={`${t("common.edit")}: ${expense.description}`}
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => onDelete(expense.id)}
+                            aria-label={`${t("common.delete")}: ${expense.description}`}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   )}
                 </li>

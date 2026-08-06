@@ -19,13 +19,11 @@ export function SettlementList({
   settlements,
   members,
   currency,
-  readOnly,
   onRecordPayment,
 }: {
   settlements: Settlement[];
   members: Member[];
   currency: string;
-  readOnly: boolean;
   onRecordPayment: () => void;
 }) {
   const t = useT();
@@ -65,12 +63,10 @@ export function SettlementList({
         </ul>
       )}
 
-      {!readOnly && (
-        <Button variant="outline" className="h-11 w-full" onClick={onRecordPayment}>
-          <Wallet className="size-4" />
-          {t("trip.recordPayment")}
-        </Button>
-      )}
+      <Button variant="outline" className="h-11 w-full" onClick={onRecordPayment}>
+        <Wallet className="size-4" />
+        {t("trip.recordPayment")}
+      </Button>
     </>
   );
 }
@@ -79,13 +75,11 @@ export function PaymentHistory({
   payments,
   members,
   currency,
-  readOnly,
   onDelete,
 }: {
   payments: Payment[];
   members: Member[];
   currency: string;
-  readOnly: boolean;
   onDelete: (paymentId: string) => void;
 }) {
   const t = useT();
@@ -134,7 +128,9 @@ export function PaymentHistory({
                 className="shrink-0 text-sm font-medium"
               />
 
-              {!readOnly && (
+              {/* Undoing a settle-up is rewriting what somebody says they were paid, so
+                  it stays with whoever recorded it — and with the owner. */}
+              {payment.mine && (
                 <Button
                   variant="ghost"
                   size="icon"

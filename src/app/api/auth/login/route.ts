@@ -56,7 +56,8 @@ export async function POST(request: NextRequest) {
 
   let joinedTripId: string | null = null;
   if (typeof body.inviteToken === "string") {
-    joinedTripId = await redeemInvite(body.inviteToken, user.id);
+    const joined = await redeemInvite(body.inviteToken, user);
+    joinedTripId = joined?.tripId ?? null;
   }
 
   return NextResponse.json({ user: publicUser(user), tripId: joinedTripId });

@@ -8,6 +8,7 @@ import { MemberAvatar } from "@/components/member-avatar";
 import { useT } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 /**
  * "Which of these is you?"
@@ -34,8 +35,10 @@ export function ClaimPrompt({
 }) {
   const t = useT();
   const [busy, setBusy] = useState<string | null>(null);
+  /** Null until they say none of the names is theirs; then it holds the alias they type. */
+  const [alias, setAlias] = useState<string | null>(null);
 
-  const claim = async (body: { memberId?: string; create?: boolean }, key: string) => {
+  const claim = async (body: { memberId?: string; create?: boolean; name?: string }, key: string) => {
     setBusy(key);
     try {
       const res = await fetch(`/api/trips/${tripId}/claim`, {
@@ -87,17 +90,40 @@ export function ClaimPrompt({
       )}
 
       {/* Nobody on the list is them — a trip they were invited into after it started, or
-          one whose members were all typed before they arrived. */}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="self-start text-muted-foreground"
-        disabled={busy !== null}
-        onClick={() => claim({ create: true }, "new")}
-      >
-        {busy === "new" ? <Loader2 className="mr-2 size-3.5 animate-spin" /> : null}
-        {candidates.length > 0 ? t("claim.noneOfThese") : t("claim.addMe")}
-      </Button>
+          one whose members were all typed before they arrived. They join as themselves,
+          and get to say what they are called here while they are at it: the alias is the
+          point of linking to an account rather than being labelled by one. */}
+      {alias === null ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="self-start text-muted-foreground"
+          disabled={busy !== null}
+          onClick={() => setAlias("")}
+        >
+          {candidates.length > 0 ? t("claim.noneOfThese") : t("claim.addMe")}
+        </Button>
+      ) : (
+        <div className="flex gap-2">
+          <Input
+            autoFocus
+            value={alias}
+            onChange={(e) => setAlias(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && claim({ create: true, name: alias }, "new")}
+            placeholder={t("claim.aliasPlaceholder")}
+            className="h-9 min-w-0 flex-1"
+            aria-label={t("claim.aliasPlaceholder")}
+          />
+          <Button
+            size="sm"
+            className="h-9 shrink-0"
+            disabled={busy !== null}
+            onClick={() => claim({ create: true, name: alias }, "new")}
+          >
+            {busy === "new" ? <Loader2 className="size-3.5 animate-spin" /> : t("claim.join")}
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }

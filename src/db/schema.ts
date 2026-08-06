@@ -99,7 +99,21 @@ export const trips = sqliteTable(
   (t) => [index("trips_owner_idx").on(t.ownerId)]
 );
 
-/** People other than the owner who can open an owned trip. */
+/**
+ * People other than the owner who are in a trip.
+ *
+ * There were roles here once — editor and viewer — and they were a second, parallel
+ * answer to "who is in this trip", sitting alongside `members` and disagreeing with it.
+ * Being let in and being one of the people the bill is split between were separate
+ * facts, so inviting somebody as an editor gave them the run of the trip while leaving
+ * them out of the arithmetic entirely, and the owner had to remember to add them again
+ * by hand in the other list.
+ *
+ * Now there is one answer: a row here means a seat in `members`, and a seat linked to an
+ * account means a row here. What anyone may *do* follows from the trip — the owner keeps
+ * the trip itself, everyone adds expenses, and each may change the ones they entered —
+ * so nothing needs to be stored per person at all.
+ */
 export const tripAccess = sqliteTable(
   "trip_access",
   {
@@ -109,8 +123,6 @@ export const tripAccess = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    /** "editor" can add expenses, "viewer" can only read. */
-    role: text("role").notNull().default("editor"),
     createdAt: integer("created_at").notNull(),
   },
   (t) => [
@@ -194,6 +206,18 @@ export const expenses = sqliteTable(
     clientId: text("client_id"),
     /** False when no live or cached rate was available at the time. */
     rateAvailable: integer("rate_available", { mode: "boolean" }).notNull().default(true),
+    /**
+     * The account that entered it.
+     *
+     * Everyone in a trip can add expenses, and each answers for what they added: this is
+     * what lets the app tell "your mistake" from "somebody else's figure", so an edit
+     * button is only offered to the person who typed it, or to the owner.
+     *
+     * Null on everything written before this column existed, and on anything left by a
+     * deleted account. It is not a gap to fill by guessing — an unattributed row is one
+     * only the owner may touch.
+     */
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [
     index("expenses_trip_idx").on(t.tripId),
@@ -244,6 +268,8 @@ export const payments = sqliteTable(
     note: text("note"),
     /** Same idempotency guarantee as expenses. */
     clientId: text("client_id"),
+    /** Who recorded it; same rule as an expense. See `expenses.createdBy`. */
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [
     index("payments_trip_idx").on(t.tripId),
@@ -266,7 +292,6 @@ export const invites = sqliteTable(
     tripId: text("trip_id")
       .notNull()
       .references(() => trips.id, { onDelete: "cascade" }),
-    role: text("role").notNull().default("editor"),
     createdAt: integer("created_at").notNull(),
     expiresAt: integer("expires_at").notNull(),
     /**

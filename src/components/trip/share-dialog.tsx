@@ -5,7 +5,6 @@ import qrcode from "qrcode-generator";
 import { Check, Copy, FileText, ImageDown, Loader2, Share2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useT, useIntlLocale } from "@/i18n/provider";
-import { cn } from "@/lib/utils";
 import { renderSummary, canvasToBlob } from "./summary-image";
 import {
   Dialog,
@@ -74,6 +73,7 @@ export function ShareDialog({
   url,
   tripId,
   tripName,
+  canInvite,
   summary,
 }: {
   open: boolean;
@@ -81,6 +81,8 @@ export function ShareDialog({
   url: string;
   tripId: string;
   tripName: string;
+  /** Who comes into a trip is the owner's call; the summary below is everyone's. */
+  canInvite: boolean;
   summary: {
     currency: string;
     total: number;
@@ -94,40 +96,22 @@ export function ShareDialog({
   const { build, busy } = useSummaryImage();
 
   /** Nothing to scan, copy or share until this exists. */
-  const [invite, setInvite] = useState<{
-    url: string;
-    role: "editor" | "viewer";
-    expiresAt: number;
-  } | null>(null);
+  const [invite, setInvite] = useState<{ url: string; expiresAt: number } | null>(null);
   const [creatingInvite, setCreatingInvite] = useState(false);
-
-  /**
-   * Chosen before the link exists, not after.
-   *
-   * The role is baked into the token — anyone who opens it joins with it — so there is
-   * no changing it afterwards. Handing out a link and only then discovering it made
-   * everybody an editor is exactly what this avoids.
-   */
-  const [role, setRole] = useState<"editor" | "viewer">("editor");
 
   const createInvite = async () => {
     setCreatingInvite(true);
     try {
-      const res = await fetch(`/api/trips/${tripId}/invite`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role }),
-      });
+      const res = await fetch(`/api/trips/${tripId}/invite`, { method: "POST" });
       const data = await res.json();
       if (res.ok) {
         setInvite({
           url: `${window.location.origin}/join/${data.token}`,
-          role,
           expiresAt: data.expiresAt,
         });
       }
     } catch {
-      /* the picker stays on screen, so the button can simply be pressed again */
+      /* the button stays on screen, so it can simply be pressed again */
     } finally {
       setCreatingInvite(false);
     }
@@ -173,20 +157,18 @@ export function ShareDialog({
               </div>
             </div>
 
-            {/* What the code grants, right next to the code: a QR looks identical
-                whether it hands over editing or not. */}
-            <div className="flex items-center justify-center gap-2 text-xs">
-              <span className="rounded-md border border-border bg-secondary/60 px-1.5 py-0.5 font-medium">
-                {invite.role === "viewer" ? t("manage.viewer") : t("manage.editor")}
-              </span>
-              <span className="text-muted-foreground">
+            {/* What the code does, right next to the code: one QR looks exactly like
+                another, and this one puts whoever scans it into the split. */}
+            <div className="text-center text-xs text-muted-foreground">
+              <p>{t("join.inviteHint")}</p>
+              <p className="mt-0.5">
                 {t("join.inviteExpires", {
                   date: new Intl.DateTimeFormat(locale, {
                     day: "numeric",
                     month: "long",
                   }).format(new Date(invite.expiresAt)),
                 })}
-              </span>
+              </p>
             </div>
 
             {/* min-w-0 on this row: DialogContent is a grid, and grid children default
@@ -218,42 +200,9 @@ export function ShareDialog({
               {t("join.inviteAnother")}
             </Button>
           </>
-        ) : (
+        ) : canInvite ? (
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">{t("join.inviteHint")}</p>
-
-            {/*
-              Two buttons rather than a dropdown: with only two answers, a select hides
-              one of them behind a tap and says nothing about what either means, while
-              this shows both choices and their consequence at once.
-            */}
-            <fieldset>
-              <legend className="mb-1.5 text-sm font-medium">{t("join.inviteWhatCan")}</legend>
-              <div className="grid grid-cols-2 gap-2">
-                {(
-                  [
-                    { value: "editor", label: t("manage.editor"), hint: t("join.editorHint") },
-                    { value: "viewer", label: t("manage.viewer"), hint: t("join.viewerHint") },
-                  ] as const
-                ).map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    aria-pressed={role === option.value}
-                    onClick={() => setRole(option.value)}
-                    className={cn(
-                      "rounded-lg border px-2.5 py-2 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      role === option.value
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:bg-secondary/60"
-                    )}
-                  >
-                    <span className="block text-sm font-medium">{option.label}</span>
-                    <span className="block text-xs text-muted-foreground">{option.hint}</span>
-                  </button>
-                ))}
-              </div>
-            </fieldset>
 
             <Button className="h-11 w-full" onClick={createInvite} disabled={creatingInvite}>
               {creatingInvite ? (
@@ -266,6 +215,8 @@ export function ShareDialog({
               )}
             </Button>
           </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">{t("join.ownerInvites")}</p>
         )}
 
         <div className="space-y-2 rounded-xl border border-border p-3">

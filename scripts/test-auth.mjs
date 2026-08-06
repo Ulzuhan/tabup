@@ -155,24 +155,41 @@ async function main() {
     body: JSON.stringify({ email: bobEmail, name: "Bob", password: "another good password" }),
   });
 
-  // ── Sharing ────────────────────────────────────────────────────────
-  console.log("\nSharing");
-  const shareUnknown = await alice(`/api/trips/${aliceTrip.id}/share`, {
-    method: "POST",
-    body: JSON.stringify({ email: "nobody@example.com" }),
+  // ── Bringing somebody into a trip ──────────────────────────────────
+  // One act, not two: an address seats them in the split *and* lets them in. It used to
+  // be possible to have one without the other, which is how somebody could run a trip
+  // while appearing in nobody's balance.
+  console.log("\nBringing somebody in");
+  const addUnknown = await alice(`/api/trips/${aliceTrip.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ addByEmail: `nobody-${uniq()}@example.com` }),
   });
-  check("sharing with an unknown email fails", shareUnknown.status, 404);
+  check("an address nobody holds still gets a seat", addUnknown.status, 200);
+  check("and an invitation to send them", typeof addUnknown.body.invite?.token, "string");
 
-  const shared = await alice(`/api/trips/${aliceTrip.id}/share`, {
-    method: "POST",
-    body: JSON.stringify({ email: bobEmail, role: "editor" }),
+  const added = await alice(`/api/trips/${aliceTrip.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ addByEmail: bobEmail }),
   });
-  check("sharing succeeds", shared.status, 200);
-  check("both are listed", shared.body.collaborators.length, 2);
-  check("collaborator can now read", (await bob(`/api/trips/${aliceTrip.id}`)).status, 200);
+  check("adding an account succeeds", added.status, 200);
+  check(
+    "and seats them in the split",
+    added.body.members.some((m) => m.accountName === "Bob"),
+    true
+  );
+  check("they can now read it", (await bob(`/api/trips/${aliceTrip.id}`)).status, 200);
+
+  const bobView = await bob(`/api/trips/${aliceTrip.id}`);
+  check("and are one of the people in it", typeof bobView.body.you, "string");
+  check("with nothing to claim", bobView.body.unclaimed.length, 0);
+  check("seen as a member, not the owner", bobView.body.access, "member");
+  check("emails stay with the owner", bobView.body.members.some((m) => m.accountEmail), false);
+
+  const bobMemberId = bobView.body.you;
+
   // Bob owns nothing of his own, so the shared trip is his whole list.
   const bobList = (await bob("/api/trips")).body.trips;
-  check("and it shows in their list", bobList.length, 1);
+  check("it shows in their list", bobList.length, 1);
   check("marked as not theirs", bobList[0].owned, false);
 
   const bobExpense = await bob(`/api/trips/${aliceTrip.id}/expense`, {
@@ -184,42 +201,183 @@ async function main() {
       category: "food",
     }),
   });
-  check("editor can write", bobExpense.status, 200);
+  check("everyone in a trip can add an expense", bobExpense.status, 200);
 
-  const bobDelete = await bob(`/api/trips/${aliceTrip.id}`, { method: "DELETE" });
-  check("editor cannot delete the trip", bobDelete.status, 403);
+  // ── The trip itself is the owner's ─────────────────────────────────
+  console.log("\nThe trip belongs to whoever made it");
+  check(
+    "somebody in it cannot delete it",
+    (await bob(`/api/trips/${aliceTrip.id}`, { method: "DELETE" })).status,
+    403
+  );
+  check(
+    "nor rename it",
+    (
+      await bob(`/api/trips/${aliceTrip.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: "Bob's now" }),
+      })
+    ).status,
+    403
+  );
+  check(
+    "nor set a budget",
+    (
+      await bob(`/api/trips/${aliceTrip.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ budget: 500 }),
+      })
+    ).status,
+    403
+  );
+  check(
+    "nor bring anybody else in",
+    (
+      await bob(`/api/trips/${aliceTrip.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ addByEmail: aliceEmail }),
+      })
+    ).status,
+    403
+  );
+  check(
+    "nor add a name by hand",
+    (
+      await bob(`/api/trips/${aliceTrip.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ addMembers: ["Ghost"] }),
+      })
+    ).status,
+    403
+  );
+  check(
+    "nor take anybody out",
+    (
+      await bob(`/api/trips/${aliceTrip.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ removeMembers: [aliceTrip.members[1].id] }),
+      })
+    ).status,
+    403
+  );
+  check(
+    "nor invite by link",
+    (await bob(`/api/trips/${aliceTrip.id}/invite`, { method: "POST" })).status,
+    403
+  );
 
-  const bobShares = await bob(`/api/trips/${aliceTrip.id}/share`, {
-    method: "POST",
-    body: JSON.stringify({ email: aliceEmail }),
-  });
-  check("editor cannot reshare", bobShares.status, 403);
-
-  // ── Read-only role ─────────────────────────────────────────────────
-  console.log("\nRead-only role");
-  await alice(`/api/trips/${aliceTrip.id}/share`, {
-    method: "POST",
-    body: JSON.stringify({ email: bobEmail, role: "viewer" }),
-  });
-  check("viewer can still read", (await bob(`/api/trips/${aliceTrip.id}`)).status, 200);
-
-  const viewerWrite = await bob(`/api/trips/${aliceTrip.id}/expense`, {
+  // ── Each answers for what they entered ─────────────────────────────
+  console.log("\nYour expenses are yours");
+  const aliceExpense = await alice(`/api/trips/${aliceTrip.id}/expense`, {
     method: "POST",
     body: JSON.stringify({
-      description: "Nope",
-      amount: 5,
+      description: "Alice pays",
+      amount: 12,
       paidBy: aliceTrip.members[0].id,
       category: "food",
     }),
   });
-  check("viewer cannot write", viewerWrite.status, 403);
+  check("the owner adds one too", aliceExpense.status, 200);
 
-  const revoked = await alice(`/api/trips/${aliceTrip.id}/share`, {
-    method: "DELETE",
-    body: JSON.stringify({ userId: shared.body.collaborators.find((c) => c.email === bobEmail).id }),
+  const bobEditsAlices = await bob(`/api/trips/${aliceTrip.id}/expense`, {
+    method: "PATCH",
+    body: JSON.stringify({ expenseId: aliceExpense.body.id, description: "Mine now" }),
   });
-  check("access is revoked", revoked.status, 200);
-  check("and they lose sight of it", (await bob(`/api/trips/${aliceTrip.id}`)).status, 404);
+  check("somebody else's expense is not theirs to edit", bobEditsAlices.status, 403);
+  check(
+    "nor to delete",
+    (
+      await bob(`/api/trips/${aliceTrip.id}/expense`, {
+        method: "DELETE",
+        body: JSON.stringify({ expenseId: aliceExpense.body.id }),
+      })
+    ).status,
+    403
+  );
+  check(
+    "their own is",
+    (
+      await bob(`/api/trips/${aliceTrip.id}/expense`, {
+        method: "PATCH",
+        body: JSON.stringify({ expenseId: bobExpense.body.id, description: "Bob pays, edited" }),
+      })
+    ).status,
+    200
+  );
+  check(
+    "and the owner can fix anybody's",
+    (
+      await alice(`/api/trips/${aliceTrip.id}/expense`, {
+        method: "PATCH",
+        body: JSON.stringify({ expenseId: bobExpense.body.id, description: "Tidied up" }),
+      })
+    ).status,
+    200
+  );
+
+  const marked = await bob(`/api/trips/${aliceTrip.id}`);
+  check(
+    "the trip says which are theirs",
+    marked.body.expenses.find((e) => e.id === bobExpense.body.id).mine,
+    true
+  );
+  check(
+    "and which are not",
+    marked.body.expenses.find((e) => e.id === aliceExpense.body.id).mine,
+    false
+  );
+  check(
+    "the owner is told they may touch all of them",
+    (await alice(`/api/trips/${aliceTrip.id}`)).body.expenses.every((e) => e.mine),
+    true
+  );
+
+  // ── Leaving a trip keeps the money ─────────────────────────────────
+  // Removing somebody with an account is not a statement that their half of the taxi
+  // never happened: they lose their access, their column and its figures stay.
+  console.log("\nTaking somebody out");
+  const released = await alice(`/api/trips/${aliceTrip.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ removeMembers: [bobMemberId] }),
+  });
+  check("the owner takes them out", released.status, 200);
+  check("they lose sight of it", (await bob(`/api/trips/${aliceTrip.id}`)).status, 404);
+
+  const afterRelease = await alice(`/api/trips/${aliceTrip.id}`);
+  check(
+    "their seat stays",
+    afterRelease.body.members.some((m) => m.id === bobMemberId),
+    true
+  );
+  check(
+    "with no account behind it any more",
+    afterRelease.body.members.find((m) => m.id === bobMemberId).userId ?? null,
+    null
+  );
+  check(
+    "and their expense is still counted",
+    afterRelease.body.expenses.some((e) => e.id === bobExpense.body.id),
+    true
+  );
+
+  const ownerSeat = afterRelease.body.members.find((m) => m.name === "Alice");
+  check(
+    "a trip cannot be left without its owner",
+    (
+      await alice(`/api/trips/${aliceTrip.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ removeMembers: [ownerSeat.id] }),
+      })
+    ).status,
+    400
+  );
+
+  // Put Bob back for the assertions further down that expect him to be a normal
+  // account with no admin powers; they do not depend on this trip.
+  await alice(`/api/trips/${aliceTrip.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ addByEmail: bobEmail }),
+  });
 
   // ── Invitations ────────────────────────────────────────────────────
   console.log("\nInvitations");
@@ -261,67 +419,74 @@ async function main() {
   check("a made-up token joins nothing", badToken.body.tripId ?? null, null);
 
   const guestInvite = await guest(`/api/trips/${inviteTrip.id}/invite`, { method: "POST" });
-  check("an editor cannot invite others", guestInvite.status, 403);
+  check("somebody in a trip cannot invite others", guestInvite.status, 403);
 
-  // ── The role carried by the link ───────────────────────────────────
-  // The owner picks it when creating the link, and it has to survive the whole trip
-  // through registration and into what the person can actually do.
-  console.log("\nInvitation roles");
-  const readOnlyLink = await alice(`/api/trips/${inviteTrip.id}/invite`, {
+  // ── An invitation puts you in the split ────────────────────────────
+  // The whole point of the change: accepting used to grant access and nothing else, so
+  // the person who accepted could run a trip they appeared in nobody's balance in.
+  //
+  // Which of the two things happens depends on whether the trip still holds names
+  // somebody typed before they arrived — one of those may be them, and that is a guess
+  // about money, so it is asked rather than assumed.
+  console.log("\nAn invitation puts you in the split");
+  const guestView = await guest(`/api/trips/${inviteTrip.id}`);
+  check("a trip with free names asks which one they are", guestView.body.you, null);
+  check("and offers exactly those", guestView.body.unclaimed.length, 2);
+
+  const guestClaim = await guest(`/api/trips/${inviteTrip.id}/claim`, {
     method: "POST",
-    body: JSON.stringify({ role: "viewer" }),
+    body: JSON.stringify({ create: true, name: "Guest in Rome" }),
   });
-  check("owner creates a read-only invitation", readOnlyLink.status, 200);
-
-  const onlooker = client();
-  await onlooker("/api/auth/register", {
-    method: "POST",
-    body: JSON.stringify({
-      email: `onlooker-${uniq()}@example.com`,
-      name: "Onlooker",
-      password: "an onlooker password",
-      inviteToken: readOnlyLink.body.token,
-    }),
-  });
-  check("who joins and can read", (await onlooker(`/api/trips/${inviteTrip.id}`)).status, 200);
-
-  const onlookerWrite = await onlooker(`/api/trips/${inviteTrip.id}/expense`, {
-    method: "POST",
-    body: JSON.stringify({
-      description: "Not allowed",
-      amount: 10,
-      currency: "EUR",
-      paidBy: inviteTrip.members[0].id,
-      splitAmong: inviteTrip.members.map((m) => m.id),
-      date: "2026-01-01",
-    }),
-  });
-  check("but cannot add expenses", onlookerWrite.status, 403);
-
-  // A read-only link forwarded round a group must not quietly demote the people who
-  // were already editors — an invitation adds access, it never takes any away.
+  check("they can join as themselves instead", guestClaim.status, 200);
+  check("under the name they chose", guestClaim.body.member.name, "Guest in Rome");
   check(
-    "a viewer link does not demote an editor",
+    "and the question stops being asked",
+    (await guest(`/api/trips/${inviteTrip.id}`)).body.unclaimed.length,
+    0
+  );
+
+  const soloTrip = await alice("/api/trips", {
+    method: "POST",
+    body: JSON.stringify({ name: "Nobody typed in", currency: "EUR", members: [] }),
+  });
+  check("a trip can start with only its owner", soloTrip.status, 200);
+
+  const soloLink = await alice(`/api/trips/${soloTrip.body.id}/invite`, { method: "POST" });
+  const newcomer = client();
+  const newcomerJoin = await newcomer("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify({
+      email: `newcomer-${uniq()}@example.com`,
+      name: "Newcomer",
+      password: "a newcomer password",
+      inviteToken: soloLink.body.token,
+    }),
+  });
+  check("somebody joins it by link", newcomerJoin.status, 200);
+
+  const newcomerView = await newcomer(`/api/trips/${soloTrip.body.id}`);
+  check("with nothing free to claim they are seated on the way in", typeof newcomerView.body.you, "string");
+  check("so there is nothing to ask", newcomerView.body.unclaimed.length, 0);
+  check(
+    "under their account's name",
+    newcomerView.body.members.find((m) => m.id === newcomerView.body.you).name,
+    "Newcomer"
+  );
+  check(
+    "and they can add expenses straight away",
     (
-      await guest("/api/join", {
+      await newcomer(`/api/trips/${soloTrip.body.id}/expense`, {
         method: "POST",
-        body: JSON.stringify({ token: readOnlyLink.body.token }),
+        body: JSON.stringify({
+          description: "First round",
+          amount: 10,
+          paidBy: newcomerView.body.you,
+          category: "food",
+        }),
       })
     ).status,
     200
   );
-  const stillEditor = await guest(`/api/trips/${inviteTrip.id}/expense`, {
-    method: "POST",
-    body: JSON.stringify({
-      description: "Still allowed",
-      amount: 10,
-      currency: "EUR",
-      paidBy: inviteTrip.members[0].id,
-      splitAmong: inviteTrip.members.map((m) => m.id),
-      date: "2026-01-01",
-    }),
-  });
-  check("who can still add expenses", stillEditor.status, 200);
 
   // ── /api/admin is closed to normal accounts ────────────────────────
   // Whoever registered first on this instance is the admin; Bob was not, so these hold

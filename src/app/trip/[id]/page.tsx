@@ -17,7 +17,6 @@ import {
   BalancesCard,
   CategoryBreakdown,
   PendingBanner,
-  ReadOnlyNotice,
   TripTotal,
 } from "@/components/trip/overview";
 import { ExpenseList } from "@/components/trip/expense-list";
@@ -395,7 +394,9 @@ export default function TripPage() {
 
   if (!trip) return <TripSkeleton />;
 
-  const readOnly = trip.access === "viewer";
+  // Everyone in a trip adds expenses; what is not everyone's is changing a figure
+  // somebody else entered, and that is decided per row rather than per person.
+  const owner = trip.access === "owner";
   const memberById = (mid: string) => trip.members.find((m) => m.id === mid);
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-20">
@@ -424,8 +425,6 @@ export default function TripPage() {
         expenseCount={view?.expenses.length ?? 0}
         memberCount={trip.members.length}
       />
-
-      {readOnly && <ReadOnlyNotice />}
 
       {(view?.expenses.length ?? 0) > 0 && (
         <BalancesCard
@@ -462,12 +461,10 @@ export default function TripPage() {
         </TabsList>
 
         <TabsContent value="expenses" className="mt-4 space-y-3">
-          {!readOnly && (
-            <Button className="h-11 w-full" onClick={openNewExpense}>
-              <Plus className="size-4" />
-              {t("trip.addExpense")}
-            </Button>
-          )}
+          <Button className="h-11 w-full" onClick={openNewExpense}>
+            <Plus className="size-4" />
+            {t("trip.addExpense")}
+          </Button>
 
           {/* The bar only earns its space once there is enough to sift through. */}
           {trip.expenses.length > 5 && (
@@ -486,7 +483,6 @@ export default function TripPage() {
             members={trip.members}
             currency={trip.currency}
             totalCount={trip.expenses.length}
-            readOnly={readOnly}
             onEdit={openEditExpense}
             onDuplicate={duplicateExpense}
             onDelete={(expenseId) => setConfirm({ type: "expense", id: expenseId })}
@@ -499,7 +495,6 @@ export default function TripPage() {
             settlements={view?.settlements ?? []}
             members={trip.members}
             currency={trip.currency}
-            readOnly={readOnly}
             onRecordPayment={openSettle}
           />
         </TabsContent>
@@ -509,7 +504,6 @@ export default function TripPage() {
             payments={trip.payments}
             members={trip.members}
             currency={trip.currency}
-            readOnly={readOnly}
             onDelete={(paymentId) => setConfirm({ type: "payment", id: paymentId })}
           />
         </TabsContent>
@@ -521,6 +515,7 @@ export default function TripPage() {
         url={typeof window === "undefined" ? "" : window.location.href}
         tripId={id}
         tripName={trip.name}
+        canInvite={owner}
         summary={{
           currency: trip.currency,
           total: view?.totalExpenses ?? trip.totalExpenses,
@@ -569,7 +564,6 @@ export default function TripPage() {
         tripBudget={trip.budget}
         currency={trip.currency}
         members={trip.members}
-        collaborators={trip.collaborators}
         access={trip.access}
         you={trip.you}
         onChanged={loadTrip}

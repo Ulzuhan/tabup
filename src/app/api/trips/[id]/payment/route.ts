@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addPayment, deletePayment, getTrip } from "@/lib/store";
+import { addPayment, authorRule, deletePayment, getTrip } from "@/lib/store";
 import { authorizeTrip } from "@/lib/authorize";
 import { logError } from "@/lib/errors";
 
@@ -61,6 +61,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       date: parsedDate,
       note: typeof note === "string" && note.trim() ? note.trim().slice(0, 200) : undefined,
       clientId: typeof body.clientId === "string" ? body.clientId.slice(0, 64) : undefined,
+      // Recorded so whoever entered it can undo it, and so nobody else can.
+      createdBy: auth.user?.id,
     });
 
     if (!payment) {
@@ -87,6 +89,22 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/trips
   }
   if (!paymentId) {
     return NextResponse.json({ error: "paymentId required" }, { status: 400 });
+  }
+
+  // Same rule as an expense: yours to undo, or the owner's. A payment id from another
+  // trip has to read as one that does not exist.
+  const check = authorRule("payment", paymentId, id, {
+    id: auth.user?.id,
+    isOwner: auth.level === "owner",
+  });
+  if (check === "missing") {
+    return NextResponse.json({ error: "Payment not found" }, { status: 404 });
+  }
+  if (check === "forbidden") {
+    return NextResponse.json(
+      { error: "Only whoever recorded it, or the trip owner, can undo that" },
+      { status: 403 }
+    );
   }
 
   const removed = await deletePayment(id, paymentId);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   addExpense,
+  authorRule,
   convertTo,
   deleteExpense,
   getTrip,
@@ -21,7 +22,9 @@ import { logError } from "@/lib/errors";
  */
 
 /** Checks the caller may write, then loads the trip, or returns the response to send. */
-async function loadTrip(id: string): Promise<{ trip: Trip } | { error: NextResponse }> {
+async function loadTrip(
+  id: string
+): Promise<{ trip: Trip; caller: { id?: string; isOwner: boolean } } | { error: NextResponse }> {
   const auth = await authorizeTrip(id, "write");
   if (!auth.ok) return { error: auth.response };
 
@@ -29,7 +32,25 @@ async function loadTrip(id: string): Promise<{ trip: Trip } | { error: NextRespo
   if (!trip) {
     return { error: NextResponse.json({ error: "Trip not found" }, { status: 404 }) };
   }
-  return { trip };
+  return { trip, caller: { id: auth.user?.id, isOwner: auth.level === "owner" } };
+}
+
+/**
+ * Turns "may this caller change that row?" into the answer to send back.
+ *
+ * Anyone in a trip can add an expense, and each answers for the ones they added; the
+ * owner can change any of them. A row belonging to another trip reads as one that does
+ * not exist, because authorisation is per trip and the id arrives in the request body.
+ */
+function refuseRow(check: ReturnType<typeof authorRule>, noun: string): NextResponse | null {
+  if (check === "ok") return null;
+  if (check === "missing") {
+    return NextResponse.json({ error: `${noun} not found` }, { status: 404 });
+  }
+  return NextResponse.json(
+    { error: `Only whoever added it, or the trip owner, can change that` },
+    { status: 403 }
+  );
 }
 
 function validateAmount(raw: unknown): number | null {
@@ -85,7 +106,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
   const { id } = await ctx.params;
   const loaded = await loadTrip(id);
   if ("error" in loaded) return loaded.error;
-  const { trip } = loaded;
+  const { trip, caller } = loaded;
 
   try {
     const body = await request.json();
@@ -159,6 +180,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
           : undefined,
       // Supplied by queued offline writes so a retry cannot duplicate the expense.
       clientId: typeof body.clientId === "string" ? body.clientId.slice(0, 64) : undefined,
+      // Recorded so the person who typed it can fix it, and so nobody else can.
+      createdBy: caller.id,
     });
 
     if (!expense) {
@@ -176,7 +199,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
   const { id } = await ctx.params;
   const loaded = await loadTrip(id);
   if ("error" in loaded) return loaded.error;
-  const { trip } = loaded;
+  const { trip, caller } = loaded;
 
   try {
     const body = await request.json();
@@ -185,6 +208,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     if (!expenseId) {
       return NextResponse.json({ error: "expenseId required" }, { status: 400 });
     }
+
+    const refusal = refuseRow(authorRule("expense", expenseId, id, caller), "Expense");
+    if (refusal) return refusal;
 
     const existing = trip.expenses.find((e) => e.id === expenseId);
     if (!existing) {
@@ -284,6 +310,15 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/trips
   if (!expenseId) {
     return NextResponse.json({ error: "expenseId required" }, { status: 400 });
   }
+
+  const refusal = refuseRow(
+    authorRule("expense", expenseId, id, {
+      id: auth.user?.id,
+      isOwner: auth.level === "owner",
+    }),
+    "Expense"
+  );
+  if (refusal) return refusal;
 
   // Looked up first: once the row is gone there is nothing left pointing at the file,
   // and it would sit on disk until the nightly sweep noticed it.

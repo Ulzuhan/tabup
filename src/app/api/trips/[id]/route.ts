@@ -2,19 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import {
   addMember,
+  authoredBy,
   calculateBalances,
   calculateSettlements,
   createInvite,
   deleteTrip,
   getTrip,
   grantAccess,
+  memberEmails,
   memberForUser,
   memberNameTaken,
   removeMembers,
   renameMember,
+  seatUser,
   unlinkedMembers,
   updateTripMeta,
-  visibleCollaborators,
 } from "@/lib/store";
 import { db, users } from "@/db";
 import { authorizeTrip } from "@/lib/authorize";
@@ -61,22 +63,36 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/trips/[
   // first — so it could never say "you owe", only "Andoni owes".
   const you = auth.user ? memberForUser(id, auth.user.id) : null;
 
+  const isOwner = auth.level === "owner";
+  // Everyone in a trip adds expenses, and each answers for what they added. Marked per
+  // row here rather than left to the client to work out: the client would need to be
+  // told who wrote every line to do it, which is more than it needs to know.
+  const written = auth.user
+    ? authoredBy(id, auth.user.id)
+    : { expenses: new Set<string>(), payments: new Set<string>() };
+  const mine = (set: Set<string>, rowId: string) => isOwner || set.has(rowId);
+
+  // The address behind a seat is the owner's to see: they typed it in order to invite
+  // the person. Nobody else on the trip needs it, so nobody else is given it.
+  const emails = isOwner ? memberEmails(id) : {};
+
   return NextResponse.json({
     ...trip,
+    members: trip.members.map((m) => ({ ...m, accountEmail: emails[m.id] })),
+    expenses: trip.expenses.map((e) => ({ ...e, mine: mine(written.expenses, e.id) })),
+    payments: trip.payments.map((p) => ({ ...p, mine: mine(written.payments, p.id) })),
     balances: enrichedBalances,
     settlements: enrichedSettlements,
     totalExpenses: Math.round(totalExpenses * 100) / 100,
-    // The UI hides the write controls on a read-only trip; the server refuses them
-    // regardless, this only avoids showing buttons that would fail.
+    // The UI hides what this caller cannot do; the server refuses it regardless, this
+    // only avoids showing buttons that would fail.
     access: auth.level,
     you: you?.id ?? null,
     // Offered rather than guessed: the names were typed by somebody else, and only the
-    // person reading them knows which one is them. Empty once they have chosen.
+    // person reading them knows which one is them. Empty once they have chosen — and
+    // empty from the start for anyone who joined a trip with nothing free to claim,
+    // since they were seated on the way in.
     unclaimed: you ? [] : unlinkedMembers(id),
-    collaborators: visibleCollaborators(id, {
-      id: auth.user?.id,
-      isOwner: auth.level === "owner",
-    }),
   });
 }
 
@@ -92,16 +108,27 @@ export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/trip
   return NextResponse.json({ success: true });
 }
 
-// PATCH — rename the trip, add members or remove them
+/**
+ * PATCH — the trip itself, and who is in it.
+ *
+ * All of it is the owner's, bar one thing: your own name. The trip belongs to whoever
+ * made it, and everyone else in it is there to keep track of money, not to rename the
+ * holiday or decide who else comes. The exception is the alias, because "what to call
+ * me here" was never the owner's to decide.
+ */
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/[id]">) {
   const { id } = await ctx.params;
-  const auth = await authorizeTrip(id, "write");
+  const auth = await authorizeTrip(id, "read");
   if (!auth.ok) return auth.response;
 
   const trip = await getTrip(id);
   if (!trip) {
     return NextResponse.json({ error: "Trip not found" }, { status: 404 });
   }
+
+  const ownerOnly = () =>
+    NextResponse.json({ error: "Only the trip owner can change that" }, { status: 403 });
+  const isOwner = auth.level === "owner";
 
   try {
     const body = await request.json();
@@ -120,12 +147,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
      * leaving them outside the arithmetic.
      */
     if (typeof body.addByEmail === "string") {
-      if (auth.level !== "owner") {
-        return NextResponse.json(
-          { error: "Only the trip owner can invite people" },
-          { status: 403 }
-        );
-      }
+      if (!isOwner) return ownerOnly();
 
       const email = normalizeEmail(body.addByEmail);
       if (!isValidEmail(email)) {
@@ -133,36 +155,36 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
       }
 
       const target = db.select().from(users).where(eq(users.email, email)).get();
-      const role = body.role === "viewer" ? "viewer" : "editor";
 
-      if (target && memberForUser(id, target.id)) {
-        return NextResponse.json({ error: "They are already in this trip" }, { status: 409 });
+      if (target) {
+        if (memberForUser(id, target.id)) {
+          return NextResponse.json({ error: "They are already in this trip" }, { status: 409 });
+        }
+        await grantAccess(id, target.id);
+        const member = await seatUser(id, target);
+        if (!member) {
+          return NextResponse.json({ error: "Could not add them" }, { status: 500 });
+        }
+        return NextResponse.json({ members: (await getTrip(id))?.members ?? [], invite: null });
       }
 
-      // Their own account name, or the part before the @ as a starting point they can
-      // change themselves once they are in.
-      const proposed = target?.name ?? email.split("@")[0];
+      // Nobody holds that address yet, so the seat is made anyway and the invitation is
+      // bound to it: accepting later lands them in the column that was kept for them
+      // instead of leaving them outside the arithmetic. The part before the @ is a
+      // starting point they can change once they are in.
+      const proposed = email.split("@")[0];
       let name = proposed.slice(0, 50);
       for (let n = 2; memberNameTaken(id, name); n++) name = `${proposed.slice(0, 46)} ${n}`;
 
-      const member = await addMember(
-        id,
-        name,
-        EMOJIS[trip.members.length % EMOJIS.length],
-        target?.id
-      );
+      const member = await addMember(id, name, EMOJIS[trip.members.length % EMOJIS.length]);
       if (!member) {
         return NextResponse.json({ error: "Could not add them" }, { status: 500 });
       }
 
-      if (target) await grantAccess(id, target.id, role);
-      const invite = target ? null : await createInvite(id, role, member.id);
-
       return NextResponse.json({
         members: (await getTrip(id))?.members ?? [],
-        // Present only when they have no account yet: the owner sends them this.
-        invite,
-        collaborators: visibleCollaborators(id, { id: auth.user?.id, isOwner: true }),
+        // The owner sends them this; their seat is already waiting under it.
+        invite: await createInvite(id, member.id),
       });
     }
 
@@ -176,6 +198,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
      * by an account later.
      */
     if (body.addMembers && Array.isArray(body.addMembers)) {
+      if (!isOwner) return ownerOnly();
+
       const names = body.addMembers.filter(
         (n: unknown): n is string =>
           typeof n === "string" && n.trim().length > 0 && n.trim().length <= 50
@@ -228,7 +252,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
 
       const isMine = Boolean(auth.user && target.userId === auth.user.id);
       const isFree = !target.userId;
-      if (!isMine && !(auth.level === "owner" && isFree)) {
+      if (!isMine && !(isOwner && isFree)) {
         return NextResponse.json(
           { error: "Only they can change that name" },
           { status: 403 }
@@ -242,12 +266,14 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     }
 
     if (body.name && typeof body.name === "string" && body.name.trim().length > 0) {
+      if (!isOwner) return ownerOnly();
       await updateTripMeta(id, { name: body.name.trim().slice(0, 100) });
     }
 
     // null clears it; a number sets it. Absent leaves it alone, so a rename does not
     // wipe the budget as a side effect.
     if (body.budget !== undefined) {
+      if (!isOwner) return ownerOnly();
       const parsed = body.budget === null ? null : Number(body.budget);
       if (parsed !== null && (!isFinite(parsed) || parsed <= 0 || parsed > 1e9)) {
         return NextResponse.json(
@@ -258,17 +284,19 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
       await updateTripMeta(id, { budget: parsed });
     }
 
+    let released = 0;
     if (body.removeMembers && Array.isArray(body.removeMembers)) {
-      // Their expenses, payments and share rows go with them (ON DELETE CASCADE), which
-      // is why a participant tied to an account is the owner's to remove and nobody
-      // else's: it is a person's money, not a mislabelled column.
-      const { refused } = await removeMembers(id, body.removeMembers as string[], {
-        allowLinked: auth.level === "owner",
-      });
-      if (refused > 0) {
+      if (!isOwner) return ownerOnly();
+
+      // Somebody with an account keeps their column and loses their access; a free
+      // member is deleted, and the cascade takes their expenses, the payments they were
+      // part of and their share of everyone else's. See `removeMembers`.
+      const result = await removeMembers(id, body.removeMembers as string[]);
+      released = result.released;
+      if (result.refused > 0) {
         return NextResponse.json(
-          { error: "Only the trip owner can remove someone with an account" },
-          { status: 403 }
+          { error: "A trip cannot be left without its owner" },
+          { status: 400 }
         );
       }
     }
@@ -276,10 +304,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     const updated = await getTrip(id);
     return NextResponse.json({
       members: updated?.members ?? [],
-      collaborators: visibleCollaborators(id, {
-        id: auth.user?.id,
-        isOwner: auth.level === "owner",
-      }),
+      // So the UI can say which of the two things happened: somebody stepped out of the
+      // trip, or a name and its figures were deleted.
+      released,
     });
   } catch (error) {
     logError("PATCH /api/trips/[id]", error);

@@ -36,13 +36,12 @@ export function TripHeader({
   tripId: string;
   name: string;
   members: Member[];
-  access: "viewer" | "editor" | "owner";
+  access: "member" | "owner";
   onManage: () => void;
   onShare: () => void;
   onDelete: () => void;
 }) {
   const t = useT();
-  const readOnly = access === "viewer";
 
   return (
     <header className="mb-6 flex items-start gap-3 pt-1">
@@ -61,17 +60,18 @@ export function TripHeader({
         <h1 className="truncate text-xl font-semibold tracking-tight">{name}</h1>
         <div className="mt-2 flex items-center gap-2.5">
           <MemberStack members={members} />
-          {!readOnly && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-1.5 text-xs text-muted-foreground"
-              onClick={onManage}
-            >
-              <UserPlus className="size-3.5" />
-              {t("trip.manage")}
-            </Button>
-          )}
+          {/* Open to everyone in the trip, not only the owner: this is also where a
+              person sets what they are called here, which was never the owner's to
+              decide. What they may change inside depends on whose it is. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-1.5 text-xs text-muted-foreground"
+            onClick={onManage}
+          >
+            <UserPlus className="size-3.5" />
+            {t("trip.manage")}
+          </Button>
         </div>
       </div>
 
