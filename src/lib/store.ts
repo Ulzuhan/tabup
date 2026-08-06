@@ -32,8 +32,8 @@ import {
   activity,
   comments,
 } from "@/db/schema";
-import { EMOJIS } from "./types";
-import type { Trip, Member, Expense, Payment } from "./types";
+import { EMOJIS, isTripKind } from "./types";
+import type { Trip, Member, Expense, Payment, TripKind } from "./types";
 
 const DATA_DIR = process.env.TABUP_DATA_DIR?.trim() || join(process.cwd(), "data");
 const CACHE_FILE = join(DATA_DIR, ".exchange-rates-cache.json");
@@ -110,6 +110,7 @@ export async function getTrip(id: string): Promise<Trip | null> {
   return {
     id: trip.id,
     name: trip.name,
+    kind: isTripKind(trip.kind) ? trip.kind : "trip",
     currency: trip.currency,
     budget: trip.budget,
     createdAt: trip.createdAt,
@@ -178,6 +179,7 @@ export async function listTrips(userId: string): Promise<
   {
     id: string;
     name: string;
+    kind: TripKind;
     currency: string;
     createdAt: number;
     memberCount: number;
@@ -212,6 +214,7 @@ export async function listTrips(userId: string): Promise<
       return {
         id: t.id,
         name: t.name,
+        kind: isTripKind(t.kind) ? t.kind : "trip",
         currency: t.currency,
         createdAt: t.createdAt,
         memberCount: trip?.members.length ?? 0,
@@ -642,6 +645,8 @@ export function commentCounts(tripId: string): Record<string, number> {
 
 export interface CreateTripInput {
   name: string;
+  /** Trip, shared home, couple or other. A label, not a rule. */
+  kind: TripKind;
   currency: string;
   /**
    * Anyone else, by bare name. May be empty.
@@ -666,6 +671,7 @@ export async function createTrip(input: CreateTripInput): Promise<Trip> {
       .values({
         id,
         name: input.name,
+        kind: input.kind,
         currency: input.currency,
         createdAt: now,
         updatedAt: now,
@@ -706,7 +712,7 @@ export async function deleteTrip(id: string): Promise<boolean> {
 
 export async function updateTripMeta(
   id: string,
-  patch: { name?: string; currency?: string; budget?: number | null }
+  patch: { name?: string; kind?: TripKind; currency?: string; budget?: number | null }
 ): Promise<boolean> {
   if (!isValidId(id)) return false;
   const result = db

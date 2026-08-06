@@ -38,6 +38,7 @@ npm run start
 | `TABUP_BACKUP_DIR` | `~/backups/tabup` | Where `backup-db.mjs` writes snapshots |
 | `TABUP_BACKUP_KEEP` | `14` | Snapshots to keep |
 | `TABUP_BACKUP_REMOTE` | unset | rsync target for offsite copies |
+| `TABUP_PUSH_SUBJECT` | `mailto:tabup@localhost` | Contact a push service can complain to; part of VAPID |
 
 The database file and its directory are created on first start. There is no separate
 migration step: the schema is applied on boot, and it is safe to run against a database
@@ -203,6 +204,43 @@ themselves or deleted their account.
 Setting your own alias is deliberately not recorded: it is nobody else's business and
 would fill the feed on the first day of any trip.
 
+### Light and dark
+
+Both, from one set of values. Every token is a `light-dark()` pair, so switching theme
+flips `color-scheme` on `<html>` and the whole palette moves — no second block of
+twenty-five variables to keep in step. The choice is a cookie read on the server, like
+the language, so the first paint is already right rather than flashing the wrong one.
+
+The light emerald is deeper than it looks like it should be. `--primary` fills buttons
+*and* is used as text — links, the selected chip, a positive balance — and a vivid
+emerald that passes as a fill fails as text on white, measured at 2.8:1. Every colour
+pair in both themes now clears 4.5:1, checked by driving a browser and reading the
+rendered pixels rather than the tokens.
+
+### Groups, not only trips
+
+A group has a **kind**: trip, home, couple or other. It changes no rule and no
+arithmetic — an icon and a word — but calling everything a "trip" made half the real use
+of this read as a mistake, since a flat share is not a holiday that never ends.
+
+### Notifications
+
+Sent by this server and nobody else, and this is the part worth knowing before turning
+it on: **no third-party service, no account, no cost**. Web Push works by the browser
+handing out a URL on its vendor's push service — Google's for Chrome, Mozilla's for
+Firefox, Apple's for Safari — and this server POSTing an encrypted payload to it, signed
+with a VAPID key pair it generates itself on first use and keeps in `app_settings`. There
+is no Firebase project to register. The payload is encrypted to the browser's own key, so
+the push service forwards bytes it cannot read.
+
+Two real limits. It needs HTTPS, which this instance has. And on iOS it only works for a
+PWA added to the Home Screen — Safari refuses it for a page in a tab.
+
+Sent on: an expense added, a payment recorded, a comment written, being put in a group.
+Never to whoever just did it, which is the fastest way to get somebody to turn them off.
+The server sends the *pieces* and the service worker builds the sentence, because it has
+no idea what language that browser reads and the browser does.
+
 ### Invitations
 
 Sharing an owned trip with someone who has no account used to be impossible: the share
@@ -296,7 +334,7 @@ npm run test:api        # 18 — splitting, balances, validation, concurrency
 npm run test:auth       # 83 — accounts, ownership, who may change what, invitations
 npm run test:money      # 21 — currencies, whole cents, settling, CSV
 npm run test:members    # 50 — members and accounts, and isolation between trips
-npm run test:social     # 42 — balances on the list, authorship, comments, the feed
+npm run test:social     # 57 — balances, authorship, comments, the feed, kinds, push
 npm run test:recurring  # 17 — fixed costs; pure functions, no server needed
 ```
 

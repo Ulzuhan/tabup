@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useT, useLocale, setLocale } from "@/i18n/provider";
+import { ThemeItems } from "@/components/theme";
+import { PushToggle } from "@/components/push-toggle";
 import { LOCALES, LOCALE_NAMES } from "@/i18n/config";
 
 export interface SessionUser {
@@ -112,6 +114,9 @@ export function AppHeader({
             )}
             <LanguageItems />
             <DropdownMenuSeparator />
+            <ThemeItems />
+            <DropdownMenuSeparator />
+            <PushToggle />
             <DropdownMenuItem onClick={onSignOut}>
               <LogOut className="size-4" />
               {t("auth.signOut")}
@@ -132,6 +137,8 @@ export function AppHeader({
             />
             <DropdownMenuContent align="end">
               <LanguageItems />
+              <DropdownMenuSeparator />
+              <ThemeItems />
             </DropdownMenuContent>
           </DropdownMenu>
 

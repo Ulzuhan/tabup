@@ -179,6 +179,20 @@ function migrate(sqlite: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS comments_expense_idx ON comments(expense_id);
 
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      endpoint TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS push_user_idx ON push_subscriptions(user_id);
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS error_log (
       id TEXT PRIMARY KEY,
       context TEXT NOT NULL,
@@ -202,6 +216,7 @@ function migrate(sqlite: Database.Database) {
   addColumn(sqlite, "expenses", "note", "TEXT");
   addColumn(sqlite, "expenses", "receipt", "TEXT");
   addColumn(sqlite, "trips", "budget", "REAL");
+  addColumn(sqlite, "trips", "kind", "TEXT NOT NULL DEFAULT 'trip'");
   addColumn(sqlite, "payments", "client_id", "TEXT");
   addColumn(sqlite, "members", "user_id", "TEXT REFERENCES users(id) ON DELETE SET NULL");
   addColumn(sqlite, "invites", "member_id", "TEXT REFERENCES members(id) ON DELETE SET NULL");

@@ -12,7 +12,8 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { CURRENCIES, EMOJIS } from "@/lib/types";
+import { CURRENCIES, EMOJIS, type TripKind } from "@/lib/types";
+import { TripKindIcon, TripKindPicker } from "@/components/trip-kind";
 import { useT } from "@/i18n/provider";
 import { Money } from "@/components/money";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ import {
 interface TripSummary {
   id: string;
   name: string;
+  kind: TripKind;
   currency: string;
   memberCount: number;
   expenseCount: number;
@@ -53,6 +55,7 @@ export function TripsView() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [tripName, setTripName] = useState("");
+  const [kind, setKind] = useState<TripKind>("trip");
   const [currency, setCurrency] = useState("EUR");
   // Empty: you are already in the trip, and everyone else can arrive by invitation.
   const [members, setMembers] = useState<string[]>([]);
@@ -129,6 +132,7 @@ export function TripsView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: tripName.trim(),
+          kind,
           currency,
           members: namedMembers.map((m) => ({ name: m.trim() })),
         }),
@@ -157,6 +161,8 @@ export function TripsView() {
         <CreateTripForm
           tripName={tripName}
           setTripName={setTripName}
+          kind={kind}
+          setKind={setKind}
           currency={currency}
           setCurrency={setCurrency}
           userName={user?.name ?? ""}
@@ -234,7 +240,10 @@ function TripRow({ trip }: { trip: TripSummary }) {
       className="group flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 transition-colors outline-none hover:border-primary/30 hover:bg-secondary/60 focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary">
-        <Compass className="size-[18px] text-muted-foreground transition-colors group-hover:text-primary" />
+        <TripKindIcon
+          kind={trip.kind}
+          className="size-[18px] text-muted-foreground transition-colors group-hover:text-primary"
+        />
       </div>
 
       <div className="min-w-0 flex-1">
@@ -323,6 +332,8 @@ function EmptyState({ signedIn }: { signedIn: boolean }) {
 function CreateTripForm({
   tripName,
   setTripName,
+  kind,
+  setKind,
   currency,
   setCurrency,
   userName,
@@ -338,6 +349,8 @@ function CreateTripForm({
 }: {
   tripName: string;
   setTripName: (v: string) => void;
+  kind: TripKind;
+  setKind: (v: TripKind) => void;
   currency: string;
   setCurrency: (v: string) => void;
   /** Shown as the first participant: the owner is always in their own trip. */
@@ -379,6 +392,13 @@ function CreateTripForm({
           placeholder={t("createTrip.namePlaceholder")}
           className="h-11"
         />
+      </div>
+
+      {/* Asked once, right after the name, because it decides what the thing is called
+          everywhere else. Four choices on one row: it is a label, not a decision. */}
+      <div className="space-y-2">
+        <Label>{t("kind.label")}</Label>
+        <TripKindPicker value={kind} onChange={setKind} />
       </div>
 
       <div className="space-y-2">

@@ -9,6 +9,7 @@ import {
   updateExpense,
 } from "@/lib/store";
 import { authorizeTrip } from "@/lib/authorize";
+import { notify, othersInTrip } from "@/lib/push";
 import { deleteReceipt } from "@/lib/receipts";
 import { CATEGORIES } from "@/lib/types";
 import type { Trip } from "@/lib/types";
@@ -198,6 +199,15 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       return NextResponse.json({ error: "Failed to add expense" }, { status: 500 });
     }
     logActivity(id, user, "expenseAdded", expense.description);
+    // Everyone else in the trip. Fire and forget: the expense is already saved, and a
+    // push service on the other side of the internet must not be able to undo that.
+    notify(othersInTrip(id, user?.id), {
+      action: "expense",
+      trip: trip.name,
+      actor: user?.name ?? "?",
+      subject: expense.description,
+      url: `/trip/${id}`,
+    });
     return NextResponse.json(expense);
   } catch (error) {
     logError("POST /api/trips/[id]/expense", error);

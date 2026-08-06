@@ -1,4 +1,4 @@
-import type { Member, Expense, Payment } from "@/lib/types";
+import type { Member, Expense, Payment, TripKind } from "@/lib/types";
 
 /**
  * The shape `GET /api/trips/[id]` returns.
@@ -29,6 +29,7 @@ export interface EnrichedBalance {
 export interface TripData {
   id: string;
   name: string;
+  kind: TripKind;
   currency: string;
   createdAt: number;
   version: number;

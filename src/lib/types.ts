@@ -1,8 +1,15 @@
 // Shared types for TabUp
 
+/** A label and an icon, not a rule: nothing behaves differently per kind. */
+export const TRIP_KINDS = ["trip", "home", "couple", "other"] as const;
+export type TripKind = (typeof TRIP_KINDS)[number];
+export const isTripKind = (v: unknown): v is TripKind =>
+  typeof v === "string" && (TRIP_KINDS as readonly string[]).includes(v);
+
 export interface Trip {
   id: string;
   name: string;
+  kind: TripKind;
   currency: string;
   /** Optional spending target; null/undefined means nobody set one. */
   budget?: number | null;

@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addComment, deleteComment, logActivity, memberForUser, readComments } from "@/lib/store";
+import {
+  addComment,
+  deleteComment,
+  getTrip,
+  logActivity,
+  memberForUser,
+  readComments,
+} from "@/lib/store";
 import { authorizeTrip } from "@/lib/authorize";
+import { notify, othersInTrip } from "@/lib/push";
 import { logError } from "@/lib/errors";
 
 /**
@@ -66,6 +74,14 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     }
 
     logActivity(id, auth.user, "commentAdded", body.body.trim().slice(0, 60));
+    const trip = await getTrip(id);
+    notify(othersInTrip(id, auth.user.id), {
+      action: "comment",
+      trip: trip?.name ?? "",
+      actor: comment.authorName,
+      subject: trip?.expenses.find((e) => e.id === body.expenseId)?.description ?? "",
+      url: `/trip/${id}`,
+    });
     return NextResponse.json({ comment });
   } catch (error) {
     logError("POST /api/trips/[id]/comment", error);

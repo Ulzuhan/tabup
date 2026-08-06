@@ -26,7 +26,7 @@
  * and a phone gets handed around.
  */
 
-const VERSION = "tabup-v3";
+const VERSION = "tabup-v4";
 const SHELL = `${VERSION}-shell`;
 const DATA = `${VERSION}-data`;
 
@@ -78,6 +78,71 @@ const isStatic = (url) =>
   url.pathname.endsWith(".png") ||
   url.pathname.endsWith(".svg") ||
   url.pathname.endsWith(".ico");
+
+/**
+ * Notifications.
+ *
+ * The server sends the pieces, not a sentence: it has no idea which language the person
+ * holding this browser reads, and guessing would be worse than asking the browser, which
+ * knows. The table is small on purpose — a notification is one line.
+ */
+const NOTICES = {
+  es: {
+    expense: (n) => [`${n.trip}`, `${n.actor} apuntó ${n.subject}`],
+    payment: (n) => [`${n.trip}`, `${n.actor} apuntó un pago: ${n.subject}`],
+    comment: (n) => [`${n.trip}`, `${n.actor} comentó en ${n.subject}`],
+    joined: (n) => ["Te han metido en un grupo", `${n.actor} te ha añadido a ${n.trip}`],
+  },
+  en: {
+    expense: (n) => [`${n.trip}`, `${n.actor} added ${n.subject}`],
+    payment: (n) => [`${n.trip}`, `${n.actor} recorded a payment: ${n.subject}`],
+    comment: (n) => [`${n.trip}`, `${n.actor} commented on ${n.subject}`],
+    joined: (n) => ["You are in a new group", `${n.actor} added you to ${n.trip}`],
+  },
+};
+
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  let notice;
+  try {
+    notice = event.data.json();
+  } catch {
+    return;
+  }
+
+  const lang = (self.navigator.language || "es").toLowerCase().startsWith("en") ? "en" : "es";
+  const build = NOTICES[lang][notice.action] ?? NOTICES[lang].expense;
+  const [title, body] = build(notice);
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      // One notification per trip rather than a stack of them: three expenses added
+      // while somebody was away is one thing to look at, not three.
+      tag: notice.url,
+      renotify: true,
+      data: { url: notice.url },
+    })
+  );
+});
+
+/** Tapping it lands on the trip — in the tab that is already open, if there is one. */
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = event.notification.data?.url || "/";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      for (const client of windows) {
+        if (client.url.includes(target) && "focus" in client) return client.focus();
+      }
+      return self.clients.openWindow(target);
+    })
+  );
+});
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;

@@ -32,6 +32,7 @@ import {
 import { OfflineBanner } from "@/components/offline";
 import { enqueue, newClientId } from "@/lib/write-queue";
 import { useT } from "@/i18n/provider";
+import { useCategoryName } from "@/components/category-icon";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
@@ -57,11 +58,18 @@ import {
 
 const today = () => new Date().toISOString().split("T")[0];
 
-const emptyExpense = (currency: string, members: Member[]): ExpenseDraft => ({
+/**
+ * `you` rather than the first member in the list.
+ *
+ * Whoever is typing is usually whoever paid — they are the one holding the phone — and
+ * defaulting to the top of the list meant the commonest case needed a correction every
+ * single time. Falls back to the first member for a reader who is in nobody's split yet.
+ */
+const emptyExpense = (currency: string, members: Member[], you: string | null): ExpenseDraft => ({
   description: "",
   amount: "",
   currency,
-  paidBy: members[0]?.id ?? "",
+  paidBy: you ?? members[0]?.id ?? "",
   splitAmong: members.map((m) => m.id),
   category: "food",
   note: "",
@@ -72,6 +80,7 @@ const emptyExpense = (currency: string, members: Member[]): ExpenseDraft => ({
 
 export default function TripPage() {
   const t = useT();
+  const categoryName = useCategoryName();
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -96,7 +105,7 @@ export default function TripPage() {
 
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>(emptyExpense("EUR", []));
+  const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>(emptyExpense("EUR", [], null));
 
   const [settleOpen, setSettleOpen] = useState(false);
   const [paymentDraft, setPaymentDraft] = useState<PaymentDraft>({
@@ -156,7 +165,10 @@ export default function TripPage() {
     // sent, rather than reconstructing it and risking a difference.
     const body = {
         expenseId: editingId ?? undefined,
-        description: expenseDraft.description.trim(),
+        // Named after its category when nobody typed a name, which is what people
+        // would have typed anyway — and is the difference between asking for a
+        // description and demanding one.
+        description: expenseDraft.description.trim() || categoryName(expenseDraft.category),
         amount: parseFloat(expenseDraft.amount),
         currency: expenseDraft.currency,
         paidBy: expenseDraft.paidBy,
@@ -330,7 +342,7 @@ export default function TripPage() {
   const openNewExpense = () => {
     if (!trip) return;
     setEditingId(null);
-    setExpenseDraft(emptyExpense(trip.currency, trip.members));
+    setExpenseDraft(emptyExpense(trip.currency, trip.members, trip.you));
     setExpenseOpen(true);
   };
 

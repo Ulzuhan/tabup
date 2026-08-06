@@ -14,6 +14,7 @@ import type { Member } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { MemberStack } from "@/components/member-avatar";
 import { LanguageItems } from "@/components/app-header";
+import { ThemeItems } from "@/components/theme";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -106,6 +107,8 @@ export function TripHeader({
           {/* The trip screen has its own header, so without this the language picker
               would only exist on the home screen. */}
           <LanguageItems />
+          <DropdownMenuSeparator />
+          <ThemeItems />
           {access === "owner" && (
             <>
               <DropdownMenuSeparator />

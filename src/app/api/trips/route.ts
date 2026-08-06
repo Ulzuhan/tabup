@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { atTripLimit, createTrip, FREE_TRIP_LIMIT, listTrips } from "@/lib/store";
 import { getCurrentUser } from "@/lib/auth";
-import { CURRENCIES, EMOJIS } from "@/lib/types";
+import { CURRENCIES, EMOJIS, isTripKind } from "@/lib/types";
 import { logError } from "@/lib/errors";
 
 export async function POST(request: NextRequest) {
@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
     // the trip and its members.
     const trip = await createTrip({
       name: name.trim().slice(0, 100),
+      kind: isTripKind(body.kind) ? body.kind : "trip",
       currency,
       members: extra.map((m: { name: string }, i: number) => ({
         name: m.name.trim(),
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       id: trip.id,
       name: trip.name,
+      kind: trip.kind,
       members: trip.members,
       createdAt: trip.createdAt,
     });

@@ -89,6 +89,15 @@ export const trips = sqliteTable(
      */
     ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
     /**
+     * What kind of thing this is: a trip, a shared home, a couple, or anything else.
+     *
+     * It changes no rule and no arithmetic — it is a label and an icon. But calling
+     * everything a "trip" made half the real use of this app read as a mistake: a flat
+     * share is not a holiday that never ends, and the copy said otherwise on every
+     * screen. Splitwise reached the same conclusion and calls them group types.
+     */
+    kind: text("kind").notNull().default("trip"),
+    /**
      * Optional spending target for the whole trip, in the trip's currency.
      *
      * Null means nobody set one, which is different from zero — a budget of zero would
@@ -380,6 +389,47 @@ export const comments = sqliteTable(
   },
   (t) => [index("comments_expense_idx").on(t.expenseId)]
 );
+
+/**
+ * Where a browser wants to be told things.
+ *
+ * One row per browser, not per person: somebody signed in on a phone and a laptop has
+ * two, and both should ring. The endpoint is the browser vendor's push service — no
+ * account of ours and no account of theirs, just a URL that vendor handed out — so the
+ * only thing this app needs to send a notification is its own VAPID key pair.
+ *
+ * Dead subscriptions are not a problem to be tidied up on a schedule: the push service
+ * answers 404 or 410 for a browser that has gone, and that answer is the signal to
+ * delete the row. See `lib/push.ts`.
+ */
+export const pushSubscriptions = sqliteTable(
+  "push_subscriptions",
+  {
+    /** The endpoint is the identity; a browser re-subscribing returns the same one. */
+    endpoint: text("endpoint").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The two halves of the browser's key, used to encrypt the payload to it. */
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("push_user_idx").on(t.userId)]
+);
+
+/**
+ * Small pieces of instance state that are not anybody's data.
+ *
+ * Currently one thing: the VAPID key pair, generated on first use. It lives in the
+ * database rather than in the environment so the app needs no setup step to be able to
+ * send a notification — losing it would only mean every browser has to subscribe again,
+ * which is why it is not worth making somebody manage.
+ */
+export const appSettings = sqliteTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
 
 /**
  * Recurring expenses: subscriptions, insurance, rent.

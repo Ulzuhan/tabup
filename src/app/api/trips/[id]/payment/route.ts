@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addPayment, authorRule, deletePayment, getTrip, logActivity } from "@/lib/store";
 import { authorizeTrip } from "@/lib/authorize";
+import { notify, othersInTrip } from "@/lib/push";
 import { logError } from "@/lib/errors";
 
 /**
@@ -69,7 +70,15 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       return NextResponse.json({ error: "Failed to record payment" }, { status: 500 });
     }
     const name = (memberId: string) => trip.members.find((m) => m.id === memberId)?.name ?? "?";
-    logActivity(id, auth.user, "paymentAdded", `${name(payment.from)} → ${name(payment.to)}`);
+    const between = `${name(payment.from)} → ${name(payment.to)}`;
+    logActivity(id, auth.user, "paymentAdded", between);
+    notify(othersInTrip(id, auth.user?.id), {
+      action: "payment",
+      trip: trip.name,
+      actor: auth.user?.name ?? "?",
+      subject: between,
+      url: `/trip/${id}`,
+    });
     return NextResponse.json(payment);
   } catch (error) {
     logError("POST /api/trips/[id]/payment", error);

@@ -7,70 +7,114 @@
 /**
  * TabUp design tokens.
  *
- * One dark theme rather than a light/dark pair: the app is a single focused surface,
- * and committing to one palette is what lets the elevation steps below stay consistent
- * instead of being tuned twice and going flat in one of them.
+ * One set of values, two themes, through `light-dark()`. Every token below names both
+ * its light and its dark value in the same place, and which one applies follows from
+ * `color-scheme` alone — so switching theme flips one property on <html> and the whole
+ * palette moves with it. The alternative, a second block redefining twenty-five
+ * variables, is two palettes to keep in step and one of them always drifts.
  *
- * Hue 265 runs through every neutral so the greys read as a deliberate cool slate
- * rather than as dead greys, and the emerald primary sits against them at high chroma
- * without vibrating.
+ * There was only a dark one until now, on the argument that committing to a single
+ * palette keeps the elevation steps honest. That holds for the steps; it does not hold
+ * for the person reading a balance in the sun outside a chiringuito, or for anyone who
+ * finds light text on dark harder to read. Every app it is measured against has both.
+ *
+ * Hue 265 runs through every neutral so the greys read as a deliberate cool slate rather
+ * than as dead greys, and the emerald primary sits against them at high chroma without
+ * vibrating. In light the neutrals invert around the same hue and the emerald darkens
+ * just enough to carry text on white — `--success` more than `--primary`, because one is
+ * used as text and the other as a fill with dark text on it.
  */
 :root {
-  --background: oklch(0.155 0.012 265);
-  --foreground: oklch(0.96 0.004 265);
+  /* What makes `light-dark()` resolve at all. Overridden per theme further down. */
+  color-scheme: light dark;
 
-  /* Raised surfaces. Each step is a real elevation, used consistently. */
-  --card: oklch(0.196 0.014 265);
-  --card-foreground: oklch(0.96 0.004 265);
-  --popover: oklch(0.216 0.015 265);
-  --popover-foreground: oklch(0.96 0.004 265);
+  --background: light-dark(oklch(0.985 0.004 265), oklch(0.155 0.012 265));
+  --foreground: light-dark(oklch(0.24 0.018 265), oklch(0.96 0.004 265));
 
-  /* Emerald: money, settled, positive. The one saturated colour in the palette. */
-  --primary: oklch(0.735 0.163 158);
-  --primary-foreground: oklch(0.17 0.03 158);
+  /* Raised surfaces. Each step is a real elevation, used consistently — which in light
+     means the page is faintly tinted and the cards are white, the other way round. */
+  --card: light-dark(oklch(1 0 0), oklch(0.196 0.014 265));
+  --card-foreground: light-dark(oklch(0.24 0.018 265), oklch(0.96 0.004 265));
+  --popover: light-dark(oklch(1 0 0), oklch(0.216 0.015 265));
+  --popover-foreground: light-dark(oklch(0.24 0.018 265), oklch(0.96 0.004 265));
 
-  --secondary: oklch(0.248 0.016 265);
-  --secondary-foreground: oklch(0.96 0.004 265);
+  /**
+   * Emerald: money, settled, positive. The one saturated colour in the palette.
+   *
+   * In light it is deeper than it looks like it should be, because it does two jobs that
+   * pull in opposite directions: it fills buttons *and* it is used as text — links, the
+   * selected chip, a positive balance. A vivid emerald passes as a fill with dark text
+   * on it and fails badly as text on white, measured at 2.8:1. One value that clears
+   * 4.5:1 both ways is worth more than two that each look nicer in one place.
+   */
+  --primary: light-dark(oklch(0.48 0.13 158), oklch(0.735 0.163 158));
+  --primary-foreground: light-dark(oklch(0.99 0.012 158), oklch(0.17 0.03 158));
 
-  --muted: oklch(0.248 0.016 265);
-  --muted-foreground: oklch(0.665 0.018 265);
+  --secondary: light-dark(oklch(0.955 0.008 265), oklch(0.248 0.016 265));
+  --secondary-foreground: light-dark(oklch(0.24 0.018 265), oklch(0.96 0.004 265));
+
+  --muted: light-dark(oklch(0.955 0.008 265), oklch(0.248 0.016 265));
+  --muted-foreground: light-dark(oklch(0.48 0.02 265), oklch(0.665 0.018 265));
 
   /* shadcn uses --accent for subtle hover fills, NOT for the brand colour. */
-  --accent: oklch(0.268 0.018 265);
-  --accent-foreground: oklch(0.96 0.004 265);
+  --accent: light-dark(oklch(0.94 0.01 265), oklch(0.268 0.018 265));
+  --accent-foreground: light-dark(oklch(0.24 0.018 265), oklch(0.96 0.004 265));
 
-  --destructive: oklch(0.637 0.208 25);
-  --destructive-foreground: oklch(0.97 0.01 25);
-  --success: oklch(0.735 0.163 158);
-  --warning: oklch(0.795 0.144 82);
+  /* These three are read as text as often as they are used as fills, so the light
+     values are dark enough to clear 4.5:1 against white rather than merely legible. */
+  --destructive: light-dark(oklch(0.48 0.2 25), oklch(0.637 0.208 25));
+  --destructive-foreground: light-dark(oklch(0.99 0.01 25), oklch(0.97 0.01 25));
+  --success: light-dark(oklch(0.48 0.13 158), oklch(0.735 0.163 158));
+  --warning: light-dark(oklch(0.47 0.115 82), oklch(0.795 0.144 82));
 
-  --border: oklch(0.288 0.017 265);
-  --input: oklch(0.288 0.017 265);
-  --ring: oklch(0.735 0.163 158);
+  --border: light-dark(oklch(0.9 0.008 265), oklch(0.288 0.017 265));
+  --input: light-dark(oklch(0.9 0.008 265), oklch(0.288 0.017 265));
+  --ring: light-dark(oklch(0.48 0.13 158), oklch(0.735 0.163 158));
 
   /* Category bars, ordered so neighbouring slices stay distinguishable. */
-  --chart-1: oklch(0.735 0.163 158);
-  --chart-2: oklch(0.7 0.145 220);
-  --chart-3: oklch(0.755 0.145 82);
-  --chart-4: oklch(0.68 0.175 300);
-  --chart-5: oklch(0.7 0.16 25);
+  --chart-1: light-dark(oklch(0.58 0.145 158), oklch(0.735 0.163 158));
+  --chart-2: light-dark(oklch(0.55 0.13 220), oklch(0.7 0.145 220));
+  --chart-3: light-dark(oklch(0.6 0.13 82), oklch(0.755 0.145 82));
+  --chart-4: light-dark(oklch(0.53 0.16 300), oklch(0.68 0.175 300));
+  --chart-5: light-dark(oklch(0.55 0.15 25), oklch(0.7 0.16 25));
 
   --radius: 0.75rem;
 
-  --sidebar: oklch(0.196 0.014 265);
-  --sidebar-foreground: oklch(0.96 0.004 265);
-  --sidebar-primary: oklch(0.735 0.163 158);
-  --sidebar-primary-foreground: oklch(0.17 0.03 158);
-  --sidebar-accent: oklch(0.268 0.018 265);
-  --sidebar-accent-foreground: oklch(0.96 0.004 265);
-  --sidebar-border: oklch(0.288 0.017 265);
-  --sidebar-ring: oklch(0.735 0.163 158);
+  --sidebar: light-dark(oklch(1 0 0), oklch(0.196 0.014 265));
+  --sidebar-foreground: light-dark(oklch(0.24 0.018 265), oklch(0.96 0.004 265));
+  --sidebar-primary: light-dark(oklch(0.48 0.13 158), oklch(0.735 0.163 158));
+  --sidebar-primary-foreground: light-dark(oklch(0.99 0.012 158), oklch(0.17 0.03 158));
+  --sidebar-accent: light-dark(oklch(0.94 0.01 265), oklch(0.268 0.018 265));
+  --sidebar-accent-foreground: light-dark(oklch(0.24 0.018 265), oklch(0.96 0.004 265));
+  --sidebar-border: light-dark(oklch(0.9 0.008 265), oklch(0.288 0.017 265));
+  --sidebar-ring: light-dark(oklch(0.48 0.13 158), oklch(0.735 0.163 158));
 }
 
-/* The palette above is already dark; .dark exists so shadcn's variant resolves. */
-.dark {
+/**
+ * The theme, chosen or inherited.
+ *
+ * Absent means "whatever the device says", which is why `:root` above declares both.
+ * The attribute is written by the server from a cookie, so the first paint is already
+ * the right theme — the same way the language is resolved, and for the same reason: a
+ * flash of the wrong one is worse than a moment of nothing.
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
   color-scheme: dark;
 }
+
+/**
+ * `.dark` carries no colour of its own.
+ *
+ * It exists only so shadcn's `dark:` variant resolves — a handful of subtle input fills
+ * and ring alphas. Giving it `color-scheme` as well would make one class responsible for
+ * both the variant and the palette, and then the server could not put the palette on the
+ * page without also guessing what the device prefers. The attribute above decides the
+ * colours; this class is set by the client once it can read `prefers-color-scheme`.
+ */
 
 @theme inline {
   --color-background: var(--background);
@@ -127,7 +171,6 @@
 
   html {
     @apply font-sans;
-    color-scheme: dark;
   }
 
   body {
@@ -179,8 +222,8 @@
   /* Hairline highlight along the top edge of a raised card. */
   .edge-light {
     box-shadow:
-      inset 0 1px 0 0 color-mix(in oklch, white 6%, transparent),
-      0 1px 2px 0 oklch(0 0 0 / 0.4);
+      inset 0 1px 0 0 light-dark(transparent, color-mix(in oklch, white 6%, transparent)),
+      0 1px 2px 0 light-dark(oklch(0 0 0 / 0.06), oklch(0 0 0 / 0.4));
   }
 }
 

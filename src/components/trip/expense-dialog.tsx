@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { Camera, Check, Loader2 } from "lucide-react";
+import { Camera, Check, ChevronDown, Loader2 } from "lucide-react";
 import { CATEGORIES, CURRENCIES } from "@/lib/types";
 import type { Member } from "@/lib/types";
 import { CategoryIcon, useCategoryName } from "@/components/category-icon";
@@ -78,8 +78,23 @@ export function ExpenseDialog({
 }) {
   const t = useT();
   const categoryName = useCategoryName();
+  /**
+   * Open once the details are needed, and stay open while they are being used.
+   *
+   * An expense that is being edited arrives with all of them already filled in, so
+   * folding them away would hide the very thing somebody came to change.
+   */
+  const [showDetails, setShowDetails] = useState(editing);
+
+  /**
+   * An amount and somebody who paid it. That is the whole requirement.
+   *
+   * A description used to be required too, which put a text field between a person at a
+   * table and the number they came to type. It is still worth having — it is the line
+   * you read back a week later — so it is asked for, just not demanded: an expense saved
+   * without one is named after its category, which is what people would have typed.
+   */
   const valid =
-    draft.description.trim().length > 0 &&
     parseFloat(draft.amount) > 0 &&
     draft.paidBy.length > 0 &&
     draft.splitAmong.length > 0 &&
@@ -117,34 +132,8 @@ export function ExpenseDialog({
           }}
           className="space-y-5"
         >
-          <ReceiptScanner
-            tripId={tripId}
-            receipt={draft.receipt}
-            onScanned={(fields, filename) =>
-              setDraft({
-                receipt: filename,
-                ...(fields.merchant ? { description: fields.merchant } : {}),
-                ...(fields.total ? { amount: String(fields.total) } : {}),
-                ...(fields.currency ? { currency: fields.currency } : {}),
-                ...(fields.date ? { date: fields.date } : {}),
-                ...(fields.category ? { category: fields.category } : {}),
-              })
-            }
-            onRemoved={() => setDraft({ receipt: undefined })}
-          />
-
-          <div className="space-y-2">
-            <Label htmlFor="desc">{t("expense.description")}</Label>
-            <Input
-              id="desc"
-              autoFocus
-              value={draft.description}
-              onChange={(e) => setDraft({ description: e.target.value })}
-              placeholder={t("expense.descriptionPlaceholder")}
-              className="h-11"
-            />
-          </div>
-
+          {/* Amount first, and focused. It is the one thing every expense has, it is
+              what the person came to type, and everything below can be guessed. */}
           <div className="space-y-2">
             <Label htmlFor="amount">{t("expense.amount")}</Label>
             <div className="flex gap-2">
@@ -154,16 +143,17 @@ export function ExpenseDialog({
                 inputMode="decimal"
                 step="0.01"
                 min="0"
+                autoFocus
                 value={draft.amount}
                 onChange={(e) => setDraft({ amount: e.target.value })}
-                placeholder="0.00"
-                className="tabular h-11 flex-1 text-base"
+                placeholder="0,00"
+                className="tabular h-14 flex-1 !text-3xl font-semibold"
               />
               <Select
                 value={draft.currency}
                 onValueChange={(v) => setDraft({ currency: String(v) })}
               >
-                <SelectTrigger className="h-11 w-28">
+                <SelectTrigger className="h-14 w-28">
                   {/* SelectValue renders the raw value; without this the trigger shows
                       "EUR" while the list shows "€ EUR". */}
                   <SelectValue>
@@ -182,54 +172,6 @@ export function ExpenseDialog({
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>{t("expense.category")}</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setDraft({ category: cat.id })}
-                  aria-pressed={draft.category === cat.id}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[13px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    draft.category === cat.id
-                      ? "border-primary/40 bg-primary/15 text-primary"
-                      : "border-border bg-secondary/50 text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <CategoryIcon category={cat.id} className="size-3.5" />
-                  {categoryName(cat.id)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="expense-note">
-              {t("expense.note")}{" "}
-              <span className="font-normal text-muted-foreground">({t("settle.optional")})</span>
-            </Label>
-            <Input
-              id="expense-note"
-              value={draft.note}
-              onChange={(e) => setDraft({ note: e.target.value })}
-              placeholder={t("expense.notePlaceholder")}
-              className="h-11"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="date">{t("expense.date")}</Label>
-            <Input
-              id="date"
-              type="date"
-              value={draft.date}
-              onChange={(e) => setDraft({ date: e.target.value })}
-              className="h-11"
-            />
           </div>
 
           <div className="space-y-2">
@@ -255,14 +197,121 @@ export function ExpenseDialog({
             </div>
           </div>
 
-          <SplitEditor
-            members={members}
-            draft={draft}
-            setDraft={setDraft}
-            total={parseFloat(draft.amount) || 0}
-            currency={draft.currency}
-            toggleSplit={toggleSplit}
-          />
+          {/* Everything with a sensible default lives behind this: the split is equal
+              among everyone, the date is today, the category is food, and the name is
+              the category unless somebody types a better one. The summary says what
+              those defaults came to, so folding them away hides nothing. */}
+          {!showDetails && (
+            <button
+              type="button"
+              onClick={() => setShowDetails(true)}
+              className="flex w-full items-center justify-between rounded-xl border border-dashed border-border px-3.5 py-2.5 text-left text-[13px] text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span className="min-w-0 truncate">
+                {draft.description.trim() || categoryName(draft.category)}
+                {" · "}
+                {draft.splitMode === "equal" && draft.splitAmong.length === members.length
+                  ? t("expense.evenlyAmongAll")
+                  : t("expense.unevenSummary")}
+              </span>
+              <ChevronDown className="size-4 shrink-0" />
+            </button>
+          )}
+
+          {showDetails && (
+            <div className="space-y-5">
+              <ReceiptScanner
+                tripId={tripId}
+                receipt={draft.receipt}
+                onScanned={(fields, filename) =>
+                  setDraft({
+                    receipt: filename,
+                    ...(fields.merchant ? { description: fields.merchant } : {}),
+                    ...(fields.total ? { amount: String(fields.total) } : {}),
+                    ...(fields.currency ? { currency: fields.currency } : {}),
+                    ...(fields.date ? { date: fields.date } : {}),
+                    ...(fields.category ? { category: fields.category } : {}),
+                  })
+                }
+                onRemoved={() => setDraft({ receipt: undefined })}
+              />
+
+              <div className="space-y-2">
+                <Label htmlFor="desc">
+                  {t("expense.description")}{" "}
+                  <span className="font-normal text-muted-foreground">
+                    ({t("settle.optional")})
+                  </span>
+                </Label>
+                <Input
+                  id="desc"
+                  value={draft.description}
+                  onChange={(e) => setDraft({ description: e.target.value })}
+                  placeholder={categoryName(draft.category)}
+                  className="h-11"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t("expense.category")}</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setDraft({ category: cat.id })}
+                      aria-pressed={draft.category === cat.id}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[13px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        draft.category === cat.id
+                          ? "border-primary/40 bg-primary/15 text-primary"
+                          : "border-border bg-secondary/50 text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <CategoryIcon category={cat.id} className="size-3.5" />
+                      {categoryName(cat.id)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="expense-note">
+                  {t("expense.note")}{" "}
+                  <span className="font-normal text-muted-foreground">
+                    ({t("settle.optional")})
+                  </span>
+                </Label>
+                <Input
+                  id="expense-note"
+                  value={draft.note}
+                  onChange={(e) => setDraft({ note: e.target.value })}
+                  placeholder={t("expense.notePlaceholder")}
+                  className="h-11"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="date">{t("expense.date")}</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={draft.date}
+                  onChange={(e) => setDraft({ date: e.target.value })}
+                  className="h-11"
+                />
+              </div>
+
+              <SplitEditor
+                members={members}
+                draft={draft}
+                setDraft={setDraft}
+                total={parseFloat(draft.amount) || 0}
+                currency={draft.currency}
+                toggleSplit={toggleSplit}
+              />
+            </div>
+          )}
         </form>
 
         <DialogFooter>

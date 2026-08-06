@@ -26,8 +26,9 @@ import {
 } from "@/lib/store";
 import { db, users } from "@/db";
 import { authorizeTrip } from "@/lib/authorize";
+import { notify } from "@/lib/push";
 import { isValidEmail, normalizeEmail } from "@/lib/auth";
-import { EMOJIS } from "@/lib/types";
+import { EMOJIS, isTripKind } from "@/lib/types";
 import { logError } from "@/lib/errors";
 
 // GET — trip with balances and the minimal set of settlements
@@ -170,6 +171,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
       "removeMembers",
       "transferOwner",
       "name",
+      "kind",
       "budget",
     ] as const;
     if (!isOwner && OWNER_ONLY.some((key) => body[key] !== undefined)) return ownerOnly();
@@ -236,6 +238,15 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
           return NextResponse.json({ error: "Could not add them" }, { status: 500 });
         }
         logActivity(id, auth.user, seat ? "memberReturned" : "memberAdded", member.name);
+        // The one notification that is not about a figure: being put in a group is
+        // otherwise completely silent — it simply appears in your list one day.
+        notify([target.id], {
+          action: "joined",
+          trip: trip.name,
+          actor: auth.user?.name ?? "?",
+          subject: "",
+          url: `/trip/${id}`,
+        });
         return NextResponse.json({ members: (await getTrip(id))?.members ?? [], invite: null });
       }
 
@@ -349,6 +360,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
       // is nobody else's business and would fill the feed on the first day.
       if (!isMine) logActivity(id, auth.user, "memberRenamed", name.trim());
     }
+
+    if (isTripKind(body.kind)) await updateTripMeta(id, { kind: body.kind });
 
     if (body.name && typeof body.name === "string" && body.name.trim().length > 0) {
       await updateTripMeta(id, { name: body.name.trim().slice(0, 100) });

@@ -382,6 +382,96 @@ async function main() {
     0
   );
 
+  // ── What kind of group this is ─────────────────────────────────────
+  console.log("\nA group is not always a trip");
+  const flat = await alice("/api/trips", {
+    method: "POST",
+    body: JSON.stringify({ name: "Piso", kind: "home", currency: "EUR", members: [] }),
+  });
+  check("a group can say what it is", flat.body.kind, "home");
+  check(
+    "and it comes back in the list",
+    (await alice("/api/trips")).body.trips.find((t) => t.id === flat.body.id).kind,
+    "home"
+  );
+  check(
+    "nonsense falls back to a trip",
+    (
+      await alice("/api/trips", {
+        method: "POST",
+        body: JSON.stringify({ name: "Raro", kind: "spaceship", currency: "EUR", members: [] }),
+      })
+    ).body.kind,
+    "trip"
+  );
+  check(
+    "the owner can change it",
+    (
+      await alice(`/api/trips/${flat.body.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ kind: "couple" }),
+      })
+    ).status,
+    200
+  );
+  check("and it stuck", (await alice(`/api/trips/${flat.body.id}`)).body.kind, "couple");
+
+  // ── Notifications ──────────────────────────────────────────────────
+  //
+  // Delivery itself needs a real browser and its vendor's push service, so what is
+  // checked here is everything this server is responsible for: it has a key to hand out,
+  // it remembers a subscription, and it forgets it on request.
+  console.log("\nNotifications");
+  const keyed = await alice("/api/push");
+  check("the instance hands out a key of its own", typeof keyed.body.publicKey, "string");
+  check("a long one", keyed.body.publicKey.length > 80, true);
+  check("nobody is subscribed to start with", keyed.body.subscribed, false);
+
+  const endpoint = `https://push.example.com/${uniq()}`;
+  const subscription = {
+    endpoint,
+    keys: { p256dh: "BOrq".padEnd(87, "x"), auth: "c2VjcmV0MTIzNDU2Nzg" },
+  };
+  check(
+    "a browser can subscribe",
+    (
+      await alice("/api/push", { method: "POST", body: JSON.stringify({ subscription }) })
+    ).body.subscribed,
+    true
+  );
+  check(
+    "and the server says so afterwards",
+    (await alice(`/api/push?endpoint=${encodeURIComponent(endpoint)}`)).body.subscribed,
+    true
+  );
+  check(
+    "somebody else's browser is not theirs",
+    (await bob(`/api/push?endpoint=${encodeURIComponent(endpoint)}`)).body.subscribed,
+    false
+  );
+  check(
+    "a request without a subscription in it is refused",
+    (await alice("/api/push", { method: "POST", body: JSON.stringify({ subscription: {} }) })).status,
+    400
+  );
+  check(
+    "signed out, there is nothing to ask",
+    (await client()("/api/push")).status,
+    401
+  );
+  check(
+    "unsubscribing works",
+    (
+      await alice("/api/push", { method: "DELETE", body: JSON.stringify({ endpoint }) })
+    ).body.subscribed,
+    false
+  );
+  check(
+    "and it is really gone",
+    (await alice(`/api/push?endpoint=${encodeURIComponent(endpoint)}`)).body.subscribed,
+    false
+  );
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
 }

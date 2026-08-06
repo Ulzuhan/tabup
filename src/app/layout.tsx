@@ -5,6 +5,8 @@ import { ServiceWorkerRegistrar } from "@/components/offline";
 import { cookies, headers } from "next/headers";
 import { I18nProvider } from "@/i18n/provider";
 import { LOCALE_COOKIE, isLocale, localeFromHeader } from "@/i18n/config";
+import { ThemeSync } from "@/components/theme";
+import { THEME_COOKIE, isTheme } from "@/lib/theme";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -36,7 +38,13 @@ export const metadata: Metadata = {
  * under the notch while the safe-area padding below keeps it clear of the home bar.
  */
 export const viewport: Viewport = {
-  themeColor: "#141520",
+  // One per scheme, so the browser chrome matches the page instead of leaving a dark bar
+  // above a light app. An explicit choice that disagrees with the device is the one case
+  // this cannot follow; a slightly wrong tint on the status bar is the whole cost.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fbfbfd" },
+    { media: "(prefers-color-scheme: dark)", color: "#141520" },
+  ],
   viewportFit: "cover",
   width: "device-width",
   initialScale: 1,
@@ -53,23 +61,35 @@ async function resolveLocale() {
   return localeFromHeader((await headers()).get("accept-language"));
 }
 
+/**
+ * The theme, resolved on the server for the same reason as the language: the first paint
+ * has to be the right one. No cookie means "whatever the device says", which the CSS
+ * already handles on its own.
+ */
+async function resolveTheme() {
+  const stored = (await cookies()).get(THEME_COOKIE)?.value;
+  return isTheme(stored) ? stored : undefined;
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const locale = await resolveLocale();
+  const [locale, theme] = await Promise.all([resolveLocale(), resolveTheme()]);
 
   return (
     <html
       lang={locale}
-      className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      data-theme={theme}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="brand-glow flex min-h-full flex-col bg-background text-foreground">
         <I18nProvider locale={locale}>
           {children}
           <Toaster position="top-center" />
           <ServiceWorkerRegistrar />
+          <ThemeSync />
         </I18nProvider>
       </body>
     </html>
