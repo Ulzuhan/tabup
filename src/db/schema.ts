@@ -391,6 +391,37 @@ export const comments = sqliteTable(
 );
 
 /**
+ * A way back into an account, handed out one at a time by the admin.
+ *
+ * There is no email here, so there is no self-service "forgot my password" — somebody
+ * who cannot get in asks, and the admin generates one of these and sends it over
+ * whatever they already talk on. That is what makes the shape of it matter: the link
+ * travels through a chat and stays there, so it is single-use and short-lived, and the
+ * moment it is spent whatever is left in the conversation is worthless.
+ *
+ * It replaces the admin typing a password and dictating it — which stays valid forever,
+ * is readable by anyone who scrolls back, and is a password the person did not choose.
+ *
+ * Only the hash is stored, like sessions: a leaked copy of this file must not be a
+ * bag of working keys.
+ */
+export const passwordResets = sqliteTable(
+  "password_resets",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+    /** Set the moment it is spent. A used link is kept until it expires so that
+        opening it twice says "already used" rather than "never existed". */
+    usedAt: integer("used_at"),
+  },
+  (t) => [index("password_resets_user_idx").on(t.userId)]
+);
+
+/**
  * Where a browser wants to be told things.
  *
  * One row per browser, not per person: somebody signed in on a phone and a laptop has

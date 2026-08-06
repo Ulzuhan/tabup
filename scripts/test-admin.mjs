@@ -152,6 +152,110 @@ async function main() {
     })
   ).status, 200);
 
+  // ── Getting back in without an email ────────────────────────────────
+  //
+  // The admin hands out a link instead of dictating a password. It is a key to somebody
+  // else's account travelling through a chat, so what matters is that it dies quickly
+  // and cannot be spent twice.
+  console.log("\nRecovery links");
+  const anaAgain = client();
+  await anaAgain("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email: "ana@example.com", password: "a fine new password" }),
+  });
+
+  check("a normal account cannot make one", (
+    await anaAgain("/api/admin/users", {
+      method: "POST",
+      body: JSON.stringify({ id: anaId, action: "reset-link" }),
+    })
+  ).status, 403);
+
+  check("nor for an account that does not exist", (
+    await admin("/api/admin/users", {
+      method: "POST",
+      body: JSON.stringify({ id: "0".repeat(32), action: "reset-link" }),
+    })
+  ).status, 404);
+
+  const link = await admin("/api/admin/users", {
+    method: "POST",
+    body: JSON.stringify({ id: anaId, action: "reset-link" }),
+  });
+  check("the admin makes one", link.status, 200);
+  check("for the right account", link.body.email, "ana@example.com");
+  check("that lasts about an hour", Math.round((link.body.expiresAt - Date.now()) / 60000), 60);
+
+  const visitor = client();
+  const look = await visitor(`/api/auth/reset?token=${encodeURIComponent(link.body.token)}`);
+  check("opening it needs no session", look.status, 200);
+  check("and it names the account", look.body.email, "ana@example.com");
+  check(
+    "a made-up token is worth nothing",
+    (await visitor("/api/auth/reset?token=nonsense")).body.state,
+    "unknown"
+  );
+
+  check("a short password is refused", (
+    await visitor("/api/auth/reset", {
+      method: "POST",
+      body: JSON.stringify({ token: link.body.token, password: "short" }),
+    })
+  ).status, 400);
+
+  const spent = await visitor("/api/auth/reset", {
+    method: "POST",
+    body: JSON.stringify({ token: link.body.token, password: "the one ana picked" }),
+  });
+  check("she sets her own password", spent.status, 200);
+  check("and is signed in on the spot", (await visitor("/api/auth/me")).body.user?.email, "ana@example.com");
+  check("her other sessions were closed", (await anaAgain("/api/auth/me")).body.user, null);
+  check("the new password works", (
+    await client()("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email: "ana@example.com", password: "the one ana picked" }),
+    })
+  ).status, 200);
+
+  // The link is in a conversation somewhere and stays there. It has to be worthless now.
+  check(
+    "the link is spent",
+    (await client()(`/api/auth/reset?token=${encodeURIComponent(link.body.token)}`)).body.state,
+    "used"
+  );
+  check("and cannot be used again", (
+    await client()("/api/auth/reset", {
+      method: "POST",
+      body: JSON.stringify({ token: link.body.token, password: "somebody else's idea" }),
+    })
+  ).body.error, "used");
+  check("so the password it set still stands", (
+    await client()("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email: "ana@example.com", password: "the one ana picked" }),
+    })
+  ).status, 200);
+
+  // Asking twice should not leave two keys under the mat.
+  const first = await admin("/api/admin/users", {
+    method: "POST",
+    body: JSON.stringify({ id: anaId, action: "reset-link" }),
+  });
+  const second = await admin("/api/admin/users", {
+    method: "POST",
+    body: JSON.stringify({ id: anaId, action: "reset-link" }),
+  });
+  check(
+    "a second link retires the first",
+    (await client()(`/api/auth/reset?token=${encodeURIComponent(first.body.token)}`)).body.state,
+    "unknown"
+  );
+  check(
+    "and the newest one still works",
+    (await client()(`/api/auth/reset?token=${encodeURIComponent(second.body.token)}`)).body.state,
+    "ok"
+  );
+
   // ── The error log ───────────────────────────────────────────────────
   console.log("\nError log");
   const before = (await admin("/api/admin/errors")).body.errors.length;

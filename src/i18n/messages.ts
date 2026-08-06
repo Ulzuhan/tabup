@@ -347,6 +347,9 @@ export const es = {
     adminRole: "Admin",
     joinedOn: "Desde el {date}",
     changePassword: "Cambiar contraseña",
+    resetLink: "Enlace de recuperación",
+    resetLinkReady: "Enlace creado: dura una hora y solo sirve una vez",
+    resetLinkFor: "Para {email}",
     newPassword: "Contraseña nueva",
     passwordChanged: "Contraseña de {name} cambiada; sus sesiones se han cerrado",
     passwordWarning:
@@ -452,6 +455,20 @@ export const es = {
     emptyHint: "Comentar es la alternativa a cambiar lo que apuntó otro.",
     deleted: "Comentario borrado",
     failed: "No se ha podido guardar",
+  },
+
+  reset: {
+    title: "Elige una contraseña nueva",
+    forAccount: "Para la cuenta {email}",
+    newPassword: "Contraseña nueva",
+    save: "Guardar y entrar",
+    willSignOut: "Se cerrará la sesión en todos los demás dispositivos.",
+    expired: "Este enlace ha caducado",
+    used: "Este enlace ya se ha usado",
+    unknown: "Este enlace no vale",
+    askAgain: "Pídele otro a quien lleva el servidor: duran una hora y solo sirven una vez.",
+    forgot: "¿No recuerdas la contraseña?",
+    forgotHint: "Pídele un enlace a quien lleva este servidor.",
   },
 
   push: {
@@ -831,6 +848,9 @@ export const en: Messages = {
     adminRole: "Admin",
     joinedOn: "Joined {date}",
     changePassword: "Change password",
+    resetLink: "Recovery link",
+    resetLinkReady: "Link created: it lasts an hour and works once",
+    resetLinkFor: "For {email}",
     newPassword: "New password",
     passwordChanged: "Changed {name}'s password; their sessions are closed",
     passwordWarning:
@@ -932,6 +952,20 @@ export const en: Messages = {
     emptyHint: "Commenting is the alternative to changing what somebody else entered.",
     deleted: "Comment deleted",
     failed: "Could not save that",
+  },
+
+  reset: {
+    title: "Choose a new password",
+    forAccount: "For the account {email}",
+    newPassword: "New password",
+    save: "Save and sign in",
+    willSignOut: "Every other device will be signed out.",
+    expired: "This link has expired",
+    used: "This link has already been used",
+    unknown: "This link is not valid",
+    askAgain: "Ask whoever runs the server for another: they last an hour and work once.",
+    forgot: "Forgotten your password?",
+    forgotHint: "Ask whoever runs this server for a link.",
   },
 
   push: {

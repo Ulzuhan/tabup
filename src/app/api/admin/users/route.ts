@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import {
   approveUser,
   approvedUsers,
+  createPasswordReset,
   getCurrentUser,
   isAdmin,
   passwordProblem,
@@ -9,6 +11,7 @@ import {
   rejectUser,
   setPassword,
 } from "@/lib/auth";
+import { db, users } from "@/db";
 import { logError } from "@/lib/errors";
 
 /**
@@ -45,6 +48,22 @@ export async function POST(request: NextRequest) {
   if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
   try {
+    /**
+     * A link, rather than a password read out over the phone.
+     *
+     * The person asks the admin because there is no email here to ask a machine. What
+     * comes back is single-use and dies within the hour, so what stays in that
+     * conversation stops being a way into somebody's account.
+     */
+    if (body.action === "reset-link") {
+      const target = db.select().from(users).where(eq(users.id, body.id)).get();
+      if (!target) {
+        return NextResponse.json({ error: "No account with that id" }, { status: 404 });
+      }
+      const reset = createPasswordReset(target.id);
+      return NextResponse.json({ ...reset, email: target.email });
+    }
+
     if (body.action === "password") {
       const password = String(body.password ?? "");
       const problem = passwordProblem(password);

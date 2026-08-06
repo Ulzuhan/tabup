@@ -179,6 +179,15 @@ function migrate(sqlite: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS comments_expense_idx ON comments(expense_id);
 
+    CREATE TABLE IF NOT EXISTS password_resets (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      used_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS password_resets_user_idx ON password_resets(user_id);
+
     CREATE TABLE IF NOT EXISTS push_subscriptions (
       endpoint TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -255,6 +264,7 @@ function migrate(sqlite: Database.Database) {
   // reliably runs.
   sqlite.prepare("DELETE FROM sessions WHERE expires_at < ?").run(Date.now());
   sqlite.prepare("DELETE FROM invites WHERE expires_at < ?").run(Date.now());
+  sqlite.prepare("DELETE FROM password_resets WHERE expires_at < ?").run(Date.now());
 }
 
 /**

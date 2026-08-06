@@ -184,6 +184,15 @@ export default function LoginPage() {
       </Card>
       )}
 
+      {/* Without an email flow there is nothing to click here, so it says what to do
+          instead of offering a button that cannot exist. Staring at a login form with no
+          way forward is the dead end this replaces. */}
+      {!registering && !requested && (
+        <p className="mt-5 text-center text-xs text-muted-foreground">
+          <span className="font-medium">{t("reset.forgot")}</span> {t("reset.forgotHint")}
+        </p>
+      )}
+
       {requested ? null : canRegister === false && !registering ? (
         <div className="mt-6 rounded-xl border border-border bg-card p-3 text-center">
           <p className="text-sm font-medium">{t("auth.closed")}</p>

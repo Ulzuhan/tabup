@@ -343,7 +343,7 @@ what it tests starts with "whoever registers first is the admin":
 
 ```bash
 rm -f data/test.db* && TABUP_DB=data/test.db TABUP_REGISTRATION=approval npm run start &
-npm run test:admin      # 18 — approvals, passwords, the error log
+npm run test:admin      # 36 — approvals, passwords, recovery links, the error log
 ```
 
 `test:restart` starts and stops its own server, so it takes no arguments and shares
@@ -491,12 +491,20 @@ rotated out, so a bad backup can never destroy the good ones.
 Restore by stopping the server, gunzipping a snapshot over the database file, and
 starting it again.
 
-**Password resets** happen from the machine that holds the database. There is no
-reset-by-email flow: for a handful of accounts, an email provider plus tokens and their
-expiry is more machinery than the problem deserves. What this does close is the real
-hole — forgetting a password used to mean losing the trips behind it for good. The
-script signs out every existing session and verifies the stored hash before reporting
-success.
+**Getting back into an account** has no email behind it, so it has no self-service
+"forgot my password" either: you ask whoever runs the instance, and they generate a
+**recovery link** from the admin panel and send it over whatever you already talk on.
+
+The link is the credential for that one act, which is why its shape matters — it travels
+through a chat and stays in it. So it expires in an hour, works exactly once, retires any
+earlier link for the same account, and the moment it is spent every session of that
+account is closed and whatever is left in the conversation is worthless. Only its hash is
+stored, like sessions.
+
+It replaces the admin typing a password and dictating it, which never expires, is
+readable by anyone who scrolls back, and is a password the person did not choose. That
+path still exists in the panel, and `scripts/reset-password.mjs` still works from the
+machine itself, but both are now the fallback rather than the procedure.
 
 ## Security notes
 

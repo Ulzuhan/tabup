@@ -3,7 +3,7 @@ import type { BinaryLike, ScryptOptions } from "crypto";
 import { promisify } from "util";
 import { cookies } from "next/headers";
 import { eq, lt, sql, isNull, isNotNull, and } from "drizzle-orm";
-import { db, users, sessions, trips } from "@/db";
+import { db, users, sessions, trips, passwordResets } from "@/db";
 import type { UserRow } from "@/db";
 
 /**
@@ -140,6 +140,102 @@ export function destroyAllSessions(userId: string): void {
 
 export function purgeExpiredSessions(): void {
   db.delete(sessions).where(lt(sessions.expiresAt, Date.now())).run();
+}
+
+// ── Getting back in ──────────────────────────────────────────────────────
+
+/**
+ * An hour.
+ *
+ * Long enough to send somebody a link and have them open it after lunch, short enough
+ * that one forgotten in a chat is a dead string by the evening. There is no email here,
+ * so this link travels through whatever people already talk on and stays in that
+ * conversation — which is exactly why it should stop working quickly.
+ */
+const RESET_MINUTES = 60;
+
+/**
+ * Issues a link that lets one person set a new password, once.
+ *
+ * The admin's alternative — typing a password and dictating it — is worse in three
+ * separate ways: it never expires, anyone who scrolls back in the conversation can read
+ * it, and it is a password the person did not choose and will not remember.
+ *
+ * Any earlier link for that account is dropped: asking again should not leave two keys
+ * under the mat.
+ */
+export function createPasswordReset(userId: string): { token: string; expiresAt: number } {
+  const token = randomBytes(32).toString("base64url");
+  const now = Date.now();
+  const expiresAt = now + RESET_MINUTES * 60 * 1000;
+
+  db.delete(passwordResets).where(eq(passwordResets.userId, userId)).run();
+  db.insert(passwordResets)
+    .values({ tokenHash: hashToken(token), userId, createdAt: now, expiresAt })
+    .run();
+
+  return { token, expiresAt };
+}
+
+export type ResetState = "ok" | "expired" | "used" | "unknown";
+
+/** What a link is worth, without spending it. Used by the page before showing a form. */
+export function readPasswordReset(
+  token: string
+): { state: ResetState; email?: string; name?: string } {
+  if (!token || token.length > 64) return { state: "unknown" };
+
+  const row = db
+    .select()
+    .from(passwordResets)
+    .where(eq(passwordResets.tokenHash, hashToken(token)))
+    .get();
+  if (!row) return { state: "unknown" };
+  if (row.usedAt) return { state: "used" };
+  if (row.expiresAt < Date.now()) return { state: "expired" };
+
+  const user = db.select().from(users).where(eq(users.id, row.userId)).get();
+  if (!user) return { state: "unknown" };
+  return { state: "ok", email: user.email, name: user.name };
+}
+
+/**
+ * Spends a link and sets the password.
+ *
+ * Named `redeem` rather than `use` for two reasons: it is what the invitation flow
+ * already calls spending a token, and anything beginning with `use` is read as a React
+ * hook by every tool in this project.
+ *
+ * Every other session goes with it. Somebody who needed this either lost their way in or
+ * suspects that somebody else has it, and both of those are answered by the same thing:
+ * everything signed in anywhere stops being signed in.
+ */
+export async function redeemPasswordReset(
+  token: string,
+  password: string
+): Promise<{ state: ResetState; userId?: string }> {
+  const row = db
+    .select()
+    .from(passwordResets)
+    .where(eq(passwordResets.tokenHash, hashToken(token)))
+    .get();
+  if (!row) return { state: "unknown" };
+  if (row.usedAt) return { state: "used" };
+  if (row.expiresAt < Date.now()) return { state: "expired" };
+
+  const hash = await hashPassword(password);
+  // Marked used in the same transaction that changes the password: two taps on a slow
+  // connection must not each get to set one.
+  db.transaction((tx) => {
+    tx.update(users).set({ passwordHash: hash }).where(eq(users.id, row.userId)).run();
+    tx.update(passwordResets)
+      .set({ usedAt: Date.now() })
+      .where(eq(passwordResets.tokenHash, row.tokenHash))
+      .run();
+    tx.delete(sessions).where(eq(sessions.userId, row.userId)).run();
+  });
+
+  return { state: "ok", userId: row.userId };
 }
 
 // ── Users ────────────────────────────────────────────────────────────────

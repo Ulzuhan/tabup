@@ -3,16 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import {
-  AlertTriangle,
-  ArrowLeft,
-  Check,
-  KeyRound,
-  Loader2,
-  ShieldCheck,
-  UserCheck,
-  X,
-} from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, KeyRound, Link2, Loader2, ShieldCheck, UserCheck, X } from "lucide-react";
 import { useT, useIntlLocale } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -70,6 +61,8 @@ export default function AdminPage() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [resetting, setResetting] = useState<Account | null>(null);
+  /** A freshly made recovery link, waiting to be copied into a chat. */
+  const [resetLink, setResetLink] = useState<{ url: string; email: string } | null>(null);
 
   const load = useCallback(async () => {
     const [usersRes, errorsRes] = await Promise.all([
@@ -92,6 +85,36 @@ export default function AdminPage() {
   useEffect(() => {
     Promise.resolve().then(load);
   }, [load]);
+
+  /**
+   * Makes a way back in for somebody who cannot get in.
+   *
+   * Shown rather than sent, because there is no email on this instance: the admin copies
+   * it into whatever they already talk on. That is also why it is worth saying out loud
+   * on screen how long it lasts.
+   */
+  const makeResetLink = async (user: Account) => {
+    setBusy(`link-${user.id}`);
+    setResetLink(null);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: user.id, action: "reset-link" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || t("common.somethingWrong"));
+        return;
+      }
+      setResetLink({ url: `${window.location.origin}/reset/${data.token}`, email: data.email });
+      toast.success(t("admin.resetLinkReady"));
+    } catch {
+      toast.error(t("common.serverUnreachable"));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const act = async (user: PendingUser, action: "approve" | "reject") => {
     setBusy(user.id);
@@ -222,6 +245,33 @@ export default function AdminPage() {
             )}
           </section>
 
+          {/* The link, once made. Sits above the list rather than inside a row: it is
+              the thing to act on now, and it has to be easy to copy on a phone. */}
+          {resetLink && (
+            <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/[0.06] p-3">
+              <div>
+                <p className="text-sm font-medium">{t("admin.resetLinkReady")}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t("admin.resetLinkFor", { email: resetLink.email })}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Input readOnly value={resetLink.url} className="h-9 min-w-0 flex-1 text-xs" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 shrink-0"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(resetLink.url);
+                    toast.success(t("common.copied"));
+                  }}
+                >
+                  {t("common.copy")}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* ── Accounts ──────────────────────────────────────────────── */}
           <section>
             <SectionHeading title={t("admin.accounts")} hint={t("admin.accountsHint")} />
@@ -249,8 +299,26 @@ export default function AdminPage() {
                         </p>
                       </div>
 
+                      {/* Two ways in, and the link is the one to reach for: it expires,
+                          it works once, and the person chooses their own password
+                          instead of being told one over a chat that keeps it forever. */}
                       <Button
                         variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => makeResetLink(user)}
+                        disabled={busy !== null}
+                      >
+                        {busy === `link-${user.id}` ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Link2 className="size-4" />
+                        )}
+                        {t("admin.resetLink")}
+                      </Button>
+
+                      <Button
+                        variant="ghost"
                         size="sm"
                         className="shrink-0"
                         onClick={() => setResetting(user)}
