@@ -468,6 +468,15 @@ Two things make this tractable without a full sync engine:
   write. Without that, a request that arrived but whose response was lost would be
   duplicated by the retry — and duplicating a charge is worse than dropping one.
 
+**A queued write belongs to an account, not to the browser.** IndexedDB is per device and
+a phone gets handed over. Without an owner on each write, one person's expense was
+replayed under whoever signed in next: the server answered 404 for a trip they had no
+access to, 404 is not retryable, and the write — the one thing in this app that exists
+nowhere else — was deleted. Each write now carries the account that made it, only that
+account's writes are ever sent, and the rest sit untouched until their owner comes back to
+that device. Covered end to end by a browser walk that blocks the write endpoint, hands
+the phone over, and checks the expense is still there afterwards.
+
 **Editing and deleting do not queue**, deliberately. They need the server's current
 state to mean anything: editing an expense someone else already changed, or deleting one
 they already deleted, are conflicts with no good silent answer. Offline they fail and

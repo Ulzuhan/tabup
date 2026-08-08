@@ -112,6 +112,9 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/trips/[
     // only avoids showing buttons that would fail.
     access: auth.level,
     you: you?.id ?? null,
+    // The account, not the seat. The offline queue stamps each write with it so a phone
+    // that changes hands cannot replay one person's expense under another's session.
+    youAccount: auth.user?.id ?? null,
     // Offered rather than guessed: the names were typed by somebody else, and only the
     // person reading them knows which one is them. Empty once they have chosen — and
     // empty from the start for anyone who joined a trip with nothing free to claim,

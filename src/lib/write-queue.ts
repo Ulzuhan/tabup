@@ -33,6 +33,19 @@ export type PendingKind = "expense" | "payment";
 export interface PendingWrite {
   /** Also the idempotency key sent to the server. */
   clientId: string;
+  /**
+   * The account that wrote it.
+   *
+   * IndexedDB belongs to the browser, not to whoever is signed in, and this used to hold
+   * nothing about ownership. A phone handed over with an expense still queued replayed it
+   * under the next person's session: the server answered 404 for a trip they had no
+   * access to, 404 is not retryable, and the write — the one thing in this app that
+   * exists nowhere else — was deleted. Watched happen end to end before this was written.
+   *
+   * Absent only on writes queued before this existed; those are still sent, because
+   * stranding somebody's expense forever is the worse of the two mistakes.
+   */
+  userId?: string;
   tripId: string;
   kind: PendingKind;
   /** The exact request body, ready to send. */
@@ -87,11 +100,17 @@ export async function enqueue(write: Omit<PendingWrite, "attempts">): Promise<vo
   notify();
 }
 
-export async function pendingFor(tripId: string): Promise<PendingWrite[]> {
+/** Whose a queued write is. Anything from before ownership was recorded is everyone's. */
+const belongsTo = (write: PendingWrite, userId?: string) =>
+  write.userId === undefined || write.userId === userId;
+
+export async function pendingFor(tripId: string, userId?: string): Promise<PendingWrite[]> {
   if (typeof indexedDB === "undefined") return [];
   try {
     const all = await withStore<PendingWrite[]>("readonly", (store) => store.getAll());
-    return all.filter((w) => w.tripId === tripId).sort((a, b) => a.createdAt - b.createdAt);
+    return all
+      .filter((w) => w.tripId === tripId && belongsTo(w, userId))
+      .sort((a, b) => a.createdAt - b.createdAt);
   } catch {
     // Private browsing and some locked-down configurations refuse IndexedDB outright.
     // Losing the queue is bad; crashing the page over it is worse.
@@ -99,11 +118,11 @@ export async function pendingFor(tripId: string): Promise<PendingWrite[]> {
   }
 }
 
-export async function allPending(): Promise<PendingWrite[]> {
+export async function allPending(userId?: string): Promise<PendingWrite[]> {
   if (typeof indexedDB === "undefined") return [];
   try {
     const all = await withStore<PendingWrite[]>("readonly", (store) => store.getAll());
-    return all.sort((a, b) => a.createdAt - b.createdAt);
+    return all.filter((w) => belongsTo(w, userId)).sort((a, b) => a.createdAt - b.createdAt);
   } catch {
     return [];
   }
@@ -156,7 +175,19 @@ let flushing = false;
  */
 const RETRYABLE = new Set([401, 403, 408, 429]);
 
-export async function flushQueue(): Promise<{ sent: number; failed: number; dropped: number }> {
+/**
+ * How many failures before the app stops calling it "waiting for a connection".
+ *
+ * `attempts` was recorded from the first day and shown nowhere, so a write stuck behind a
+ * 500 looked exactly like one waiting for signal — indefinitely, and with no way to tell
+ * the difference from the banner.
+ */
+export const STUCK_AFTER = 3;
+
+export async function flushQueue(
+  /** Only this account's writes are sent. Without one, nothing is: see `PendingWrite`. */
+  userId?: string
+): Promise<{ sent: number; failed: number; dropped: number }> {
   if (flushing || typeof navigator === "undefined" || !navigator.onLine) {
     return { sent: 0, failed: 0, dropped: 0 };
   }
@@ -167,7 +198,7 @@ export async function flushQueue(): Promise<{ sent: number; failed: number; drop
   let dropped = 0;
 
   try {
-    for (const write of await allPending()) {
+    for (const write of await allPending(userId)) {
       const path = write.kind === "expense" ? "expense" : "payment";
       try {
         const res = await fetch(`/api/trips/${write.tripId}/${path}`, {

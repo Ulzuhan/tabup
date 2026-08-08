@@ -19,8 +19,23 @@ import { Card, CardContent } from "@/components/ui/card";
  * immediately rather than waiting for a sync to make it real.
  */
 
-/** Writes still sitting in the local queue. */
-export function PendingBanner({ count, onFlush }: { count: number; onFlush: () => void }) {
+/**
+ * Writes still sitting in the local queue.
+ *
+ * Two states, not one. "Waiting for a connection" and "tried several times and is not
+ * going through" look identical from the outside and mean completely different things —
+ * the first resolves itself on the walk back down, the second wants somebody to look at
+ * it. The count of attempts was recorded from the first day and shown nowhere.
+ */
+export function PendingBanner({
+  count,
+  stuck,
+  onFlush,
+}: {
+  count: number;
+  stuck: number;
+  onFlush: () => void;
+}) {
   const t = useT();
   if (count === 0) return null;
 
@@ -34,7 +49,9 @@ export function PendingBanner({ count, onFlush }: { count: number; onFlush: () =
         <p className="font-medium">
           {count === 1 ? t("offline.pendingOne") : t("offline.pendingMany", { count })}
         </p>
-        <p className="text-xs opacity-80">{t("offline.pendingHint")}</p>
+        <p className="text-xs opacity-80">
+          {stuck > 0 ? t("offline.pendingStuck") : t("offline.pendingHint")}
+        </p>
       </div>
       <Button
         size="sm"

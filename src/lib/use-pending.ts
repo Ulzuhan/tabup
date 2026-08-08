@@ -6,9 +6,9 @@ import type { Expense, Payment, Trip } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { calculateBalances, calculateSettlements } from "@/lib/balances";
 import {
-  allPending,
   flushQueue,
   pendingFor,
+  STUCK_AFTER,
   subscribeToQueue,
   type PendingWrite,
 } from "@/lib/write-queue";
@@ -26,7 +26,16 @@ export interface PendingExpense extends Expense {
  * that matters: walking back into wifi should quietly deliver everything typed on the
  * mountain, with no button to press.
  */
-export function usePendingWrites(tripId: string, onDelivered: () => void) {
+export function usePendingWrites(
+  tripId: string,
+  /**
+   * Whose queue this is. Undefined while the trip is still loading, and then nothing is
+   * sent — a write belongs to the account that made it, and replaying somebody else's
+   * under the session that happens to be signed in now is how one gets destroyed.
+   */
+  userId: string | undefined,
+  onDelivered: () => void
+) {
   const [pending, setPending] = useState<PendingWrite[]>([]);
   const t = useT();
 
@@ -39,11 +48,12 @@ export function usePendingWrites(tripId: string, onDelivered: () => void) {
   }, [onDelivered]);
 
   const refresh = useCallback(async () => {
-    setPending(await pendingFor(tripId));
-  }, [tripId]);
+    setPending(await pendingFor(tripId, userId));
+  }, [tripId, userId]);
 
   const attemptFlush = useCallback(async () => {
-    const { sent, dropped } = await flushQueue();
+    if (!userId) return;
+    const { sent, dropped } = await flushQueue(userId);
     await refresh();
     // Only refetch when something actually landed; otherwise this would hammer the
     // server every time the browser flaps between networks.
@@ -51,7 +61,7 @@ export function usePendingWrites(tripId: string, onDelivered: () => void) {
     // A write the server refused outright is gone, and it was somebody's money. It used
     // to disappear into a console warning; whoever typed it deserves to hear about it.
     if (dropped > 0) toast.error(t("offline.dropped", { count: dropped }));
-  }, [refresh, t]);
+  }, [refresh, t, userId]);
 
   useEffect(() => {
     // Deferred so no state is set during the render pass; both of these resolve after
@@ -156,15 +166,12 @@ export function mergePending(
   };
 }
 
-/** How many writes are waiting across every trip, for the home screen. */
-export function useTotalPending(): number {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    const refresh = async () => setCount((await allPending()).length);
-    refresh();
-    return subscribeToQueue(refresh);
-  }, []);
-
-  return count;
+/**
+ * How many of these have tried and failed rather than simply waited.
+ *
+ * The difference matters on screen: one is "there is no signal yet", the other is "this
+ * is not going through and somebody should look".
+ */
+export function stuckCount(pending: PendingWrite[]): number {
+  return pending.filter((w) => w.attempts >= STUCK_AFTER).length;
 }

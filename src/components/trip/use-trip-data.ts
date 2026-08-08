@@ -52,7 +52,11 @@ export function useTripData(id: string, filters: ExpenseFilters) {
     Promise.resolve().then(loadTrip);
   }, [loadTrip]);
 
-  const { pending, refresh: refreshPending, flush: flushPending } = usePendingWrites(id, () => {
+  const {
+    pending,
+    refresh: refreshPending,
+    flush: flushPending,
+  } = usePendingWrites(id, trip?.youAccount ?? undefined, () => {
     // Something in the queue reached the server, so the trip on screen is now behind.
     Promise.resolve().then(() => loadTrip());
   });

@@ -31,6 +31,7 @@ import {
 } from "@/components/trip/expense-filter";
 import { OfflineBanner } from "@/components/offline";
 import { enqueue, newClientId } from "@/lib/write-queue";
+import { stuckCount } from "@/lib/use-pending";
 import { useT } from "@/i18n/provider";
 import { useCategoryName } from "@/components/category-icon";
 import { Button } from "@/components/ui/button";
@@ -217,6 +218,7 @@ export default function TripPage() {
 
       await enqueue({
         clientId: newClientId(),
+        userId: trip.youAccount ?? undefined,
         tripId: id,
         kind: "expense",
         body,
@@ -260,6 +262,7 @@ export default function TripPage() {
     } catch {
       await enqueue({
         clientId: newClientId(),
+        userId: trip?.youAccount ?? undefined,
         tripId: id,
         kind: "payment",
         body: paymentBody,
@@ -434,7 +437,11 @@ export default function TripPage() {
       />
 
       <OfflineBanner stale={stale} />
-      <PendingBanner count={pending.length} onFlush={() => flushPending()} />
+      <PendingBanner
+        count={pending.length}
+        stuck={stuckCount(pending)}
+        onFlush={() => flushPending()}
+      />
 
       {/* Asked once, near the top, because until it is answered every figure below is a
           list of other people's names rather than what you owe. */}

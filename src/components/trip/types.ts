@@ -50,6 +50,8 @@ export interface TripData {
   access: "member" | "owner";
   /** Which participant the reader is, when they have said. Null asks the question. */
   you: string | null;
+  /** The reader's account. What the offline queue stamps its writes with. */
+  youAccount: string | null;
   /** The participants still free to claim, offered only while `you` is null. */
   unclaimed: Member[];
 }
