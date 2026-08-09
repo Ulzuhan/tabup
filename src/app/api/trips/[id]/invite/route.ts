@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import { createInvite } from "@/lib/store";
 import { authorizeTrip } from "@/lib/authorize";
 
@@ -17,7 +18,7 @@ export async function POST(_request: NextRequest, ctx: RouteContext<"/api/trips/
 
   const invite = await createInvite(id);
   if (!invite) {
-    return NextResponse.json({ error: "Could not create the invitation" }, { status: 500 });
+    return fail("save_failed", 500);
   }
 
   return NextResponse.json(invite);

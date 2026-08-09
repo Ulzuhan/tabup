@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import { getCurrentUser } from "./auth";
 import { accessLevel, canRead, canWrite, isValidId } from "./store";
 import type { Access } from "./store";
@@ -34,7 +35,7 @@ export async function authorizeTrip(
   if (!canRead(level)) {
     return {
       ok: false,
-      response: NextResponse.json({ error: "Trip not found" }, { status: 404 }),
+      response: fail("not_found", 404),
     };
   }
 
@@ -49,7 +50,7 @@ export async function authorizeTrip(
   if (need === "own" && level !== "owner") {
     return {
       ok: false,
-      response: NextResponse.json({ error: "Only the trip owner can do that" }, { status: 403 }),
+      response: fail("owner_only", 403),
     };
   }
 

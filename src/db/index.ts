@@ -225,6 +225,7 @@ function migrate(sqlite: Database.Database) {
   addColumn(sqlite, "expenses", "note", "TEXT");
   addColumn(sqlite, "expenses", "receipt", "TEXT");
   addColumn(sqlite, "trips", "budget", "REAL");
+  addColumn(sqlite, "members", "former_account", "INTEGER NOT NULL DEFAULT 0");
   addColumn(sqlite, "trips", "kind", "TEXT NOT NULL DEFAULT 'trip'");
   addColumn(sqlite, "payments", "client_id", "TEXT");
   addColumn(sqlite, "members", "user_id", "TEXT REFERENCES users(id) ON DELETE SET NULL");

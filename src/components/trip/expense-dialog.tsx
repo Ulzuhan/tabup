@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { useT } from "@/i18n/provider";
+import { useServerError, useT } from "@/i18n/provider";
 
 export type SplitMode = "equal" | "percent" | "amount";
 
@@ -572,6 +572,7 @@ function ReceiptScanner({
   onRemoved: () => void;
 }) {
   const t = useT();
+  const serverError = useServerError();
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -585,7 +586,7 @@ function ReceiptScanner({
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        toast.error(data.error || t("expense.scanFailed"));
+        toast.error(serverError(data, "expense.scanFailed"));
         return;
       }
 

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail, type ErrorCode } from "@/lib/api-error";
 import { getCurrentUser } from "@/lib/auth";
+import type { RecurringInput } from "@/lib/store";
 import {
   addRecurring,
   convertTo,
@@ -23,26 +25,33 @@ async function requireUser() {
 
 export async function GET() {
   const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+  if (!user) return fail("signin_required", 401);
 
   return NextResponse.json({ items: await listRecurring(user.id) });
 }
 
-/** Validates a payload for both create and update. */
-async function parseBody(body: Record<string, unknown>) {
+/**
+ * Validates a payload for both create and update.
+ *
+ * The refusal is a code rather than a sentence, like every other route: the wording is
+ * the client's business, since it is the one that knows what language somebody reads.
+ */
+async function parseBody(
+  body: Record<string, unknown>
+): Promise<{ error: ErrorCode; value?: undefined } | { error?: undefined; value: RecurringInput }> {
   const name = typeof body.name === "string" ? body.name.trim() : "";
-  if (!name || name.length > 100) return { error: "Name must be 1-100 characters" };
+  if (!name || name.length > 100) return { error: "name_required" as const };
 
   const amount = parseFloat(String(body.amount));
   if (!isFinite(amount) || amount <= 0 || amount > 1e9) {
-    return { error: "Amount must be a positive number up to 1 billion" };
+    return { error: "amount_range" as const };
   }
 
   const currency = typeof body.currency === "string" ? body.currency : "EUR";
-  if (!CURRENCIES.find((c) => c.code === currency)) return { error: "Invalid currency" };
+  if (!CURRENCIES.find((c) => c.code === currency)) return { error: "invalid_currency" as const };
 
   const period = String(body.period ?? "monthly");
-  if (!PERIODS.includes(period as (typeof PERIODS)[number])) return { error: "Invalid period" };
+  if (!PERIODS.includes(period as (typeof PERIODS)[number])) return { error: "invalid_period" as const };
 
   const chargeDay = Math.min(31, Math.max(1, parseInt(String(body.chargeDay ?? 1), 10) || 1));
 
@@ -54,11 +63,11 @@ async function parseBody(body: Record<string, unknown>) {
   const category = CATEGORIES.find((c) => c.id === body.category) ? String(body.category) : "other";
 
   const startedAt = body.startedAt ? new Date(String(body.startedAt)).getTime() : Date.now();
-  if (!isFinite(startedAt)) return { error: "Invalid start date" };
+  if (!isFinite(startedAt)) return { error: "invalid_date" as const };
 
   const endedAt = body.endedAt ? new Date(String(body.endedAt)).getTime() : null;
   if (endedAt !== null && (!isFinite(endedAt) || endedAt < startedAt)) {
-    return { error: "The end date cannot be before the start date" };
+    return { error: "invalid_date" as const };
   }
 
   // Converted once and stored, so a total does not move every time rates refresh.
@@ -71,7 +80,7 @@ async function parseBody(body: Record<string, unknown>) {
     try {
       ({ amount: amountBase } = await convertTo(amount, currency, "EUR"));
     } catch {
-      return { error: `No exchange rate available for ${currency}` };
+      return { error: "rate_unavailable" };
     }
   }
 
@@ -95,7 +104,7 @@ async function parseBody(body: Record<string, unknown>) {
 
 export async function POST(request: NextRequest) {
   const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+  if (!user) return fail("signin_required", 401);
 
   let body: Record<string, unknown>;
   try {
@@ -105,16 +114,16 @@ export async function POST(request: NextRequest) {
   }
 
   const parsed = await parseBody(body);
-  if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+  if (parsed.error) return fail(parsed.error, 400);
 
   const created = await addRecurring(user.id, parsed.value);
-  if (!created) return NextResponse.json({ error: "Could not save it" }, { status: 500 });
+  if (!created) return fail("save_failed", 500);
   return NextResponse.json(created);
 }
 
 export async function PATCH(request: NextRequest) {
   const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+  if (!user) return fail("signin_required", 401);
 
   let body: Record<string, unknown>;
   try {
@@ -127,7 +136,7 @@ export async function PATCH(request: NextRequest) {
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
   const parsed = await parseBody(body);
-  if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+  if (parsed.error) return fail(parsed.error, 400);
 
   /**
    * Re-priced only when the money itself moved.
@@ -145,13 +154,13 @@ export async function PATCH(request: NextRequest) {
 
   // The user id in the WHERE clause is what stops anyone editing someone else's row.
   const updated = await updateRecurring(user.id, id, value);
-  if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!updated) return fail("not_found", 404);
   return NextResponse.json({ success: true });
 }
 
 export async function DELETE(request: NextRequest) {
   const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+  if (!user) return fail("signin_required", 401);
 
   let id = "";
   try {
@@ -162,6 +171,6 @@ export async function DELETE(request: NextRequest) {
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
   const removed = await deleteRecurring(user.id, id);
-  if (!removed) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!removed) return fail("not_found", 404);
   return NextResponse.json({ success: true });
 }

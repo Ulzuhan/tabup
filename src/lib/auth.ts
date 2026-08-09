@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { eq, lt, sql, isNull, isNotNull, and } from "drizzle-orm";
 import { db, users, sessions, trips, passwordResets } from "@/db";
 import type { UserRow } from "@/db";
+import type { ErrorCode } from "./api-error";
 
 /**
  * Accounts, sessions and password hashing.
@@ -213,7 +214,7 @@ export function readPasswordReset(
 export async function redeemPasswordReset(
   token: string,
   password: string
-): Promise<{ state: ResetState; userId?: string }> {
+): Promise<{ state: ResetState; user?: UserRow }> {
   const row = db
     .select()
     .from(passwordResets)
@@ -258,7 +259,11 @@ export async function redeemPasswordReset(
   });
   if (!claimed) return { state: "used" };
 
-  return { state: "ok", userId: row.userId };
+  // Handed back whole rather than as an id: the caller has to know whether this account
+  // has been let in before it signs them in, and looking it up twice invites the two
+  // answers to drift.
+  const user = db.select().from(users).where(eq(users.id, row.userId)).get();
+  return user ? { state: "ok", user } : { state: "unknown" };
 }
 
 // ── Users ────────────────────────────────────────────────────────────────
@@ -276,11 +281,9 @@ export function isValidEmail(email: string): boolean {
  * Composition requirements ("one uppercase, one symbol") measurably push people towards
  * `Password1!`, so length is the only thing enforced here.
  */
-export function passwordProblem(password: string): string | null {
-  if (typeof password !== "string" || password.length < 8) {
-    return "Password must be at least 8 characters";
-  }
-  if (password.length > 200) return "Password must be at most 200 characters";
+export function passwordProblem(password: string): ErrorCode | null {
+  if (typeof password !== "string" || password.length < 8) return "password_short";
+  if (password.length > 200) return "password_long";
   return null;
 }
 

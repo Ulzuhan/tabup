@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import { claimMember, logActivity, memberForUser, seatUser, unlinkedMembers } from "@/lib/store";
 import { authorizeTrip } from "@/lib/authorize";
 import { logError } from "@/lib/errors";
@@ -22,7 +23,7 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: st
   const auth = await authorizeTrip(id, "read");
   if (!auth.ok) return auth.response;
   if (!auth.user) {
-    return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+    return fail("signin_required", 401);
   }
 
   const mine = memberForUser(id, auth.user.id);
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   const auth = await authorizeTrip(id, "read");
   if (!auth.ok) return auth.response;
   if (!auth.user) {
-    return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+    return fail("signin_required", 401);
   }
 
   let body: { memberId?: string; create?: boolean; name?: string };
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
       // column belongs to an account, which is the part that matters.
       const alias = typeof body.name === "string" ? body.name.trim().slice(0, 50) : "";
       const member = await seatUser(id, { id: auth.user.id, name: alias || auth.user.name });
-      if (!member) return NextResponse.json({ error: "Could not add you" }, { status: 500 });
+      if (!member) return fail("save_failed", 500);
       logActivity(id, auth.user, "memberJoined", member.name);
       return NextResponse.json({ member });
     }
@@ -72,12 +73,12 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     const member = claimMember(id, body.memberId, auth.user.id);
     if (!member) {
       // Somebody else got there first, or the name is not free any more.
-      return NextResponse.json({ error: "That person is already taken" }, { status: 409 });
+      return fail("member_taken", 409);
     }
     logActivity(id, auth.user, "memberClaimed", member.name);
     return NextResponse.json({ member });
   } catch (error) {
     logError("POST /api/trips/[id]/claim", error);
-    return NextResponse.json({ error: "Could not save that" }, { status: 500 });
+    return fail("save_failed", 500);
   }
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import { atTripLimit, createTrip, FREE_TRIP_LIMIT, listTrips } from "@/lib/store";
 import { getCurrentUser } from "@/lib/auth";
 import { CURRENCIES, EMOJIS, isTripKind } from "@/lib/types";
@@ -10,23 +11,17 @@ export async function POST(request: NextRequest) {
     // one place that decides a trip exists at all.
     const user = await getCurrentUser();
     if (!user) {
-      return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+      return fail("signin_required", 401);
     }
     if (atTripLimit(user)) {
-      return NextResponse.json(
-        {
-          error: `This account is capped at ${FREE_TRIP_LIMIT} trips.`,
-          code: "trip_limit",
-        },
-        { status: 402 }
-      );
+      return fail("trip_limit", 402, { limit: FREE_TRIP_LIMIT });
     }
 
     const body = await request.json();
     const { name, currency = "EUR", members } = body;
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
-      return NextResponse.json({ error: "Trip name is required" }, { status: 400 });
+      return fail("name_required", 400);
     }
 
     /**
@@ -41,7 +36,7 @@ export async function POST(request: NextRequest) {
     const extra = Array.isArray(members) ? members : [];
     for (const m of extra) {
       if (typeof m?.name !== "string" || m.name.trim().length === 0 || m.name.trim().length > 50) {
-        return NextResponse.json({ error: "Each member name must be 1-50 characters" }, { status: 400 });
+        return fail("member_name_length", 400);
       }
     }
     // The owner is a participant too, so their name counts in the uniqueness check.
@@ -49,7 +44,7 @@ export async function POST(request: NextRequest) {
       n.trim().toLowerCase()
     );
     if (new Set(memberNames).size !== memberNames.length) {
-      return NextResponse.json({ error: "Duplicate member names are not allowed" }, { status: 400 });
+      return fail("duplicate_name", 400);
     }
 
     if (!CURRENCIES.find((c) => c.code === currency)) {
@@ -80,7 +75,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     logError("POST /api/trips", error);
-    return NextResponse.json({ error: "Failed to create trip" }, { status: 500 });
+    return fail("save_failed", 500);
   }
 }
 
@@ -89,12 +84,12 @@ export async function GET() {
     // Only ever the caller's own trips: there is no endpoint that lists everyone's.
     const user = await getCurrentUser();
     if (!user) {
-      return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+      return fail("signin_required", 401);
     }
     const trips = await listTrips(user.id);
     return NextResponse.json({ trips });
   } catch (error) {
     logError("GET /api/trips", error);
-    return NextResponse.json({ error: "Failed to list trips" }, { status: 500 });
+    return fail("save_failed", 500);
   }
 }

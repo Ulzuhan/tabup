@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import {
   addComment,
   deleteComment,
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   const auth = await authorizeTrip(id, "write");
   if (!auth.ok) return auth.response;
   if (!auth.user) {
-    return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+    return fail("signin_required", 401);
   }
 
   let body: { expenseId?: string; body?: string };
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     return NextResponse.json({ comment });
   } catch (error) {
     logError("POST /api/trips/[id]/comment", error);
-    return NextResponse.json({ error: "Could not save that" }, { status: 500 });
+    return fail("save_failed", 500);
   }
 }
 
@@ -109,13 +110,10 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
     isOwner: auth.level === "owner",
   });
   if (result === "missing") {
-    return NextResponse.json({ error: "Comment not found" }, { status: 404 });
+    return fail("not_found", 404);
   }
   if (result === "forbidden") {
-    return NextResponse.json(
-      { error: "Only whoever wrote it, or the trip owner, can delete it" },
-      { status: 403 }
-    );
+    return fail("author_only", 403);
   }
   return NextResponse.json({ success: true });
 }

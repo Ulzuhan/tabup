@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { KeyRound, Loader2 } from "lucide-react";
-import { useT } from "@/i18n/provider";
+import { useServerError, useT } from "@/i18n/provider";
 import { Wordmark } from "@/components/app-header";
 import { clearSessionCache } from "@/lib/session-cache";
 import { Button } from "@/components/ui/button";
@@ -26,12 +26,13 @@ import { Skeleton } from "@/components/ui/skeleton";
  */
 export default function ResetPage() {
   const t = useT();
+  const serverError = useServerError();
   const router = useRouter();
   const token = useParams().token as string;
 
   const [state, setState] = useState<
     | { status: "loading" }
-    | { status: "bad"; reason: "expired" | "used" | "unknown" }
+    | { status: "bad"; reason: "expired" | "used" | "unknown" | "pending" }
     | { status: "ready"; email: string; name: string }
   >({ status: "loading" });
 
@@ -74,12 +75,20 @@ export default function ResetPage() {
       if (!res.ok) {
         // The three token states come back as bare words so they can be translated here
         // rather than arriving as a sentence in the wrong language.
-        if (["expired", "used", "unknown"].includes(data.error)) {
-          setState({ status: "bad", reason: data.error });
+        if (["expired", "used", "unknown"].includes(data.code)) {
+          setState({ status: "bad", reason: data.code });
           return;
         }
-        setError(data.error || t("common.somethingWrong"));
+        setError(serverError(data, "common.somethingWrong"));
         setBusy(false);
+        return;
+      }
+
+      // The password is set either way. What does not follow, for an account still
+      // waiting to be let in, is being signed in — so say that rather than dropping them
+      // on a front page that will ask them to sign in and then refuse.
+      if (data.pending) {
+        setState({ status: "bad", reason: "pending" });
         return;
       }
 
@@ -123,7 +132,7 @@ export default function ResetPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-10">
+    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-10">
       <div className="mb-7 text-center">
         <p className="text-2xl font-semibold tracking-tight">
           <Wordmark />
@@ -170,6 +179,6 @@ export default function ResetPage() {
       </Card>
 
       <p className="mt-5 text-center text-xs text-muted-foreground">{t("reset.willSignOut")}</p>
-    </div>
+    </main>
   );
 }

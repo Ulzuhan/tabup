@@ -39,6 +39,35 @@ function DialogOverlay({
   )
 }
 
+/**
+ * The last thing focused that was not inside a dialog.
+ *
+ * Base UI hands focus back to whatever opened a dialog — but only when that is a
+ * `Dialog.Trigger`, and almost nothing here uses one: these dialogs are opened from state
+ * by a button somewhere else on the page. With nothing to hand back to, focus landed on
+ * `<body>`. Measured: open "Añadir gasto" from the keyboard, press Escape, and you are at
+ * the top of the document with the whole page to tab through again — which is most of the
+ * reason people give up on using an app with a keyboard.
+ *
+ * Tracked at the document rather than captured when the popup renders, because the popup
+ * is not where the timing is: `DialogContent` runs on every render of the page that holds
+ * it, open or not, so reading `activeElement` there caught whatever was focused when the
+ * page first drew — which is nothing. A listener has no such question about *when*: the
+ * answer is always the last element that actually had focus.
+ */
+let lastFocusedOutside: HTMLElement | null = null
+
+if (typeof document !== "undefined") {
+  document.addEventListener(
+    "focusin",
+    (event) => {
+      const el = event.target as HTMLElement | null
+      if (el && !el.closest("[data-slot=dialog-content]")) lastFocusedOutside = el
+    },
+    true
+  )
+}
+
 function DialogContent({
   className,
   children,
@@ -52,6 +81,9 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
+        // Only if it is still on the page: a row deleted while the dialog was open
+        // cannot be focused, and asking for it would put focus nowhere again.
+        finalFocus={() => (lastFocusedOutside?.isConnected ? lastFocusedOutside : null)}
         className={cn(
           "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className

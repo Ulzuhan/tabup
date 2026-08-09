@@ -14,7 +14,7 @@
  * arrives with its members, expenses and payments nested.
  */
 import { randomBytes } from "crypto";
-import { eq, asc, desc, and, gt, isNull, sql } from "drizzle-orm";
+import { eq, asc, desc, and, gt, isNull, isNotNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   trips,
@@ -1108,6 +1108,80 @@ export async function transferOwnership(
   return "ok";
 }
 
+/**
+ * Closing an account for good.
+ *
+ * There was no way to do this at all, which is a strange gap in an app that holds
+ * somebody's spending: the only exit was asking the person who runs the server to open
+ * SQLite. Most of the work is already described by the schema — sessions, push
+ * subscriptions, recurring costs and access grants are all `ON DELETE CASCADE`, and
+ * authorship on expenses, payments, comments and the activity feed goes null, so what
+ * they wrote stays and the name on it stops pointing anywhere.
+ *
+ * Two things the cascade cannot decide on its own:
+ *
+ * **Trips they own** would be left with `owner_id` null — a group everyone else is still
+ * using that nobody can invite to, rename or take anybody out of. So it is handed to
+ * whoever else has been in it longest, and only deleted when there is nobody to hand it
+ * to, which means it was theirs alone.
+ *
+ * **Their seat in other people's trips** must not evaporate: their half of the taxi
+ * happened. The column stays with its name on it, and is marked as belonging to an
+ * account that is gone, so the trip never offers it to the next person through the door.
+ *
+ * Deliberately not refused over a balance. Being owed twelve euros is a good reason to
+ * warn somebody, and a bad reason to tell them they may not leave.
+ */
+export async function deleteAccount(
+  userId: string
+): Promise<{ handedOver: number; tripsDeleted: number; seatsKept: number }> {
+  const owned = db.select({ id: trips.id }).from(trips).where(eq(trips.ownerId, userId)).all();
+
+  let handedOver = 0;
+  let tripsDeleted = 0;
+
+  for (const { id } of owned) {
+    // Longest-standing first: whoever has been in it since the beginning is the least
+    // surprising person to find themselves running it.
+    const heir = db
+      .select({ memberId: members.id })
+      .from(members)
+      .innerJoin(
+        tripAccess,
+        and(eq(tripAccess.tripId, members.tripId), eq(tripAccess.userId, members.userId))
+      )
+      .where(
+        and(
+          eq(members.tripId, id),
+          isNotNull(members.userId),
+          ne(members.userId, userId)
+        )
+      )
+      .orderBy(asc(tripAccess.createdAt))
+      .get();
+
+    if (heir) {
+      await transferOwnership(id, heir.memberId);
+      handedOver++;
+    } else {
+      await deleteTrip(id);
+      tripsDeleted++;
+    }
+  }
+
+  // Marked before the delete, because the delete is what nulls `userId` and there would
+  // be nothing left to find them by afterwards.
+  const seatsKept = db
+    .update(members)
+    .set({ formerAccount: true })
+    .where(eq(members.userId, userId))
+    .run().changes;
+
+  db.delete(users).where(eq(users.id, userId)).run();
+
+  return { handedOver, tripsDeleted, seatsKept };
+}
+
 /** Whether an account can still open a trip, without going through `accessLevel`. */
 function stillInTrip(tripId: string, userId: string): boolean {
   const trip = db.select({ ownerId: trips.ownerId }).from(trips).where(eq(trips.id, tripId)).get();
@@ -1217,7 +1291,15 @@ export function unlinkedMembers(tripId: string): Member[] {
   return db
     .select()
     .from(members)
-    .where(and(eq(members.tripId, tripId), isNull(members.userId)))
+    .where(
+      and(
+        eq(members.tripId, tripId),
+        isNull(members.userId),
+        // A seat whose account was deleted is unlinked and will stay unlinked. Offering
+        // it would hand somebody else's figures to whoever arrives next.
+        eq(members.formerAccount, false)
+      )
+    )
     .orderBy(asc(members.position))
     .all()
     .filter((m) => !reserved.has(m.id))

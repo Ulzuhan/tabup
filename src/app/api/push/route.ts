@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import { getCurrentUser } from "@/lib/auth";
 import { isSubscribed, publicKey, removeSubscription, saveSubscription } from "@/lib/push";
 import { logError } from "@/lib/errors";
@@ -13,7 +14,7 @@ import { logError } from "@/lib/errors";
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
-    return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+    return fail("signin_required", 401);
   }
 
   // The browser knows its own endpoint and asks whether this server still has it: a
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
-    return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+    return fail("signin_required", 401);
   }
 
   try {
@@ -46,14 +47,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ subscribed: true });
   } catch (error) {
     logError("POST /api/push", error);
-    return NextResponse.json({ error: "Could not save that" }, { status: 500 });
+    return fail("save_failed", 500);
   }
 }
 
 export async function DELETE(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
-    return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+    return fail("signin_required", 401);
   }
 
   try {

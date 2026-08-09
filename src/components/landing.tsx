@@ -44,6 +44,9 @@ export function Landing({ locale, canRegister }: { locale: Locale; canRegister: 
         <Button variant="ghost" size="sm" render={<Link href="/login">{t.signIn}</Link>} />
       </header>
 
+      {/* Between the header and the footer, so there is something to skip to. */}
+      <main className="flex flex-1 flex-col">
+
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       {/* overflow-x-clip because the bloom behind the demo card extends past the
           container, and on a phone that alone gives the page a horizontal scrollbar. */}
@@ -112,6 +115,8 @@ export function Landing({ locale, canRegister }: { locale: Locale; canRegister: 
           }
         />
       </section>
+
+      </main>
 
       <footer className="border-t border-border/60">
         <div className="mx-auto w-full max-w-5xl px-5 py-6 text-center text-xs text-muted-foreground">

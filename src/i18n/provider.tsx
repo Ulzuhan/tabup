@@ -67,6 +67,43 @@ export function useT() {
 }
 
 /**
+ * Turns a refusal from the server into a sentence.
+ *
+ * Every call site used to be `data.error || t("something.failed")`, and `data.error` was
+ * an English sentence written in a route file — so the one moment the app has to explain
+ * itself to somebody was also the one moment it stopped speaking their language.
+ *
+ * Now the wire carries a code and the wording lives in the message tree. Anything without
+ * a code, or with one this build has never heard of, falls through to whatever the caller
+ * would have said anyway: an unrecognised code must read as "something went wrong", never
+ * as the code itself, and never as the English detail that travels beside it for the log.
+ *
+ * The extra fields come along because some refusals are useless without them — which
+ * people still owe money, which currency had no rate on the day.
+ */
+export function useServerError() {
+  const t = useT();
+  const locale = useLocale();
+
+  return useMemo(() => {
+    const dict = MESSAGES[locale] ?? MESSAGES[DEFAULT_LOCALE];
+
+    return (data: unknown, fallback: Paths): string => {
+      const body = (data ?? {}) as { code?: string; names?: string[] } & Record<string, unknown>;
+      const code = body.code;
+      if (!code || !(code in dict.errors)) return t(fallback);
+
+      const vars: Record<string, string | number> = {};
+      for (const [key, value] of Object.entries(body)) {
+        if (key === "code" || key === "error") continue;
+        vars[key] = Array.isArray(value) ? value.join(", ") : String(value);
+      }
+      return t(`errors.${code}` as Paths, vars);
+    };
+  }, [t, locale]);
+}
+
+/**
  * Plural-aware translation.
  *
  * Picks between `key_one` and `key_other` using Intl.PluralRules, so "1 gasto" and

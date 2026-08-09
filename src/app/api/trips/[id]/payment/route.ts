@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import {
   addPayment,
   authorRule,
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
 
   const trip = await getTrip(id);
   if (!trip) {
-    return NextResponse.json({ error: "Trip not found" }, { status: 404 });
+    return fail("not_found", 404);
   }
 
   try {
@@ -47,20 +48,17 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       return NextResponse.json({ error: "Invalid 'to' member" }, { status: 400 });
     }
     if (from === to) {
-      return NextResponse.json({ error: "Cannot settle with yourself" }, { status: 400 });
+      return fail("settle_self", 400);
     }
 
     const parsedDate = body.date === undefined ? Date.now() : new Date(body.date).getTime();
     if (!isFinite(parsedDate)) {
-      return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+      return fail("invalid_date", 400);
     }
 
     const parsedAmount = parseFloat(String(amount));
     if (!isFinite(parsedAmount) || parsedAmount <= 0 || parsedAmount > 1e9) {
-      return NextResponse.json(
-        { error: "Amount must be a positive finite number up to 1 billion" },
-        { status: 400 }
-      );
+      return fail("amount_range", 400);
     }
 
     /**
@@ -86,15 +84,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
         trip.currency,
         parsedDate
       ));
-    } catch (err) {
-      return NextResponse.json(
-        {
-          error: `Cannot convert ${payCurrency} to ${trip.currency}: ${
-            err instanceof Error ? err.message : "Rate unavailable"
-          }`,
-        },
-        { status: 502 }
-      );
+    } catch {
+      return fail("rate_unavailable", 502, { from: payCurrency, to: trip.currency });
     }
 
     const payment = await addPayment(id, {
@@ -112,7 +103,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
     });
 
     if (!payment) {
-      return NextResponse.json({ error: "Failed to record payment" }, { status: 500 });
+      return fail("save_failed", 500);
     }
     const name = (memberId: string) => trip.members.find((m) => m.id === memberId)?.name ?? "?";
     const between = `${name(payment.from)} → ${name(payment.to)}`;
@@ -127,7 +118,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
     return NextResponse.json(payment);
   } catch (error) {
     logError("POST /api/trips/[id]/payment", error);
-    return NextResponse.json({ error: "Failed to record payment" }, { status: 500 });
+    return fail("save_failed", 500);
   }
 }
 
@@ -154,13 +145,10 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/trips
     isOwner: auth.level === "owner",
   });
   if (check === "missing") {
-    return NextResponse.json({ error: "Payment not found" }, { status: 404 });
+    return fail("not_found", 404);
   }
   if (check === "forbidden") {
-    return NextResponse.json(
-      { error: "Only whoever recorded it, or the trip owner, can undo that" },
-      { status: 403 }
-    );
+    return fail("author_only", 403);
   }
 
   const trip = await getTrip(id);
@@ -168,7 +156,7 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/trips
 
   const removed = await deletePayment(id, paymentId);
   if (!removed) {
-    return NextResponse.json({ error: "Payment not found" }, { status: 404 });
+    return fail("not_found", 404);
   }
 
   const name = (memberId?: string) => trip?.members.find((m) => m.id === memberId)?.name ?? "?";

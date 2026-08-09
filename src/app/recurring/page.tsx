@@ -155,7 +155,16 @@ export default function RecurringPage() {
       <AppHeader user={user} loading={loading} onSignOut={signOut} pendingApprovals={pendingApprovals} />
       <SectionTabs current="recurring" />
 
-      {loading ? (
+      <main className="flex flex-1 flex-col">
+        {/*
+          The design gives this page no title — the highlighted tab is what says where you
+          are, and that works by looking. Nothing said it any other way, so the page had no
+          heading at all and anything skimming by headings found nothing. Hidden visually,
+          present for everything else, and outside the loading branch so it is there before
+          the data is.
+        */}
+        <h1 className="sr-only">{t("recurring.tabRecurring")}</h1>
+        {loading ? (
         <div className="mt-6 space-y-2">
           <Skeleton className="h-28 w-full rounded-xl" />
           <Skeleton className="h-16 w-full rounded-xl" />
@@ -377,6 +386,7 @@ export default function RecurringPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </main>
       <SectionTabsSpacer />
     </div>
   );

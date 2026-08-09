@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import {
   clientKey,
   createSession,
@@ -43,15 +44,12 @@ export async function POST(request: NextRequest) {
   const firstEver = registrationOpen() && mode === "closed";
 
   if (!invite && mode === "closed" && !firstEver) {
-    return NextResponse.json(
-      { error: "This server is not accepting new accounts. Use an invitation link." },
-      { status: 403 }
-    );
+    return fail("registration_closed", 403);
   }
 
   const throttleKey = clientKey(request, "register");
   if (tooManyAttempts(throttleKey)) {
-    return NextResponse.json({ error: "Too many attempts, try again later" }, { status: 429 });
+    return fail("throttled", 429);
   }
 
   const email = typeof body.email === "string" ? body.email : "";
@@ -59,15 +57,13 @@ export async function POST(request: NextRequest) {
   const password = typeof body.password === "string" ? body.password : "";
 
   if (!isValidEmail(email)) {
-    return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
+    return fail("invalid_email", 400);
   }
   if (name.length === 0 || name.length > 80) {
-    return NextResponse.json({ error: "Name must be 1-80 characters" }, { status: 400 });
+    return fail("name_length", 400);
   }
   const problem = passwordProblem(password);
-  if (problem) {
-    return NextResponse.json({ error: problem }, { status: 400 });
-  }
+  if (problem) return fail(problem, 400);
 
   recordAttempt(throttleKey);
 
@@ -79,7 +75,7 @@ export async function POST(request: NextRequest) {
 
   const user = await createUser(email, name, password, { approved });
   if (!user) {
-    return NextResponse.json({ error: "That email is already registered" }, { status: 409 });
+    return fail("email_taken", 409);
   }
 
   // No session for an account nobody has let in yet.

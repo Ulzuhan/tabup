@@ -63,7 +63,12 @@ export function SectionTabs({ current }: { current: "trips" | "recurring" }) {
               href={href}
               aria-current={current === key ? "page" : undefined}
               className={cn(
-                "flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors outline-none focus-visible:bg-secondary",
+                // `outline-none` with only a background tint behind it was the same
+                // treatment as hover, on a bar where the tint is barely visible against
+                // muted text — so tabbing to the navigation looked like tabbing to
+                // nothing. An inset ring, because the bar is fixed to the bottom edge and
+                // an outset one would be cut off by it.
+                "flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors outline-none focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
                 current === key ? "text-primary" : "text-muted-foreground"
               )}
             >

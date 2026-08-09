@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import {
   authenticate,
   clearAttempts,
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
   const ipKey = clientKey(request, "login");
   const accountKey = `account:${email.toLowerCase()}`;
   if (tooManyAttempts(ipKey) || tooManyAttempts(accountKey)) {
-    return NextResponse.json({ error: "Too many attempts, try again later" }, { status: 429 });
+    return fail("throttled", 429);
   }
 
   recordAttempt(ipKey);
@@ -35,13 +36,13 @@ export async function POST(request: NextRequest) {
   const user = await authenticate(email, password);
   if (!user) {
     // One message for both cases: which half was wrong is not the caller's business.
-    return NextResponse.json({ error: "Wrong email or password" }, { status: 401 });
+    return fail("wrong_credentials", 401);
   }
 
   // Told apart from a wrong password on purpose: somebody waiting on approval needs to
   // know that is what is happening, not that their password is wrong.
   if (user.approvedAt == null) {
-    return NextResponse.json({ error: "pending_approval" }, { status: 403 });
+    return fail("pending_approval", 403);
   }
 
   // Both counters, not just the account's. The IP key is shared by everyone the server

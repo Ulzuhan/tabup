@@ -288,6 +288,60 @@ async function main() {
     "used"
   );
 
+  /**
+   * A link is a way back into an account, not a way past the queue.
+   *
+   * Redeeming one signed the person in whatever their state, so an account still waiting
+   * to be approved could be walked straight past that wait by a reset link. Only the admin
+   * can issue one, so it was never going to happen by accident — but the password change
+   * and the session are two different things and only one of them follows from holding the
+   * link.
+   */
+  const pending = (await admin("/api/admin/users")).body.pending.find(
+    (u) => u.email === "bea@example.com"
+  );
+  check("Bea is still waiting", Boolean(pending), true);
+  const beaLink = await admin("/api/admin/users", {
+    method: "POST",
+    body: JSON.stringify({ id: pending.id, action: "reset-link" }),
+  });
+  const beaSets = client();
+  const redeemed = await beaSets("/api/auth/reset", {
+    method: "POST",
+    body: JSON.stringify({ token: beaLink.body.token, password: "bea's brand new password" }),
+  });
+  check("she can set a password", redeemed.status, 200);
+  check("and is told she is still waiting", redeemed.body.pending, true);
+  check("without being signed in by it", (await beaSets("/api/auth/me")).body.user, null);
+  check(
+    "the new password is real, it just does not open anything yet",
+    (
+      await client()("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email: "bea@example.com", password: "bea's brand new password" }),
+      })
+    ).status,
+    403
+  );
+
+  /**
+   * The panel is a door now, not a room with the lights off.
+   *
+   * Every endpoint under /api/admin re-checked the role, so nothing was ever shown to the
+   * wrong person — but the page itself loaded, and a normal account could open /admin and
+   * get headings, an empty list and a password dialog, with the data missing for reasons
+   * it could not explain. 404 rather than 403, like a trip you cannot see: whether this
+   * instance has an admin panel at a guessable path is not worth confirming.
+   */
+  const ordinary = client();
+  await ordinary("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email: "ana@example.com", password: "the one ana picked" }),
+  });
+  check("a normal account cannot open the panel", (await ordinary("/admin")).status, 404);
+  check("nor can a stranger", (await client()("/admin")).status, 404);
+  check("the admin can", (await admin("/admin")).status, 200);
+
   // ── The error log ───────────────────────────────────────────────────
   console.log("\nError log");
   const before = (await admin("/api/admin/errors")).body.errors.length;

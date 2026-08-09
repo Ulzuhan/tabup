@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import { eq } from "drizzle-orm";
 import {
   approveUser,
@@ -29,14 +30,14 @@ const snapshot = () => ({ pending: pendingUsers(), users: approvedUsers() });
 
 export async function GET() {
   if (!(await requireAdmin())) {
-    return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+    return fail("not_allowed", 403);
   }
   return NextResponse.json(snapshot());
 }
 
 export async function POST(request: NextRequest) {
   const admin = await requireAdmin();
-  if (!admin) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+  if (!admin) return fail("not_allowed", 403);
 
   let body: { id?: string; action?: string; password?: string };
   try {
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
     if (body.action === "reset-link") {
       const target = db.select().from(users).where(eq(users.id, body.id)).get();
       if (!target) {
-        return NextResponse.json({ error: "No account with that id" }, { status: 404 });
+        return fail("not_found", 404);
       }
       const reset = createPasswordReset(target.id);
       return NextResponse.json({ ...reset, email: target.email });
@@ -67,22 +68,22 @@ export async function POST(request: NextRequest) {
     if (body.action === "password") {
       const password = String(body.password ?? "");
       const problem = passwordProblem(password);
-      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+      if (problem) return fail(problem, 400);
 
       if (!(await setPassword(body.id, password))) {
-        return NextResponse.json({ error: "No account with that id" }, { status: 404 });
+        return fail("not_found", 404);
       }
       return NextResponse.json(snapshot());
     }
 
     const done = body.action === "reject" ? rejectUser(body.id) : approveUser(body.id);
     if (!done) {
-      return NextResponse.json({ error: "No pending request with that id" }, { status: 404 });
+      return fail("not_found", 404);
     }
 
     return NextResponse.json(snapshot());
   } catch (error) {
     logError("POST /api/admin/users", error);
-    return NextResponse.json({ error: "Failed to update the account" }, { status: 500 });
+    return fail("save_failed", 500);
   }
 }

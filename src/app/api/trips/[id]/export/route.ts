@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import { getTrip } from "@/lib/store";
 import { calculateBalances, calculateSettlements, expenseShares } from "@/lib/balances";
 import { authorizeTrip } from "@/lib/authorize";
@@ -22,7 +23,7 @@ export async function GET(
 
   const trip = await getTrip(id);
   if (!trip) {
-    return NextResponse.json({ error: "Trip not found" }, { status: 404 });
+    return fail("not_found", 404);
   }
 
   /**

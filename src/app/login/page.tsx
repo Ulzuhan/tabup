@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Clock, Loader2 } from "lucide-react";
 import { Wordmark } from "@/components/app-header";
-import { useT } from "@/i18n/provider";
+import { useServerError, useT } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { clearSessionCache } from "@/lib/session-cache";
 /** Sign in and registration on one screen. */
 export default function LoginPage() {
   const t = useT();
+  const serverError = useServerError();
   const router = useRouter();
   // The landing links here with ?new=1 for "create account", so the form opens on the
   // step the person actually chose instead of making them switch again.
@@ -60,7 +61,11 @@ export default function LoginPage() {
       if (!res.ok) {
         // The server says "pending_approval" rather than a message, so the wording
         // lives here with the rest of the copy and gets translated.
-        setError(data.error === "pending_approval" ? t("auth.pendingApproval") : data.error || t("common.somethingWrong"));
+        setError(
+          data.code === "pending_approval"
+            ? t("auth.pendingApproval")
+            : serverError(data, "common.somethingWrong")
+        );
         setBusy(false);
         return;
       }
@@ -85,7 +90,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-10">
+    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-10">
       <Link
         href="/"
         className="mb-8 inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -95,9 +100,12 @@ export default function LoginPage() {
       </Link>
 
       <div className="mb-7 text-center">
-        <p className="text-2xl font-semibold tracking-tight">
+        {/* An h1, not a styled paragraph. This page had no heading of any kind, so
+            anything navigating by headings — which is how a screen reader skims — found
+            nothing to land on. It looks identical. */}
+        <h1 className="text-2xl font-semibold tracking-tight">
           <Wordmark />
-        </p>
+        </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {registering ? t("auth.keepAcrossDevices") : t("auth.welcomeBack")}
         </p>
@@ -214,6 +222,6 @@ export default function LoginPage() {
         </p>
       )}
 
-    </div>
+    </main>
   );
 }

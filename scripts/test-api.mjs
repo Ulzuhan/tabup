@@ -225,6 +225,27 @@ async function main() {
   const gone = await api(`/api/trips/${trip.id}`);
   check("deleted trip is gone", gone.status, 404);
 
+  /**
+   * What the HTML says about itself.
+   *
+   * Cheap here and worth guarding: there was no `main` anywhere in the app, so anything
+   * navigating by landmark — which is how a screen reader skims — had nothing to jump to,
+   * and two whole pages had no heading of any kind. Both are the sort of thing that is
+   * invisible until somebody who needs it opens the app, and easy to lose again in a
+   * refactor. Only the server-rendered shell is checked; the rest is a browser's job.
+   */
+  console.log("\nPage structure");
+  for (const path of ["/", "/login", "/recurring"]) {
+    const html = await (await fetch(`${BASE}${path}`, { headers: { cookie } })).text();
+    check(`${path} has a main landmark`, html.includes("<main"), true);
+    check(`${path} has a heading`, html.includes("<h1"), true);
+  }
+  check(
+    "and the document says which language it is in",
+    /<html[^>]+lang="(es|en)"/.test(await (await fetch(`${BASE}/login`)).text()),
+    true
+  );
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
 }

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import type { Member } from "@/lib/types";
 import { MemberAvatar } from "@/components/member-avatar";
-import { useT } from "@/i18n/provider";
+import { useServerError, useT } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ export function ClaimPrompt({
   onClaimed: () => Promise<void>;
 }) {
   const t = useT();
+  const serverError = useServerError();
   const [busy, setBusy] = useState<string | null>(null);
   /** Null until they say none of the names is theirs; then it holds the alias they type. */
   const [alias, setAlias] = useState<string | null>(null);
@@ -48,7 +49,7 @@ export function ClaimPrompt({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(data.error || t("claim.failed"));
+        toast.error(serverError(data, "claim.failed"));
         return;
       }
       await onClaimed();

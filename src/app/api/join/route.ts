@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import { getCurrentUser } from "@/lib/auth";
 import { readInvite, redeemInvite } from "@/lib/store";
 
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
-    return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+    return fail("signin_required", 401);
   }
 
   let token = "";

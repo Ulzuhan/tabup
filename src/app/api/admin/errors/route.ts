@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { acknowledgeErrors, clearErrors, recentErrors } from "@/lib/errors";
 
@@ -10,14 +11,14 @@ async function requireAdmin() {
 
 export async function GET() {
   if (!(await requireAdmin())) {
-    return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+    return fail("not_allowed", 403);
   }
   return NextResponse.json({ errors: recentErrors() });
 }
 
 export async function POST(request: NextRequest) {
   if (!(await requireAdmin())) {
-    return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+    return fail("not_allowed", 403);
   }
 
   let body: { action?: string; id?: string };

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import {
   addExpense,
   authorRule,
@@ -37,7 +38,7 @@ async function loadTrip(id: string): Promise<
 
   const trip = await getTrip(id);
   if (!trip) {
-    return { error: NextResponse.json({ error: "Trip not found" }, { status: 404 }) };
+    return { error: fail("not_found", 404) };
   }
   return {
     trip,
@@ -56,12 +57,9 @@ async function loadTrip(id: string): Promise<
 function refuseRow(check: ReturnType<typeof authorRule>, noun: string): NextResponse | null {
   if (check === "ok") return null;
   if (check === "missing") {
-    return NextResponse.json({ error: `${noun} not found` }, { status: 404 });
+    return fail("not_found", 404, { detail: `${noun} not found` });
   }
-  return NextResponse.json(
-    { error: `Only whoever added it, or the trip owner, can change that` },
-    { status: 403 }
-  );
+  return fail("author_only", 403);
 }
 
 function validateAmount(raw: unknown): number | null {
@@ -129,10 +127,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
 
     const parsedAmount = validateAmount(amount);
     if (parsedAmount === null) {
-      return NextResponse.json(
-        { error: "Amount must be a positive finite number up to 1 billion" },
-        { status: 400 }
-      );
+      return fail("amount_range", 400);
     }
 
     if (!trip.members.find((m) => m.id === paidBy)) {
@@ -141,7 +136,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
 
     const parsedDate = body.date === undefined ? null : validateDate(body.date);
     if (body.date !== undefined && parsedDate === null) {
-      return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+      return fail("invalid_date", 400);
     }
 
     const splitIds: string[] = splitAmong || trip.members.map((m) => m.id);
@@ -164,16 +159,9 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
         trip.currency,
         spentOn
       ));
-    } catch (err) {
+    } catch {
       // Refusing beats guessing: a made-up 1:1 rate would corrupt every balance.
-      return NextResponse.json(
-        {
-          error: `Cannot convert ${expCurrency} to ${trip.currency}: ${
-            err instanceof Error ? err.message : "Rate unavailable"
-          }`,
-        },
-        { status: 502 }
-      );
+      return fail("rate_unavailable", 502, { from: expCurrency, to: trip.currency });
     }
 
     const expense = await addExpense(id, {
@@ -204,7 +192,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
     });
 
     if (!expense) {
-      return NextResponse.json({ error: "Failed to add expense" }, { status: 500 });
+      return fail("save_failed", 500);
     }
     logActivity(id, user, "expenseAdded", expense.description);
     // Everyone else in the trip. Fire and forget: the expense is already saved, and a
@@ -219,7 +207,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
     return NextResponse.json(expense);
   } catch (error) {
     logError("POST /api/trips/[id]/expense", error);
-    return NextResponse.json({ error: "Failed to add expense" }, { status: 500 });
+    return fail("save_failed", 500);
   }
 }
 
@@ -243,7 +231,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
 
     const existing = trip.expenses.find((e) => e.id === expenseId);
     if (!existing) {
-      return NextResponse.json({ error: "Expense not found" }, { status: 404 });
+      return fail("not_found", 404);
     }
 
     const newPaidBy = paidBy || existing.paidBy;
@@ -253,7 +241,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
 
     const parsedDate = body.date === undefined ? null : validateDate(body.date);
     if (body.date !== undefined && parsedDate === null) {
-      return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+      return fail("invalid_date", 400);
     }
 
     const newSplitAmong: string[] = splitAmong || existing.splitAmong;
@@ -265,10 +253,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     if (amount !== undefined) {
       const parsed = validateAmount(amount);
       if (parsed === null) {
-        return NextResponse.json(
-          { error: "Amount must be a positive finite number up to 1 billion" },
-          { status: 400 }
-        );
+        return fail("amount_range", 400);
       }
       newAmount = parsed;
     }
@@ -295,15 +280,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
         const result = await convertTo(newAmount, newCurrency, trip.currency, newDate);
         newAmountBase = result.amount;
         rateUsed = result.rateUsed;
-      } catch (err) {
-        return NextResponse.json(
-          {
-            error: `Cannot convert ${newCurrency} to ${trip.currency}: ${
-              err instanceof Error ? err.message : "Rate unavailable"
-            }`,
-          },
-          { status: 502 }
-        );
+      } catch {
+        return fail("rate_unavailable", 502, { from: newCurrency, to: trip.currency });
       }
     }
 
@@ -329,13 +307,13 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     });
 
     if (!updated) {
-      return NextResponse.json({ error: "Failed to edit expense" }, { status: 500 });
+      return fail("save_failed", 500);
     }
     logActivity(id, user, "expenseEdited", updated.description);
     return NextResponse.json(updated);
   } catch (error) {
     logError("PATCH /api/trips/[id]/expense", error);
-    return NextResponse.json({ error: "Failed to edit expense" }, { status: 500 });
+    return fail("save_failed", 500);
   }
 }
 
@@ -371,7 +349,7 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/trips
 
   const removed = await deleteExpense(id, expenseId);
   if (!removed) {
-    return NextResponse.json({ error: "Expense not found" }, { status: 404 });
+    return fail("not_found", 404);
   }
 
   logActivity(id, auth.user, "expenseDeleted", gone?.description);

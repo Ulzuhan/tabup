@@ -32,7 +32,7 @@ import {
 import { OfflineBanner } from "@/components/offline";
 import { enqueue, newClientId } from "@/lib/write-queue";
 import { stuckCount } from "@/lib/use-pending";
-import { useT } from "@/i18n/provider";
+import { useServerError, useT } from "@/i18n/provider";
 import { useCategoryName } from "@/components/category-icon";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -81,6 +81,7 @@ const emptyExpense = (currency: string, members: Member[], you: string | null): 
 
 export default function TripPage() {
   const t = useT();
+  const serverError = useServerError();
   const categoryName = useCategoryName();
   const params = useParams();
   const router = useRouter();
@@ -199,7 +200,7 @@ export default function TripPage() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || t("expense.saveFailed"));
+        toast.error(serverError(err, "expense.saveFailed"));
         return;
       }
 
@@ -251,7 +252,7 @@ export default function TripPage() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || t("settle.failed"));
+        toast.error(serverError(err, "settle.failed"));
         return;
       }
 
@@ -436,6 +437,9 @@ export default function TripPage() {
         onDelete={() => setConfirm({ type: "trip", id })}
       />
 
+      {/* The header is a landmark of its own; this is the rest. Dialogs are portalled
+          out of here when they open, so they are not really inside it. */}
+      <main className="flex flex-1 flex-col">
       <OfflineBanner stale={stale} />
       <PendingBanner
         count={pending.length}
@@ -664,6 +668,7 @@ export default function TripPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </main>
     </div>
   );
 }

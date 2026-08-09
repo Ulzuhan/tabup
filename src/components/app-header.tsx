@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Check, Globe, LogOut, User as UserIcon, UserCheck } from "lucide-react";
+import { Check, Globe, LogOut, Trash2, User as UserIcon, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useT, useLocale, setLocale } from "@/i18n/provider";
 import { ThemeItems } from "@/components/theme";
 import { PushToggle } from "@/components/push-toggle";
+import { DeleteAccountDialog } from "@/components/delete-account";
 import { LOCALES, LOCALE_NAMES } from "@/i18n/config";
 
 export interface SessionUser {
@@ -55,6 +57,9 @@ export function AppHeader({
   pendingApprovals?: number;
 }) {
   const t = useT();
+  // Held here rather than inside the menu: choosing the item closes the menu, and a
+  // dialog rendered inside it would be unmounted on the way out.
+  const [deleting, setDeleting] = useState(false);
 
   return (
     <header className="mb-8 flex h-9 w-full items-center justify-between">
@@ -121,6 +126,11 @@ export function AppHeader({
               <LogOut className="size-4" />
               {t("auth.signOut")}
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onClick={() => setDeleting(true)}>
+              <Trash2 className="size-4" />
+              {t("account.deleteTitle")}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ) : (
@@ -154,6 +164,10 @@ export function AppHeader({
           />
         </div>
       )}
+
+      {/* Outside the menu on purpose: choosing the item closes the menu, and anything
+          rendered inside it goes with it. */}
+      {user && <DeleteAccountDialog open={deleting} onOpenChange={setDeleting} />}
     </header>
   );
 }

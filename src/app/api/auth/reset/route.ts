@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import {
   clearAttempts,
+  isApproved,
   clientKey,
   createSession,
   passwordProblem,
@@ -36,7 +38,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const key = clientKey(request, "reset");
   if (tooManyAttempts(key)) {
-    return NextResponse.json({ error: "Too many attempts. Wait a minute." }, { status: 429 });
+    return fail("throttled", 429);
   }
 
   let body: { token?: string; password?: string };
@@ -48,22 +50,36 @@ export async function POST(request: NextRequest) {
 
   const password = String(body.password ?? "");
   const problem = passwordProblem(password);
-  if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+  if (problem) return fail(problem, 400);
 
   try {
     const result = await redeemPasswordReset(String(body.token ?? ""), password);
     if (result.state !== "ok") {
       recordAttempt(key);
-      return NextResponse.json({ error: result.state }, { status: 400 });
+      // `code` as well as `error`, like every other route: the page turns it into a
+      // sentence, and "expired" was never a sentence in anybody's language.
+      return NextResponse.json({ error: result.state, code: result.state }, { status: 400 });
     }
 
     clearAttempts(key);
-    // Signed in straight away: they have just chosen the password, so asking them to
-    // type it again on the next screen proves nothing and loses people.
-    await createSession(result.userId!);
+
+    /**
+     * Signed in straight away — unless they were never let in to begin with.
+     *
+     * Choosing a password is proof of holding the link, not of having been approved, and
+     * this used to hand out a session either way: an account still sitting in the queue
+     * could be walked straight past it by a reset link. Rare, since only the admin issues
+     * one, but "rare" is not the same as "cannot". The password change stands, because
+     * that is what the link was for; what does not follow is the session.
+     */
+    if (!isApproved(result.user!)) {
+      return NextResponse.json({ ok: true, pending: true });
+    }
+
+    await createSession(result.user!.id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     logError("POST /api/auth/reset", error);
-    return NextResponse.json({ error: "Could not change the password" }, { status: 500 });
+    return fail("save_failed", 500);
   }
 }

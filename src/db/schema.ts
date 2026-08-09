@@ -164,6 +164,16 @@ export const members = sqliteTable(
      * split.
      */
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    /**
+     * The account behind this seat was deleted.
+     *
+     * `userId` goes null when somebody deletes their account, which would otherwise turn
+     * their column into a free name — and a free name is offered to the next person who
+     * arrives with a link, along with every figure in it. This says the column is nobody's
+     * and is not going to be anybody's: the arithmetic stands, the name stays on it, and
+     * the trip stops asking whether a stranger might be them.
+     */
+    formerAccount: integer("former_account", { mode: "boolean" }).notNull().default(false),
   },
   (t) => [
     index("members_trip_idx").on(t.tripId),

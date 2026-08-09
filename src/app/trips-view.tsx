@@ -157,7 +157,12 @@ export function TripsView() {
       <AppHeader user={user} loading={loading} onSignOut={signOut} showWordmark={false} pendingApprovals={pendingApprovals} />
       <SectionTabs current="trips" />
 
-      {showCreate ? (
+      {/* Everything that is not the header or the navigation. There was no `main` in the
+          app at all, so anything navigating by landmark — which is how a screen reader
+          skims a page — had nothing to jump to. A flex column, so the layout is exactly
+          what it was. */}
+      <main className="flex flex-1 flex-col">
+        {showCreate ? (
         <CreateTripForm
           tripName={tripName}
           setTripName={setTripName}
@@ -226,8 +231,15 @@ export function TripsView() {
               <EmptyState signedIn={Boolean(user)} />
             )}
           </section>
-        </>
-      )}
+          </>
+        )}
+      </main>
+
+      {/* The spacer belongs to the page, not to the empty state. It reserves the height
+          of the bar fixed to the bottom of a phone screen, and it was rendered only when
+          there were no trips — so the moment there was a list, its last row sat under the
+          bar. */}
+      <SectionTabsSpacer />
     </div>
   );
 }
@@ -324,7 +336,6 @@ function EmptyState({ signedIn }: { signedIn: boolean }) {
           {t("home.signInToKeep")}
         </p>
       )}
-      <SectionTabsSpacer />
     </div>
   );
 }

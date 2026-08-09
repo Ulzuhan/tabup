@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Send, Trash2 } from "lucide-react";
-import { useT, useIntlLocale } from "@/i18n/provider";
+import { useServerError, useT, useIntlLocale } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -48,6 +48,7 @@ export function CommentsDialog({
   onChanged: () => void;
 }) {
   const t = useT();
+  const serverError = useServerError();
   const locale = useIntlLocale();
   /**
    * Held with the expense it belongs to rather than cleared on the way in.
@@ -87,7 +88,7 @@ export function CommentsDialog({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(data.error || t("comments.failed"));
+        toast.error(serverError(data, "comments.failed"));
         return;
       }
       setLoaded((current) =>
@@ -115,7 +116,7 @@ export function CommentsDialog({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast.error(data.error || t("comments.failed"));
+        toast.error(serverError(data, "comments.failed"));
         return;
       }
       setLoaded((current) =>

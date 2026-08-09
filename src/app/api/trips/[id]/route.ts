@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import { eq } from "drizzle-orm";
 import {
   accessLevel,
@@ -39,7 +40,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/trips/[
 
   const trip = await getTrip(id);
   if (!trip) {
-    return NextResponse.json({ error: "Trip not found" }, { status: 404 });
+    return fail("not_found", 404);
   }
 
   const balances = calculateBalances(trip);
@@ -130,7 +131,7 @@ export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/trip
 
   const deleted = await deleteTrip(id);
   if (!deleted) {
-    return NextResponse.json({ error: "Trip not found" }, { status: 404 });
+    return fail("not_found", 404);
   }
   return NextResponse.json({ success: true });
 }
@@ -150,11 +151,11 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
 
   const trip = await getTrip(id);
   if (!trip) {
-    return NextResponse.json({ error: "Trip not found" }, { status: 404 });
+    return fail("not_found", 404);
   }
 
   const ownerOnly = () =>
-    NextResponse.json({ error: "Only the trip owner can change that" }, { status: 403 });
+    fail("owner_only", 403);
   const isOwner = auth.level === "owner";
 
   try {
@@ -190,13 +191,10 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
       const target = trip.members.find((m) => m.id === body.transferOwner);
       const result = await transferOwnership(id, body.transferOwner);
       if (result === "missing") {
-        return NextResponse.json({ error: "No such member" }, { status: 404 });
+        return fail("not_found", 404);
       }
       if (result === "not-an-account") {
-        return NextResponse.json(
-          { error: "Only somebody with an account, still in the trip, can be given it" },
-          { status: 400 }
-        );
+        return fail("not_an_account", 400);
       }
 
       logActivity(id, auth.user, "tripOwner", target?.name);
@@ -219,7 +217,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     if (typeof body.addByEmail === "string") {
       const email = normalizeEmail(body.addByEmail);
       if (!isValidEmail(email)) {
-        return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
+        return fail("invalid_email", 400);
       }
 
       const target = db.select().from(users).where(eq(users.email, email)).get();
@@ -232,13 +230,13 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
         // getting a second one beside it. Having a seat is therefore not the question —
         // whether they can still open the trip is.
         if (seat && accessLevel(id, target.id) !== "none") {
-          return NextResponse.json({ error: "They are already in this trip" }, { status: 409 });
+          return fail("already_in_trip", 409);
         }
 
         await grantAccess(id, target.id);
         const member = seat ?? (await seatUser(id, target));
         if (!member) {
-          return NextResponse.json({ error: "Could not add them" }, { status: 500 });
+          return fail("save_failed", 500);
         }
         logActivity(id, auth.user, seat ? "memberReturned" : "memberAdded", member.name);
         // The one notification that is not about a figure: being put in a group is
@@ -274,7 +272,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
 
       const member = await addMember(id, name, EMOJIS[trip.members.length % EMOJIS.length]);
       if (!member) {
-        return NextResponse.json({ error: "Could not add them" }, { status: 500 });
+        return fail("save_failed", 500);
       }
 
       logActivity(id, auth.user, "memberInvited", member.name);
@@ -311,10 +309,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
         existingNames.includes(n.trim().toLowerCase())
       );
       if (duplicates.length > 0) {
-        return NextResponse.json(
-          { error: `Duplicate member name(s): ${duplicates.join(", ")}` },
-          { status: 400 }
-        );
+        return fail("duplicate_name", 400, { names: duplicates });
       }
 
       for (let i = 0; i < names.length; i++) {
@@ -343,19 +338,16 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
 
       const target = trip.members.find((m) => m.id === memberId);
       if (!target) {
-        return NextResponse.json({ error: "No such member" }, { status: 404 });
+        return fail("not_found", 404);
       }
 
       const isMine = Boolean(auth.user && target.userId === auth.user.id);
       const isFree = !target.userId;
       if (!isMine && !(isOwner && isFree)) {
-        return NextResponse.json(
-          { error: "Only they can change that name" },
-          { status: 403 }
-        );
+        return fail("name_not_yours", 403);
       }
       if (memberNameTaken(id, name, memberId)) {
-        return NextResponse.json({ error: `Duplicate member name: ${name.trim()}` }, { status: 400 });
+        return fail("duplicate_name", 400, { names: [name.trim()] });
       }
 
       renameMember(id, memberId, name);
@@ -376,10 +368,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     if (body.budget !== undefined) {
       const parsed = body.budget === null ? null : Number(body.budget);
       if (parsed !== null && (!isFinite(parsed) || parsed <= 0 || parsed > 1e9)) {
-        return NextResponse.json(
-          { error: "Budget must be a positive number up to 1 billion" },
-          { status: 400 }
-        );
+        return fail("budget_range", 400);
       }
       await updateTripMeta(id, { budget: parsed });
       logActivity(id, auth.user, parsed === null ? "tripBudgetCleared" : "tripBudget");
@@ -400,17 +389,11 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
       released = result.released;
 
       if (result.refused?.reason === "owner") {
-        return NextResponse.json(
-          { error: "A trip cannot be left without its owner" },
-          { status: 400 }
-        );
+        return fail("needs_owner", 400);
       }
       if (result.refused?.reason === "balance") {
         // Named, because "somebody has a balance" leaves the owner hunting for who.
-        return NextResponse.json(
-          { error: "settle_first", names: result.refused.names },
-          { status: 409 }
-        );
+        return fail("settle_first", 409, { names: result.refused.names });
       }
 
       for (const member of going) {
@@ -428,6 +411,6 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     });
   } catch (error) {
     logError("PATCH /api/trips/[id]", error);
-    return NextResponse.json({ error: "Failed to update trip" }, { status: 500 });
+    return fail("save_failed", 500);
   }
 }

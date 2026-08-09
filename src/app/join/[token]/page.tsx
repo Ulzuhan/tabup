@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Compass, Loader2 } from "lucide-react";
-import { useT } from "@/i18n/provider";
+import { useServerError, useT } from "@/i18n/provider";
 import { Wordmark } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,6 +23,7 @@ import { clearSessionCache } from "@/lib/session-cache";
  */
 export default function JoinPage() {
   const t = useT();
+  const serverError = useServerError();
   const router = useRouter();
   const token = useParams().token as string;
 
@@ -110,7 +111,7 @@ export default function JoinPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || t("common.somethingWrong"));
+        setError(serverError(data, "common.somethingWrong"));
         setBusy(false);
         return;
       }
@@ -147,7 +148,7 @@ export default function JoinPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-10">
+    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-10">
       <div className="mb-7 text-center">
         <p className="text-2xl font-semibold tracking-tight">
           <Wordmark />
@@ -254,6 +255,6 @@ export default function JoinPage() {
           </p>
         </>
       )}
-    </div>
+    </main>
   );
 }

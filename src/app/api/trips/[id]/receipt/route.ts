@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import { authorizeTrip } from "@/lib/authorize";
 import {
   MAX_UPLOAD_BYTES,
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
 
   const contentLength = Number(request.headers.get("content-length") ?? 0);
   if (contentLength > MAX_UPLOAD_BYTES) {
-    return NextResponse.json({ error: "That photo is too large" }, { status: 413 });
+    return fail("photo_too_large", 413);
   }
 
   let bytes: Buffer;
@@ -29,22 +30,22 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
     const form = await request.formData();
     const file = form.get("photo");
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: "No photo in the request" }, { status: 400 });
+      return fail("not_an_image", 400);
     }
     // Checked again after reading: content-length is a claim, not a guarantee.
     if (file.size > MAX_UPLOAD_BYTES) {
-      return NextResponse.json({ error: "That photo is too large" }, { status: 413 });
+      return fail("photo_too_large", 413);
     }
     bytes = Buffer.from(await file.arrayBuffer());
   } catch {
-    return NextResponse.json({ error: "Could not read the upload" }, { status: 400 });
+    return fail("not_an_image", 400);
   }
 
   // storeReceipt re-encodes with sharp, which both strips EXIF (a phone photo carries
   // GPS coordinates) and rejects anything that is not actually an image.
   const stored = await storeReceipt(id, bytes);
   if (!stored) {
-    return NextResponse.json({ error: "That does not look like an image" }, { status: 400 });
+    return fail("not_an_image", 400);
   }
 
   /**
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/trips/[i
 
   const image = await readReceipt(id, filename);
   if (!image) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return fail("not_found", 404);
   }
 
   return new NextResponse(new Uint8Array(image), {

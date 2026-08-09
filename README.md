@@ -389,12 +389,13 @@ No test framework. Most run against a live server:
 TABUP_DB=/tmp/test.db PORT=3999 TABUP_REGISTRATION=open npm run start &
 export BASE=http://127.0.0.1:3999
 
-npm run test:api        # 18 — splitting, balances, validation, concurrency
+npm run test:api        # 25 — splitting, balances, validation, concurrency, page structure
 npm run test:auth       # 83 — accounts, ownership, who may change what, invitations
 npm run test:money      # 40 — currencies, rates, whole cents, settling, CSV
-npm run test:members    # 50 — members and accounts, and isolation between trips
-npm run test:social     # 57 — balances, authorship, comments, the feed, kinds, push
+npm run test:members    # 55 — members and accounts, and isolation between trips
+npm run test:social     # 58 — balances, authorship, comments, the feed, kinds, push
 npm run test:races      # 18 — two people doing the same thing at the same instant
+npm run test:account    # 24 — closing an account, and what it does to everyone else
 npm run test:recurring  # 17 — fixed costs; pure functions, no server needed
 ```
 
@@ -448,6 +449,15 @@ the browser's `Accept-Language` decides, falling back to Spanish.
 Deliberately **not** the sub-path routing Next's own guide recommends (`/es/trip/abc`).
 People have trip links saved and pasted into group chats, and prefixing every route
 would break every one of them — for a two-language app that is a bad trade.
+
+**Refusals from the server are codes, not sentences.** They used to be English prose
+written in a route file and shown verbatim — so a Spanish app answered "Only whoever added
+it, or the trip owner, can change that", in the middle of a screen with no other English
+on it, at the one moment somebody is already annoyed that a thing did not work. Now a
+refusal carries `code`, the client turns it into a sentence from the message tree, and the
+English text travels beside it as the developer-facing half: it is what curl shows, what
+the error log records and what a test asserts on. A code this build has never heard of
+reads as "something went wrong" rather than as the code itself.
 
 Spanish is the source of truth in `src/i18n/messages.ts` and its shape defines the
 type, so a key missing from English is a compile error rather than an untranslated
@@ -555,13 +565,69 @@ uploads a photo with a marker in its EXIF, and fails if that marker reaches the 
 
 They live on disk under `data/receipts/<tripId>/`, never in the database, and travel in
 the nightly backup as their own archive. Deleting an expense deletes its photo; anything
-orphaned by an abandoned form is swept up after a day.
+orphaned by an abandoned form is swept up six hours later by the app itself.
+
+That sweep used to be the *backup script's* job and nobody else's, which is a strange
+thing to depend on: a backup is what you run to copy the data, not the reason the data
+stops growing. It now runs at startup and every six hours, along with the other things
+that pile up — expired sessions, expired invitations and spent recovery links, none of
+which were ever being cleared. `purgeExpiredSessions` had been written, exported, and
+called from nowhere.
 
 ## Budget and pace
 
 An optional budget per trip, plus the daily average and a bar per day. The total on its
 own never answered the question people actually ask halfway through a trip — "are we
 going over?" — because a number means nothing without a rate to compare it to.
+
+## Closing an account
+
+From the account menu, with the password typed again — a session is whoever is holding the
+phone, and an unlocked phone on a table should not be enough to delete somebody's spending
+for good.
+
+The dialog says what will happen before it asks for anything, because the consequences
+reach other people's screens and none of them are guessable:
+
+- **Groups they run** go to whoever else has been in them longest. Leaving `owner_id` null
+  would strand a group everyone else still uses with nobody able to invite, rename or
+  remove anyone.
+- **Groups nobody else is in** are deleted with them. There is nobody to hand those to.
+- **Their column in other people's groups stays**, with its name on it. Their half of the
+  taxi happened, and it does not stop having happened because they left. It is marked as
+  belonging to an account that is gone, so the group never offers it to the next person
+  through the door — a free name is claimable, and that column is not free, it is nobody's.
+
+Everything else the schema already described: sessions, push subscriptions, fixed costs
+and access grants cascade away, while authorship on expenses, payments, comments and the
+activity feed goes null — what they wrote stays and the name on it stops pointing anywhere.
+
+Deliberately **not** refused over a balance. Being owed twelve euros is a good reason to
+warn somebody and a bad reason to tell them they may not leave.
+
+## Accessibility
+
+Audited in a real browser rather than by reading, which is the only way to find out that a
+focus ring is missing or that focus lands on `<body>`. What it turned up:
+
+- **No `main` anywhere in the app.** Every page had a header and content and nothing
+  saying which was which, so anything navigating by landmark — how a screen reader skims —
+  had nothing to jump to.
+- **Two pages with no heading at all**: the sign-in page, whose title was a styled
+  paragraph, and the fixed-costs page, which has no visible title by design and now carries
+  a screen-reader one.
+- **The bottom bar on phones had no visible focus.** `outline-none` with a background tint
+  behind it, the same treatment as hover, on muted text — tabbing to the navigation looked
+  like tabbing to nothing.
+- **Closing a dialog dropped focus on `<body>`.** Base UI returns focus to whatever opened
+  a dialog, but only when that is a `Dialog.Trigger`, and these are opened from state by a
+  button somewhere else. Open "Añadir gasto" from the keyboard, press Escape, and you were
+  at the top of the document with the whole page to tab through again.
+
+What was already right, and worth knowing: the focus trap holds and the page behind a
+dialog is properly inert, every icon-only control has a label, no image is missing alt
+text, toasts are announced through a polite live region, `lang` matches the chosen
+language, and there is a `prefers-reduced-motion` block.
 
 ## Operations
 
@@ -626,6 +692,13 @@ machine itself, but both are now the fallback rather than the procedure.
 - **Endpoints in a body are claims**: turning notifications off is scoped to the account
   making the request. Unscoped, anybody who learned another browser's push endpoint could
   silently stop its notifications.
+- **The admin panel is a door**: `/admin` is refused on the server, not merely emptied by
+  the API. It used to load for anybody — headings, an empty list, a password dialog — with
+  the data missing for reasons the page could not explain. 404, like a trip you cannot
+  see: whether this instance has a panel at a guessable path is not worth confirming.
+- **A reset link is a way back in, not a way past the queue**: redeeming one sets the
+  password whatever the account's state, but only signs somebody in if they have been
+  approved.
 - **Response headers**: a content policy, `frame-ancestors 'none'` and `X-Frame-Options`
   against clickjacking, `nosniff`, and a referrer policy — invitations carry a token in
   the path, and a referrer carries the whole path. The policy is not nonce-based: that

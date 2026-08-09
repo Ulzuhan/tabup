@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import { getCurrentUser } from "@/lib/auth";
 import { listRecurring } from "@/lib/store";
 import { monthlyEquivalent, nextCharge, yearlyEquivalent } from "@/lib/recurring";
@@ -13,7 +14,7 @@ import { monthlyEquivalent, nextCharge, yearlyEquivalent } from "@/lib/recurring
  */
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Sign in first" }, { status: 401 });
+  if (!user) return fail("signin_required", 401);
 
   const items = await listRecurring(user.id);
 

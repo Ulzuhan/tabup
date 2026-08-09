@@ -73,7 +73,13 @@ function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
   return (
     <TabsPrimitive.Panel
       data-slot="tabs-content"
-      className={cn("flex-1 text-sm outline-none", className)}
+      // Focusable by design — it is how a keyboard reaches a long list without going
+      // through every row — so it has to look focused when it is. It had `outline-none`
+      // and nothing in its place, which is the one combination that is never right.
+      className={cn(
+        "flex-1 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        className
+      )}
       {...props}
     />
   )

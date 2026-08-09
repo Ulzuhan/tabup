@@ -6,7 +6,7 @@ import { Crown, Link2, Loader2, Mail, UserPlus, X } from "lucide-react";
 import type { Member } from "@/lib/types";
 import { MemberAvatar } from "@/components/member-avatar";
 import { currencySymbol } from "@/components/money";
-import { useT } from "@/i18n/provider";
+import { useServerError, useT } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,6 +59,7 @@ export function ManageDialog({
   onChanged: () => Promise<void>;
 }) {
   const t = useT();
+  const serverError = useServerError();
   const [name, setName] = useState(tripName);
   const [budget, setBudget] = useState(tripBudget != null ? String(tripBudget) : "");
   const [newMember, setNewMember] = useState("");
@@ -78,7 +79,7 @@ export function ManageDialog({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(data.error || t("manage.failed"));
+        toast.error(serverError(data, "manage.failed"));
         return false;
       }
       await onChanged();
@@ -135,7 +136,7 @@ export function ManageDialog({
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          toast.error(data.error || t("manage.failed"));
+          toast.error(serverError(data, "manage.failed"));
           return;
         }
         await onChanged();
@@ -185,11 +186,7 @@ export function ManageDialog({
         // Deleting somebody takes their expenses with them, so everyone else's share of
         // a bill they were part of would silently change. Named, because "somebody has a
         // balance" leaves you hunting for who.
-        toast.error(
-          data.error === "settle_first"
-            ? t("manage.settleFirst", { names: (data.names ?? []).join(", ") })
-            : data.error || t("manage.failed")
-        );
+        toast.error(serverError(data, "manage.failed"));
         return;
       }
 

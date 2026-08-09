@@ -15,7 +15,8 @@ import { logError } from "./errors";
  */
 
 const DATA_DIR = process.env.TABUP_DATA_DIR?.trim() || join(process.cwd(), "data");
-const RECEIPTS_DIR = join(DATA_DIR, "receipts");
+/** Exported so housekeeping sweeps the same place uploads are written to. */
+export const RECEIPTS_DIR = join(DATA_DIR, "receipts");
 
 /** Bigger than any phone photo needs to be for this, small enough to bound abuse. */
 export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
