@@ -569,10 +569,11 @@ orphaned by an abandoned form is swept up six hours later by the app itself.
 
 That sweep used to be the *backup script's* job and nobody else's, which is a strange
 thing to depend on: a backup is what you run to copy the data, not the reason the data
-stops growing. It now runs at startup and every six hours, along with the other things
-that pile up — expired sessions, expired invitations and spent recovery links, none of
-which were ever being cleared. `purgeExpiredSessions` had been written, exported, and
-called from nowhere.
+stops growing. It now runs at startup and every six hours, along with the rows that expire
+— sessions, invitations, spent recovery links. Those were already cleared, but only by the
+boot migration, whose own comment gave the reason: "there is no other moment that reliably
+runs". A server that stays up for a month therefore kept a month of dead rows. This is
+that other moment.
 
 ## Budget and pace
 

@@ -2,7 +2,7 @@ import { randomBytes, scrypt, timingSafeEqual, createHash } from "crypto";
 import type { BinaryLike, ScryptOptions } from "crypto";
 import { promisify } from "util";
 import { cookies } from "next/headers";
-import { eq, lt, sql, isNull, isNotNull, and } from "drizzle-orm";
+import { eq, sql, isNull, isNotNull, and } from "drizzle-orm";
 import { db, users, sessions, trips, passwordResets } from "@/db";
 import type { UserRow } from "@/db";
 import type { ErrorCode } from "./api-error";
@@ -137,10 +137,6 @@ export async function destroySession(): Promise<void> {
 /** Signing out everywhere, used after a password change. */
 export function destroyAllSessions(userId: string): void {
   db.delete(sessions).where(eq(sessions.userId, userId)).run();
-}
-
-export function purgeExpiredSessions(): void {
-  db.delete(sessions).where(lt(sessions.expiresAt, Date.now())).run();
 }
 
 // ── Getting back in ──────────────────────────────────────────────────────

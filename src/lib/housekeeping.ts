@@ -9,16 +9,20 @@ import { logError } from "./errors";
 /**
  * Things that pile up if nobody sweeps.
  *
- * All of this was written and none of it ran. `purgeExpiredSessions` was exported and
- * never called from anywhere, so a session row outlived its own expiry until the person
- * happened to come back with the dead cookie in hand. Expired invitations and spent reset
- * links stayed for good. And an uploaded photo that never became an expense — tap the
- * camera, change your mind, close the sheet — sat on disk until the *backup script*
- * noticed it, which is a strange thing to depend on: the backup is a thing you run to
- * copy the data, not the only reason the data does not grow.
+ * Two different gaps, and it is worth being exact about which was which.
  *
- * None of it was a leak of anything. It is a machine under a desk filling up quietly,
- * which is the kind of problem that is invisible for a year and then is not.
+ * Expired sessions, invitations and spent reset links *were* being cleared — by three
+ * statements at the end of the boot migration, which is the comment's own reason: "there
+ * is no other moment that reliably runs". True when it was written, and it means a server
+ * that stays up for a month keeps a month of dead rows. This is that other moment.
+ *
+ * The photos were the real gap. An upload that never became an expense — tap the camera,
+ * change your mind, close the sheet — sat on disk until the *backup script* noticed it,
+ * which is a strange thing to depend on: a backup is what you run to copy the data, not
+ * the reason the data stops growing.
+ *
+ * Neither is a leak of anything. It is a machine under a desk filling up quietly, which is
+ * the kind of problem that is invisible for a year and then is not.
  */
 
 /**
