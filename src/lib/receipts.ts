@@ -3,6 +3,7 @@ import { mkdir, readFile, unlink, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import { join, resolve } from "path";
 import sharp from "sharp";
+import { CURRENCIES } from "./types";
 import { logError } from "./errors";
 
 /**
@@ -61,7 +62,7 @@ export async function deleteReceipt(tripId: string, filename: string): Promise<v
 export async function storeReceipt(
   tripId: string,
   input: Buffer
-): Promise<{ filename: string; bytes: number } | null> {
+): Promise<{ filename: string; bytes: number; sanitised: Buffer } | null> {
   if (!/^[0-9a-f]{8,32}$/.test(tripId)) return null;
 
   const dir = join(RECEIPTS_DIR, tripId);
@@ -79,7 +80,9 @@ export async function storeReceipt(
       .toBuffer();
 
     await writeFile(join(dir, filename), output);
-    return { filename, bytes: output.length };
+    // Handed back, not just written: whatever else looks at this photo must look at the
+    // stripped copy. Sending the original anywhere would defeat the point of stripping.
+    return { filename, bytes: output.length, sanitised: output };
   } catch {
     // Anything sharp cannot decode is not an image, whatever the request claimed.
     return null;
@@ -101,6 +104,13 @@ If a field is unreadable, omit it. Never invent a value.`;
 
 /**
  * Reads a receipt with a vision model through Ollama.
+ *
+ * **The image given to this leaves the machine when the model is a cloud one**, which the
+ * default is: a 397-billion-parameter model at BF16 is some 800 GB of weights and does
+ * not run on a mini PC. Ollama forwards it. That is a reasonable trade for legible OCR on
+ * modest hardware, but it has to be said out loud rather than assumed away — and it is
+ * why the caller must pass the *stripped* copy. Set `TABUP_OCR_MODEL` to a local vision
+ * model to keep photos on the machine.
  *
  * Returns null rather than throwing on any failure: OCR is a convenience on top of a
  * form the user can always fill in themselves, so a model being slow, missing or
@@ -159,9 +169,11 @@ function sanitise(raw: Record<string, unknown>): ReceiptReading {
   const total = typeof raw.total === "number" ? raw.total : parseFloat(String(raw.total));
   if (isFinite(total) && total > 0 && total < 1e9) out.total = Math.round(total * 100) / 100;
 
-  if (typeof raw.currency === "string" && /^[A-Z]{3}$/.test(raw.currency.trim().toUpperCase())) {
-    out.currency = raw.currency.trim().toUpperCase();
-  }
+  // Only a currency this app can actually convert. Any three letters used to be enough,
+  // so a model reading "XYZ" off a receipt put a code in the form that no rate exists for
+  // — and the expense then failed to save with a message about exchange rates.
+  const currency = String(raw.currency ?? "").trim().toUpperCase();
+  if (CURRENCIES.some((c) => c.code === currency)) out.currency = currency;
 
   if (typeof raw.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw.date.trim())) {
     const parsedDate = new Date(`${raw.date.trim()}T12:00:00`);

@@ -380,6 +380,7 @@ npm run test:auth       # 83 — accounts, ownership, who may change what, invit
 npm run test:money      # 40 — currencies, rates, whole cents, settling, CSV
 npm run test:members    # 50 — members and accounts, and isolation between trips
 npm run test:social     # 57 — balances, authorship, comments, the feed, kinds, push
+npm run test:races      # 18 — two people doing the same thing at the same instant
 npm run test:recurring  # 17 — fixed costs; pure functions, no server needed
 ```
 
@@ -389,6 +390,14 @@ what it tests starts with "whoever registers first is the admin":
 ```bash
 rm -f data/test.db* && TABUP_DB=data/test.db TABUP_REGISTRATION=approval npm run start &
 npm run test:admin      # 36 — approvals, passwords, recovery links, the error log
+```
+
+`test:receipts` stands up a fake Ollama on port 11500 and needs the app pointed at it,
+because what it mainly checks is *what leaves the machine*:
+
+```bash
+TABUP_OLLAMA_URL=http://127.0.0.1:11500 npm run start &
+npm run test:receipts   # 29 — photos, what is sent to the model, what it may say back
 ```
 
 `test:restart` starts and stops its own server, so it takes no arguments and shares
@@ -513,10 +522,22 @@ which is too slow to use at a table. Set `TABUP_OCR_MODEL` to change it.
 The reading is a shortcut, never a gate: if the model is slow, missing or unsure, the
 photo is still attached and the fields are typed by hand.
 
+**The photo leaves the machine when the model is a cloud one, which the default is.** A
+397-billion-parameter model at BF16 is some 800 GB of weights; it does not run on a mini
+PC, and Ollama forwards the image to run it. That is a fair trade for OCR that works at a
+table on modest hardware, but it is a fact about somebody's receipt and belongs in writing
+rather than in an inference from a model name. Point `TABUP_OCR_MODEL` at a local vision
+model to keep photos here, at the cost of speed.
+
 Photos are re-encoded with sharp on upload. That is not about file size — a phone photo
 carries EXIF, and EXIF carries **GPS coordinates**, so storing the original would mean
 every receipt quietly records where its owner was standing, and a shared trip would hand
 that to everyone with the link. Re-encoding drops it.
+
+**The model is given the re-encoded copy, never the upload.** It used to be handed the
+original: the stripped version was the one kept on disk and the one with the GPS in it was
+the one sent away, which is precisely backwards. `test:receipts` stands up a fake Ollama,
+uploads a photo with a marker in its EXIF, and fails if that marker reaches the model.
 
 They live on disk under `data/receipts/<tripId>/`, never in the database, and travel in
 the nightly backup as their own archive. Deleting an expense deletes its photo; anything

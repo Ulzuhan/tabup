@@ -47,8 +47,16 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
     return NextResponse.json({ error: "That does not look like an image" }, { status: 400 });
   }
 
+  /**
+   * The model gets the stripped copy, never the upload.
+   *
+   * This used to pass `bytes` — the original straight off the phone, EXIF and GPS
+   * coordinates intact — while the sanitised version was the one kept on disk. Exactly
+   * backwards: the copy that stayed here was clean and the copy that left carried where
+   * the photo was taken. With the default model, "left" means left the machine.
+   */
   const scan = request.nextUrl.searchParams.get("scan") !== "false";
-  const fields = scan ? await readReceiptFields(bytes) : null;
+  const fields = scan ? await readReceiptFields(stored.sanitised) : null;
 
   return NextResponse.json({
     receipt: stored.filename,

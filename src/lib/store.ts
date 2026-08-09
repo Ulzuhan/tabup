@@ -1373,6 +1373,14 @@ export async function createInvite(
   const now = Date.now();
   const expiresAt = now + INVITE_DAYS * 24 * 60 * 60 * 1000;
 
+  // One live invitation per address per trip, by construction rather than by luck. Two
+  // requests for the same address arriving together are caught by `pendingInviteFor`
+  // today — but only because SQLite serialises the writes and the second read happens to
+  // see the first insert, which is an accident of the engine rather than a rule.
+  if (email) {
+    db.delete(invites).where(and(eq(invites.tripId, tripId), eq(invites.email, email))).run();
+  }
+
   db.insert(invites)
     .values({
       token,

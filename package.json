@@ -15,6 +15,8 @@
     "test:admin": "node scripts/test-admin.mjs",
     "test:members": "node scripts/test-members.mjs",
     "test:social": "node scripts/test-social.mjs",
+    "test:receipts": "node scripts/test-receipts.mjs",
+    "test:races": "node scripts/test-races.mjs",
     "test:restart": "bash scripts/test-restart.sh"
   },
   "dependencies": {
