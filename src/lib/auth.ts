@@ -224,16 +224,39 @@ export async function redeemPasswordReset(
   if (row.expiresAt < Date.now()) return { state: "expired" };
 
   const hash = await hashPassword(password);
-  // Marked used in the same transaction that changes the password: two taps on a slow
-  // connection must not each get to set one.
+
+  /**
+   * The link is spent by the same statement that checks it is unspent.
+   *
+   * The check above is a hundred milliseconds old by the time anything is written —
+   * hashing a password is deliberately slow, and the request yields while it happens. Two
+   * redemptions arriving together therefore both passed it, and both went on to write:
+   * measured, they each answered `{ok: true}`, the second one's password was the live one,
+   * and its `DELETE FROM sessions` took the first one's brand-new session with it. Whoever
+   * arrived last owned the account and whoever arrived first was told it had worked.
+   *
+   * That matters because of where these links travel. There is no email here, so one goes
+   * through whatever people already talk on, and a link sitting in a group chat being
+   * single-use is the entire reason the second person to try it is supposed to be refused.
+   *
+   * `WHERE used_at IS NULL` moves the guard to where the write is. SQLite runs one writer
+   * at a time, so exactly one of the two can report a change; the other finds nothing to
+   * update and is told the link is used, which is true.
+   */
+  let claimed = false;
   db.transaction((tx) => {
-    tx.update(users).set({ passwordHash: hash }).where(eq(users.id, row.userId)).run();
-    tx.update(passwordResets)
+    const spent = tx
+      .update(passwordResets)
       .set({ usedAt: Date.now() })
-      .where(eq(passwordResets.tokenHash, row.tokenHash))
+      .where(and(eq(passwordResets.tokenHash, row.tokenHash), isNull(passwordResets.usedAt)))
       .run();
+    if (spent.changes === 0) return;
+
+    claimed = true;
+    tx.update(users).set({ passwordHash: hash }).where(eq(users.id, row.userId)).run();
     tx.delete(sessions).where(eq(sessions.userId, row.userId)).run();
   });
+  if (!claimed) return { state: "used" };
 
   return { state: "ok", userId: row.userId };
 }

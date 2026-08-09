@@ -1479,8 +1479,26 @@ export async function redeemInvite(
   const invite = readInvite(token);
   if (!invite) return null;
 
+  /**
+   * Somebody who was taken out does not come back through the link they still have.
+   *
+   * Removing a member ends their access and leaves their seat standing, because the
+   * money in it is everyone else's business. Nothing was done to the invitation, though,
+   * and the invitation is a shared link that lives in whatever chat the group uses — so
+   * the whole removal lasted exactly as long as it took them to scroll up and tap it
+   * again. Measured: 404 on the trip, then the same token, then a 200 and an expense.
+   *
+   * A seat in this trip with no way into it means precisely one thing, since that is the
+   * only way the two come apart: they were in and were shown the door. The owner can let
+   * them back in deliberately by adding their address again, which returns them to the
+   * seat that already holds their figures. What they cannot do is let themselves in.
+   */
+  const seatHere = memberForUser(invite.tripId, user.id);
+  const level = accessLevel(invite.tripId, user.id);
+  if (seatHere && level === "none") return null;
+
   // The owner opening their own link is already in; anyone else is let in now.
-  if (accessLevel(invite.tripId, user.id) === "none") {
+  if (level === "none") {
     const granted = await grantAccess(invite.tripId, user.id);
     if (!granted) return null;
   }

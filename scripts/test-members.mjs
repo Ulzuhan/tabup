@@ -352,6 +352,47 @@ async function main() {
     false
   );
 
+  /**
+   * The link they already have does not undo being removed.
+   *
+   * An invitation is a shared link that lives in whatever chat the group uses, so it is
+   * still in the pocket of the person who was just shown the door. Nothing was done to it
+   * on the way out and nothing consumes it, so the removal used to last exactly as long as
+   * it took them to scroll up: 404 on the trip, tap the same link, 200 — and write access
+   * back. A seat here with no way in means one thing, and it is not "please come back".
+   */
+  const stillLive = await alice(`/api/trips/${tripId}/invite`, { method: "POST" });
+  check(
+    "somebody who was removed cannot let themselves back in",
+    (await bob("/api/join", { method: "POST", body: JSON.stringify({ token: stillLive.body.token }) })).status,
+    404
+  );
+  check("and the trip stays shut to them", (await bob(`/api/trips/${tripId}`)).status, 404);
+  // Narrow on purpose: it is that person who is refused, not the link that is burnt.
+  // Everyone else in the group chat still has a working invitation.
+  check(
+    "while the link itself is still live",
+    (await heidi(`/api/join?token=${encodeURIComponent(stillLive.body.token)}`)).status,
+    200
+  );
+  // The owner can still let them back in deliberately, which is the difference that
+  // matters: the door is shut, not walled up.
+  check(
+    "the owner can readmit them by address",
+    (
+      await alice(`/api/trips/${tripId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ addByEmail: bobEmail }),
+      })
+    ).status,
+    200
+  );
+  check("and then they are in again", (await bob(`/api/trips/${tripId}`)).status, 200);
+  await alice(`/api/trips/${tripId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ removeMembers: [bobMember.id] }),
+  });
+
   const ownerRemovesAgain = await alice(`/api/trips/${tripId}`, {
     method: "PATCH",
     body: JSON.stringify({ removeMembers: [bobMember.id] }),

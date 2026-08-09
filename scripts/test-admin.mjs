@@ -256,6 +256,38 @@ async function main() {
     "ok"
   );
 
+  /**
+   * Single-use has to mean single-use when both arrive together.
+   *
+   * The check was a hundred milliseconds old by the time anything was written, because
+   * hashing a password is slow on purpose and the request yields while it happens. Both
+   * redemptions passed it and both wrote: each answered ok, the second one's password won,
+   * and its session sweep took the first one's new session with it. These links travel
+   * through group chats — being refused on the second try is the whole point of them.
+   */
+  const raced = await admin("/api/admin/users", {
+    method: "POST",
+    body: JSON.stringify({ id: anaId, action: "reset-link" }),
+  });
+  const bothAtOnce = await Promise.all(
+    ["one password", "another password"].map((password) =>
+      client()("/api/auth/reset", {
+        method: "POST",
+        body: JSON.stringify({ token: raced.body.token, password }),
+      })
+    )
+  );
+  check(
+    "two redemptions at the same instant: exactly one wins",
+    bothAtOnce.filter((r) => r.status === 200).length,
+    1
+  );
+  check(
+    "and the other is told the link is spent",
+    bothAtOnce.find((r) => r.status !== 200)?.body.error,
+    "used"
+  );
+
   // ── The error log ───────────────────────────────────────────────────
   console.log("\nError log");
   const before = (await admin("/api/admin/errors")).body.errors.length;

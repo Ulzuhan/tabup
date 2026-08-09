@@ -454,6 +454,15 @@ async function main() {
     (await alice("/api/push", { method: "POST", body: JSON.stringify({ subscription: {} }) })).status,
     400
   );
+  // An endpoint arriving in a body is a claim about a browser, not proof of holding one.
+  // Unscoped, this deleted the row and answered 200, so anybody who learned somebody
+  // else's endpoint could switch their notifications off and nothing would say why.
+  await bob("/api/push", { method: "DELETE", body: JSON.stringify({ endpoint }) });
+  check(
+    "somebody else cannot unsubscribe your browser",
+    (await alice(`/api/push?endpoint=${encodeURIComponent(endpoint)}`)).body.subscribed,
+    true
+  );
   check(
     "signed out, there is nothing to ask",
     (await client()("/api/push")).status,

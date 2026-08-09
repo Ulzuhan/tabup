@@ -89,8 +89,26 @@ export function saveSubscription(
     .run();
 }
 
-export function removeSubscription(endpoint: string): void {
-  db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint)).run();
+/**
+ * Drops one browser's subscription.
+ *
+ * `userId` is not optional for a request: an endpoint arriving in a body is a claim about
+ * somebody else's browser until it is checked against the account making it, and without
+ * that check any signed-in person could turn off anybody's notifications by naming their
+ * endpoint. Left unscoped it also is not idempotent in the way it looks — it silently
+ * deletes a row that was never yours.
+ *
+ * The push service is the exception, and that is why the parameter exists at all: a 410
+ * is that service saying the browser is gone, which is true regardless of whose it was.
+ */
+export function removeSubscription(endpoint: string, userId?: string): void {
+  db.delete(pushSubscriptions)
+    .where(
+      userId
+        ? and(eq(pushSubscriptions.endpoint, endpoint), eq(pushSubscriptions.userId, userId))
+        : eq(pushSubscriptions.endpoint, endpoint)
+    )
+    .run();
 }
 
 export function isSubscribed(userId: string, endpoint: string): boolean {

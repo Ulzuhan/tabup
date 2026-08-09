@@ -230,6 +230,15 @@ invitation to claim, and would hand them a second, empty column if they were eve
 back. Instead `inTrip` goes false, and inviting them again puts them where their money
 already is.
 
+**And the link they already have does not undo it.** An invitation is a shared link that
+lives in whatever chat the group uses, so it is still in the pocket of the person who was
+just shown the door — and for a while it worked: 404 on the trip, scroll up, tap the same
+link, 200, and write access back. Redeeming an invitation now refuses anybody who has a
+seat in that trip and no way into it, because that combination only arises one way. The
+link stays live for everyone else; it is that person who is refused. The owner can still
+let them back in deliberately by adding their address again, which returns them to the
+seat their figures are already in.
+
 ### Saying so, instead of changing it
 
 Every expense carries **who entered it**, shown on the row whenever that is not the
@@ -300,6 +309,11 @@ register**, which is what makes this work on a closed instance.
 Invitations last 7 days and are not single-use — a trip link gets forwarded around a
 group, and a one-shot invite would work for whoever tapped first and leave everyone
 else with an error they could not explain. Only the owner can create them.
+
+That makes the link exactly as private as the conversation it is sent through, which is
+the usual bargain for a group link and worth saying plainly: for those seven days, anyone
+it is forwarded to can join. The one thing it cannot do is readmit somebody who was taken
+out — see [Taking somebody out](#taking-somebody-out).
 
 They no longer carry a role, because there is none to carry: whoever opens one joins the
 trip. A QR code looks identical whether it hands over the trip or not, and the version
@@ -604,10 +618,23 @@ machine itself, but both are now the fallback rather than the procedure.
   hash so the response time does not give it away.
 - **CSV export**: fields starting with `=`, `+`, `-` or `@` are prefixed, so a crafted
   expense description cannot become a formula in Excel.
+- **Single-use links really are**: a password reset is spent by the same statement that
+  checks it is unspent (`WHERE used_at IS NULL`). Checking first and writing after left a
+  hundred-millisecond gap — hashing a password is slow on purpose — and two redemptions
+  arriving together both won it, the later one taking the earlier one's new session with
+  it. Same shape as the invitation rule above: the guard belongs where the write is.
+- **Endpoints in a body are claims**: turning notifications off is scoped to the account
+  making the request. Unscoped, anybody who learned another browser's push endpoint could
+  silently stop its notifications.
+- **Response headers**: a content policy, `frame-ancestors 'none'` and `X-Frame-Options`
+  against clickjacking, `nosniff`, and a referrer policy — invitations carry a token in
+  the path, and a referrer carries the whole path. The policy is not nonce-based: that
+  needs a proxy and makes every page dynamic. What is there still means an injected script
+  cannot load code from another host or post anybody's expenses to one.
 
-Not covered: there is no email verification, no password reset, and no CSRF token
-beyond `sameSite=lax`. Those are the next things to add if this is ever exposed to
-people you do not know.
+Not covered: there is no email verification and no CSRF token beyond `sameSite=lax`.
+Losing a password is handled by the admin issuing a link, which is the section above —
+there is no self-service reset, because there is no email to send it to.
 
 ---
 
