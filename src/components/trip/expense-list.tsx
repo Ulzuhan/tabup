@@ -126,15 +126,24 @@ export function ExpenseList({
                         {expense.note}
                       </p>
                     )}
-                    <p className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] text-muted-foreground">
+                    {/*
+                      The text truncates, not the row. `truncate` on a flex container
+                      clips and nothing else — `text-overflow` does not apply to a flex
+                      box — so this line used to be cut mid-word with no ellipsis to say
+                      so: "Bea pag". The flex is here to keep the offline icon level with
+                      the text, so the text gets its own element to ellipsize inside.
+                    */}
+                    <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-muted-foreground">
                       {queued && <CloudOff className="size-3.5 shrink-0 text-warning" />}
-                      {payer?.emoji} {t("trip.paidBy", { name: payer?.name ?? "" })} ·{" "}
-                      {plural("trip.ways", expense.splitAmong.length)}
-                      {expense.splitShares && ` · ${t("trip.uneven")}`}
-                      {/* Who typed it, when that is somebody other than who paid. The
-                          rule about who may change it is invisible otherwise: a line
-                          with no edit button says neither whose it is nor who to ask. */}
-                      {expense.by && ` · ${t("trip.enteredBy", { name: expense.by })}`}
+                      <span className="truncate">
+                        {payer?.emoji} {t("trip.paidBy", { name: payer?.name ?? "" })} ·{" "}
+                        {plural("trip.ways", expense.splitAmong.length)}
+                        {expense.splitShares && ` · ${t("trip.uneven")}`}
+                        {/* Who typed it, when that is somebody other than who paid. The
+                            rule about who may change it is invisible otherwise: a line
+                            with no edit button says neither whose it is nor who to ask. */}
+                        {expense.by && ` · ${t("trip.enteredBy", { name: expense.by })}`}
+                      </span>
                     </p>
                   </div>
 

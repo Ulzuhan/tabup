@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` rather than `npm install`: the lockfile is the point of committing one.
+      - run: npm ci
+
+      - name: Types
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint src scripts
+
+      - name: Build
+        run: npm run build
+
+      # Ten suites, each against its own server and its own empty database — see the
+      # script for why one shared server does not work. They talk to the Frankfurter rate
+      # API for the currency assertions, which is the one thing here that can fail for
+      # reasons that have nothing to do with this code.
+      - name: Test
+        run: ./scripts/run-suites.sh
+
+      - name: Server log on failure
+        if: failure()
+        run: tail -40 /tmp/*.log 2>/dev/null || true

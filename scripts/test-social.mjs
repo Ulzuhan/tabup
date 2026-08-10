@@ -68,7 +68,7 @@ async function register(api, name) {
 
 async function main() {
   const alice = client();
-  const aliceEmail = await register(alice, "Alice");
+  await register(alice, "Alice");
   const bob = client();
   const bobEmail = await register(bob, "Bob");
 

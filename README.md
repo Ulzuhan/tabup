@@ -1,5 +1,8 @@
 # TabUp
 
+[![CI](https://github.com/Ulzuhan/tabup/actions/workflows/ci.yml/badge.svg)](https://github.com/Ulzuhan/tabup/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Shared expense tracking for trips: who paid what, in which currency, and who owes whom
 at the end. Multi-currency, uneven splits, settle-up payments and CSV export.
 
@@ -7,6 +10,18 @@ Every trip belongs to an account, and the people it splits between are `members`
 is a different thing. An account is who may *open* a trip; a member is a column in its
 arithmetic. Most members at a real table will never register here, and that is fine: a
 member can be a bare name, and it can be tied to an account later.
+
+<p align="center">
+  <img src="docs/screenshots/trip-dark.png" width="270" alt="A trip's overview: your balance, who owes what, spending pace against a budget, and where the money went by category">
+  <img src="docs/screenshots/expenses-dark.png" width="270" alt="The expense list: amounts in baht with their euro equivalent underneath, grouped by day">
+  <img src="docs/screenshots/expense-light.png" width="270" alt="Adding an expense: an amount, who paid, and nothing else required">
+</p>
+<p align="center">
+  <img src="docs/screenshots/settle-light.png" width="270" alt="Settling up: the smallest set of payments that clears every debt">
+  <img src="docs/screenshots/home-dark.png" width="270" alt="The list of groups, each showing whether you are owed money or owe it">
+</p>
+
+<p align="center"><sub>A trip run in euros with expenses paid in baht. Everything above is invented.</sub></p>
 
 ---
 
@@ -384,6 +399,16 @@ Every write is a transaction. It either lands completely or not at all.
 ## Tests
 
 No test framework. Most run against a live server:
+
+All of them at once, each against its own server and its own empty database — which is
+what CI runs on every push:
+
+```bash
+npm run build
+./scripts/run-suites.sh          # or: ./scripts/run-suites.sh money races
+```
+
+One at a time, against a server you are already running:
 
 ```bash
 TABUP_DB=/tmp/test.db PORT=3999 TABUP_REGISTRATION=open npm run start &

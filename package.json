@@ -1,6 +1,22 @@
 {
   "name": "tabup",
   "version": "0.1.0",
+  "description": "Self-hosted shared expense tracking: who paid what, in which currency, and who owes whom.",
+  "license": "MIT",
+  "author": "Ulzuhan",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ulzuhan/tabup.git"
+  },
+  "keywords": [
+    "expenses",
+    "split-bill",
+    "self-hosted",
+    "pwa",
+    "nextjs",
+    "sqlite",
+    "offline-first"
+  ],
   "private": true,
   "scripts": {
     "dev": "next dev",

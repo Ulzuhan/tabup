@@ -283,8 +283,10 @@ export function AdminPanel() {
                   <Card>
                     <CardContent className="flex flex-wrap items-center gap-3 py-1">
                       <div className="min-w-0 flex-1">
-                        <p className="flex items-center gap-1.5 truncate font-medium">
-                          {user.name}
+                        {/* Same as the expense row: `truncate` on a flex box clips
+                            without an ellipsis, so a long name was cut mid-letter. */}
+                        <p className="flex items-center gap-1.5 font-medium">
+                          <span className="truncate">{user.name}</span>
                           {user.role === "admin" && (
                             <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                               <ShieldCheck className="size-3" />

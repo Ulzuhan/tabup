@@ -65,7 +65,7 @@ async function register(api, name) {
 }
 
 const alice = client();
-const aliceEmail = await register(alice, "Alice");
+await register(alice, "Alice");
 
 // ── Two people claiming the same free seat ────────────────────────────
 console.log("\nTwo people claiming the same seat");
