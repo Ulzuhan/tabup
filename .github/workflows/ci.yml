@@ -22,6 +22,13 @@ jobs:
       # `npm ci` rather than `npm install`: the lockfile is the point of committing one.
       - run: npm ci
 
+      # `RouteContext<"/api/trips/[id]">` and friends are *generated*, not written, so on a
+      # fresh checkout there is nothing for tsc to resolve them against. This is why the
+      # first CI run failed while the same command passed locally: a `.next/types` from an
+      # earlier build was sitting there. `typegen` writes them without a full build.
+      - name: Route types
+        run: npx next typegen
+
       - name: Types
         run: npx tsc --noEmit
 
