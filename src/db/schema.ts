@@ -54,6 +54,15 @@ export const users = sqliteTable("users", {
    * handling right.
    */
   approvedAt: integer("approved_at"),
+  /**
+   * The `sub` claim of the Authentik account this one is tied to.
+   *
+   * Null on accounts that predate the move to a shared identity provider: the
+   * first time such a person signs in through Authentik with the same email,
+   * their existing account is linked here rather than a second one appearing
+   * beside it — which would have left their trips behind.
+   */
+  oidcSub: text("oidc_sub"),
 });
 
 /**

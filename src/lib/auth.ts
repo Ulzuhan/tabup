@@ -306,6 +306,9 @@ export async function createUser(
     // Whoever sets the instance up runs it: there is nobody else to approve them.
     role: isFirst ? "admin" : "user",
     approvedAt: isFirst || options.approved ? now : null,
+    // Local account: not tied to an identity in the provider (yet — signing in
+    // through it later with the same email links the two).
+    oidcSub: null,
   };
 
   try {
@@ -322,6 +325,63 @@ export async function createUser(
   }
 
   return row;
+}
+
+/**
+ * The account behind an Authentik identity, linking or creating as needed.
+ *
+ * Three cases, in order:
+ *
+ *   1. Already linked — matched by `sub`, which survives someone changing
+ *      their email address in the identity provider.
+ *   2. Known email, never linked — this is the migration path. The account
+ *      that already owns their trips gets the sub written onto it instead of a
+ *      second, empty account appearing next to it.
+ *   3. Nobody — a new person. Created and approved on the spot: Authentik only
+ *      issued this token because they are in the group for this application,
+ *      so the queue has already been walked once and asking twice is theatre.
+ *
+ * The password hash is random and unusable: these accounts sign in through the
+ * provider, and leaving the column empty would be a hash that verifies against
+ * nothing rather than against everything.
+ */
+export async function linkOrCreateFromIdentity(identity: {
+  sub: string;
+  email: string;
+  name?: string;
+}): Promise<UserRow> {
+  const email = normalizeEmail(identity.email);
+  const now = Date.now();
+
+  const linked = db.select().from(users).where(eq(users.oidcSub, identity.sub)).get();
+  if (linked) {
+    db.update(users).set({ email }).where(eq(users.id, linked.id)).run();
+    return { ...linked, email };
+  }
+
+  const byEmail = db.select().from(users).where(eq(users.email, email)).get();
+  if (byEmail) {
+    db.update(users)
+      .set({ oidcSub: identity.sub, approvedAt: byEmail.approvedAt ?? now })
+      .where(eq(users.id, byEmail.id))
+      .run();
+    return { ...byEmail, oidcSub: identity.sub, approvedAt: byEmail.approvedAt ?? now };
+  }
+
+  const [{ count }] = db.select({ count: sql<number>`count(*)` }).from(users).all();
+  const row = {
+    id: randomBytes(16).toString("hex"),
+    email,
+    name: (identity.name ?? email.split("@")[0]).trim().slice(0, 80),
+    passwordHash: `oidc$${randomBytes(32).toString("hex")}`,
+    createdAt: now,
+    plan: "free",
+    role: count === 0 ? "admin" : "user",
+    approvedAt: now,
+    oidcSub: identity.sub,
+  };
+  db.insert(users).values(row).run();
+  return row as UserRow;
 }
 
 export async function authenticate(email: string, password: string): Promise<UserRow | null> {
