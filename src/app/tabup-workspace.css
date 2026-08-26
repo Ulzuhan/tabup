@@ -28,3 +28,14 @@
 @media (min-width: 700px) { .tb-fixed-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tb-fixed-total { grid-row: span 2; } .tb-fixed-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; } .tb-fixed-list > li { margin: 0; } .tb-fixed-actions { max-width: 28rem; margin-left: auto; } }
 @media (min-width: 1024px) { .tb-fixed-summary { grid-template-columns: 1.08fr .96fr .96fr; } .tb-fixed-total { grid-row: auto; } .tb-fixed-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .tb-fixed-actions, .tb-fixed-list { margin-inline: -.25rem; padding: .65rem; } .tb-fixed-item { padding: .75rem; } .tb-fixed-item > div:last-child { width: 2rem; flex-direction: column; } }
+
+/* El pie, despejado de la barra de pestañas.
+   La barra es `fixed` al borde inferior y el pie va después de la página en el
+   layout, así que al bajar del todo le tapaba 59 px. `:has()` para aplicarlo
+   solo en las pantallas donde la barra existe —en las demás sobraría el hueco—
+   y el mismo alto que reserva el spacer. */
+@media (max-width: 39.99rem) {
+  body:has(.tb-tabbar) footer {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}

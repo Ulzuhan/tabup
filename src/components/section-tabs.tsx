@@ -50,9 +50,14 @@ export function SectionTabs({ current }: { current: "trips" | "recurring" }) {
         Phones: fixed to the bottom, clear of the home indicator. The spacer below
         reserves the same height in the flow so the last row of a list is never left
         hidden underneath it.
+
+        `tb-tabbar` no pinta nada: es el gancho con el que el CSS le da al PIE el
+        hueco de esta barra. El spacer de abajo protege el contenido de la página,
+        pero el pie lo pinta el layout DESPUÉS de la página, así que al bajar del
+        todo esta barra le tapaba 59 px de pie.
       */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur sm:hidden"
+        className="tb-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur sm:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label="Sections"
       >
