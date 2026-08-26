@@ -429,6 +429,8 @@ export const es = {
     headline: "Las cuentas del viaje, claras al volver",
     sub: "Apunta lo que paga cada uno, en cualquier moneda, y TabUp calcula quién debe a quién con los menos pagos posibles.",
     getStarted: "Crear cuenta",
+    accountHint:
+      "¿Ya tienes cuenta de KaiCorp Labs? Usa el mismo botón: pide acceso a este servicio.",
     signIn: "Entrar",
     demoTitle: "Fin de semana en Lisboa",
     demoTotal: "Total gastado",
@@ -981,6 +983,8 @@ export const en: Messages = {
     headline: "Trip accounts, settled by the time you are home",
     sub: "Log what everyone paid, in any currency, and TabUp works out who owes whom in the fewest possible payments.",
     getStarted: "Create account",
+    accountHint:
+      "Already have a KaiCorp Labs account? Use the same button — it asks for access to this one.",
     signIn: "Sign in",
     demoTitle: "Weekend in Lisbon",
     demoTotal: "Total spent",

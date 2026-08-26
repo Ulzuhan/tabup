@@ -71,6 +71,7 @@ export function Landing({ locale }: { locale: Locale; canRegister?: boolean }) {
                 render={<Link href="/login">{t.signIn}</Link>}
               />
             </div>
+            <p className="mt-3 text-xs text-muted-foreground">{t.accountHint}</p>
           </div>
 
           <DemoCard t={t} locale={locale} />
