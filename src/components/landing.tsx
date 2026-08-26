@@ -23,7 +23,16 @@ import { Button } from "@/components/ui/button";
  * for those expenses — rather than a stock illustration. Showing the one screen that
  * matters says more than any amount of copy about balances.
  */
-export function Landing({ locale, canRegister }: { locale: Locale; canRegister: boolean }) {
+/**
+ * Where somebody asks for an account.
+ *
+ * The flow lives in the identity provider and is specific to this service: it
+ * creates the account inactive AND already in TabUp's group, so approving it is
+ * one click and cannot forget to grant access.
+ */
+const ENROLL_URL = "https://auth.kaicorplabs.com/if/flow/enroll-tabup/";
+
+export function Landing({ locale }: { locale: Locale; canRegister?: boolean }) {
   const t = MESSAGES[locale].landing;
 
   const features = [
@@ -61,12 +70,10 @@ export function Landing({ locale, canRegister }: { locale: Locale; canRegister: 
             </p>
 
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
-              {canRegister && (
-                <Button size="lg" className="h-12 px-7 text-base" render={<Link href="/login?new=1">{t.getStarted}</Link>} />
-              )}
+              <Button size="lg" className="h-12 px-7 text-base" render={<Link href={ENROLL_URL}>{t.getStarted}</Link>} />
               <Button
                 size="lg"
-                variant={canRegister ? "outline" : "default"}
+                variant="outline"
                 className="h-12 px-7 text-base"
                 render={<Link href="/login">{t.signIn}</Link>}
               />
@@ -108,8 +115,8 @@ export function Landing({ locale, canRegister }: { locale: Locale; canRegister: 
           size="lg"
           className="mt-7 h-12 px-7 text-base"
           render={
-            <Link href={canRegister ? "/login?new=1" : "/login"}>
-              {canRegister ? t.getStarted : t.signIn}
+            <Link href={ENROLL_URL}>
+              {t.getStarted}
               <ArrowRight className="size-4" />
             </Link>
           }
