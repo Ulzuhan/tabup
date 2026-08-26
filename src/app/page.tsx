@@ -1,5 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { getCurrentUser, registrationOpen } from "@/lib/auth";
+import { oidcConfigured } from "@/lib/oidc";
 import { LOCALE_COOKIE, isLocale, localeFromHeader } from "@/i18n/config";
 import { Landing } from "@/components/landing";
 import { TripsView } from "./trips-view";
@@ -20,5 +21,13 @@ export default async function Home() {
     ? stored
     : localeFromHeader((await headers()).get("accept-language"));
 
-  return <Landing locale={locale} canRegister={registrationOpen()} />;
+  // Sin proveedor, "crear cuenta" va al formulario propio: mandar a alguien al
+  // flujo de alta de un Authentik que no existe es un callejón sin salida.
+  return (
+    <Landing
+      locale={locale}
+      canRegister={registrationOpen()}
+      enrollUrl={oidcConfigured() ? undefined : "/login?new=1"}
+    />
+  );
 }

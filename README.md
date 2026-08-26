@@ -54,6 +54,11 @@ npm run start
 | `TABUP_BACKUP_KEEP` | `14` | Snapshots to keep |
 | `TABUP_BACKUP_REMOTE` | unset | rsync target for offsite copies |
 | `TABUP_PUSH_SUBJECT` | `mailto:tabup@localhost` | Contact a push service can complain to; part of VAPID |
+| `TABUP_OIDC_CLIENT_ID` | unset | Setting these three delegates sign-in to an identity provider; see [Two ways in](#two-ways-in) |
+| `TABUP_OIDC_CLIENT_SECRET` | unset | |
+| `TABUP_OIDC_REDIRECT_URI` | unset | `https://your-host/api/auth/callback` |
+| `TABUP_OIDC_PUBLIC_BASE` | `https://auth.kaicorplabs.com` | Where the browser is sent |
+| `TABUP_OIDC_INTERNAL_BASE` | `http://127.0.0.1:9100` | Where the server talks to the provider, if that differs |
 
 The database file and its directory are created on first start. There is no separate
 migration step: the schema is applied on boot, and it is safe to run against a database
@@ -339,7 +344,34 @@ An invitation made by adding somebody by email carries the member it was made fo
 accepting it seats that person. A plain invitation carries no member, and whoever
 accepts is asked which participant they are.
 
+### Two ways in
+
+Sign-in is decided by configuration, not by a code change.
+
+**Its own accounts, by default.** Clone this, run it, and it works: emails and
+passwords live in TabUp's own database, hashed with scrypt. Nothing else is needed —
+which is the point of it being the default.
+
+**Or an identity provider,** when `TABUP_OIDC_CLIENT_ID`, `TABUP_OIDC_CLIENT_SECRET`
+and `TABUP_OIDC_REDIRECT_URI` are set. Then `/login` stops rendering a form and sends
+people to the provider instead, `/api/auth/callback` brings them back, and the local
+password paths are simply never reached. That is how the deployment this was written
+for runs it: one account opens five different services, so a login form per service
+would mean five places to get password handling right.
+
+The provider does not replace the account: it decides who may sign in. Everything
+below — trips, members, approvals — works the same either way. Somebody arriving by
+OIDC is matched first on the provider's `sub` claim and then on their email address,
+so an account that existed before the provider did keeps its trips.
+
+The local paths were kept rather than deleted on purpose. Deleting them would have
+meant this repository could not be run without standing up an identity provider first,
+and a project you cannot start is a project nobody reads.
+
 ### Registration
+
+Applies to TabUp's own accounts. With a provider configured, who may get an account is
+the provider's business and these values are not consulted.
 
 `TABUP_REGISTRATION` takes three values:
 

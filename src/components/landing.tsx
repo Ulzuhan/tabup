@@ -32,7 +32,17 @@ import { Button } from "@/components/ui/button";
  */
 const ENROLL_URL = "https://auth.kaicorplabs.com/if/flow/enroll-tabup/";
 
-export function Landing({ locale }: { locale: Locale; canRegister?: boolean }) {
+export function Landing({
+  locale,
+  enrollUrl = ENROLL_URL,
+}: {
+  locale: Locale;
+  canRegister?: boolean;
+  /** Dónde se pide cuenta. Con proveedor, su flujo de alta; sin él, el
+      formulario propio. Lo decide el servidor, que es quien sabe si hay
+      proveedor configurado. */
+  enrollUrl?: string;
+}) {
   const t = MESSAGES[locale].landing;
 
   const features = [
@@ -63,7 +73,7 @@ export function Landing({ locale }: { locale: Locale; canRegister?: boolean }) {
             </p>
 
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
-              <Button size="lg" className="h-12 px-7 text-base" render={<Link href={ENROLL_URL}>{t.getStarted}</Link>} />
+              <Button size="lg" className="h-12 px-7 text-base" render={<Link href={enrollUrl}>{t.getStarted}</Link>} />
               <Button
                 size="lg"
                 variant="outline"
@@ -109,7 +119,7 @@ export function Landing({ locale }: { locale: Locale; canRegister?: boolean }) {
           size="lg"
           className="mt-7 h-12 px-7 text-base"
           render={
-            <Link href={ENROLL_URL}>
+            <Link href={enrollUrl}>
               {t.getStarted}
               <ArrowRight className="size-4" />
             </Link>
