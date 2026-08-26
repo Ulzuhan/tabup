@@ -55,7 +55,7 @@ export function Landing({
   ];
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="kc-product-landing flex flex-1 flex-col">
       {/* La barra superior la pone el layout: es la misma en los cinco servicios. */}
       <main className="flex flex-1 flex-col">
 
@@ -95,7 +95,7 @@ export function Landing({
             {t.features}
           </h2>
 
-          <div className="mt-8 grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="kc-card-grid mt-8 grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
             {features.map(({ Icon, title, body }) => (
               <div key={title}>
                 <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10">

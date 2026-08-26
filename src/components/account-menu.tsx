@@ -47,11 +47,14 @@ export function AccountMenu({
   const [deleting, setDeleting] = useState(false);
 
   const signOut = async () => {
-    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    const res = await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
     // La caché offline es del navegador, no de la cuenta: dejarla ahí le entrega
     // los viajes a quien entre después en este dispositivo.
     clearSessionCache();
-    window.location.reload();
+    // Recargar no bastaba: la sesión del proveedor seguía viva y "Sign in"
+    // volvía a entrar sin pedir nada.
+    const next = res ? (await res.json().catch(() => ({}))).next : null;
+    window.location.href = next ?? "/";
   };
 
   if (!user) {

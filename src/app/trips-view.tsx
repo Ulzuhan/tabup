@@ -143,7 +143,7 @@ export function TripsView() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-16 sm:pt-8">
+    <div className="kc-workspace mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-16 sm:pt-8">
       <SectionTabs current="trips" />
 
       {/* Everything that is not the header or the navigation. There was no `main` in the

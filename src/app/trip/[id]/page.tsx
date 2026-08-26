@@ -426,7 +426,7 @@ export default function TripPage() {
   const owner = trip.access === "owner";
   const memberById = (mid: string) => trip.members.find((m) => m.id === mid);
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-20">
+    <div className="kc-workspace mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-20">
       <TripHeader
         tripId={id}
         name={trip.name}
@@ -675,7 +675,7 @@ export default function TripPage() {
 
 function TripSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 pt-5 pb-20">
+    <div className="kc-workspace mx-auto w-full max-w-2xl px-4 pt-5 pb-20">
       <div className="mb-6 flex items-center gap-3">
         <Skeleton className="size-9 rounded-lg" />
         <div className="flex-1 space-y-2">

@@ -401,7 +401,7 @@ export const es = {
     badge: "{count} pendientes",
 
     accounts: "Cuentas",
-    accountsHint: "Aquí no se manda correo, así que las contraseñas se cambian desde aquí.",
+    accountsHint: "Cada uno puede recuperar su contraseña desde la pantalla de entrada; esto es para cuando no puede.",
     adminRole: "Admin",
     joinedOn: "Desde el {date}",
     changePassword: "Cambiar contraseña",
@@ -955,7 +955,7 @@ export const en: Messages = {
     badge: "{count} pending",
 
     accounts: "Accounts",
-    accountsHint: "Nothing here sends email, so passwords are changed from here.",
+    accountsHint: "People can reset their own password from the sign-in screen; these are for when they cannot.",
     adminRole: "Admin",
     joinedOn: "Joined {date}",
     changePassword: "Change password",

@@ -141,7 +141,7 @@ export default function RecurringPage() {
     new Date(ms).toLocaleDateString(locale, { day: "numeric", month: "short" });
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-16 sm:pt-8">
+    <div className="kc-workspace mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-16 sm:pt-8">
       <SectionTabs current="recurring" />
 
       <main className="flex flex-1 flex-col">
