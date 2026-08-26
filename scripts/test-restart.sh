@@ -32,14 +32,30 @@ SERVER_PID=""
 # and any pattern loose enough to catch it also catches the node process running this
 # very test, which kills the suite instead of the server. The listener on the port is
 # unambiguous, and it is never this script.
+listening_pids() {
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null || true
+  elif command -v ss >/dev/null 2>&1; then
+    ss -ltnp 2>/dev/null | sed -n "s/.*:$PORT .*pid=\([0-9][0-9]*\).*/\1/p" | sort -u
+  fi
+}
+
+port_busy() {
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1
+  else
+    ss -ltn 2>/dev/null | grep -q ":$PORT "
+  fi
+}
+
 stop_server() {
   local pids
-  pids=$(ss -ltnp 2>/dev/null | grep ":$PORT " | grep -oP 'pid=\K[0-9]+' | sort -u)
+  pids="$(listening_pids)"
   [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null
   [ -n "$pids" ] && kill $pids 2>/dev/null
   SERVER_PID=""
   for _ in $(seq 1 20); do
-    ss -ltn 2>/dev/null | grep -q ":$PORT " || return 0
+    port_busy || return 0
     sleep 1
   done
   [ -n "$pids" ] && kill -9 $pids 2>/dev/null
@@ -60,7 +76,7 @@ start_server() {
   return 1
 }
 
-if ss -ltn 2>/dev/null | grep -q ":$PORT "; then
+if port_busy; then
   echo "port $PORT is already in use; set PORT to a free one"
   exit 1
 fi

@@ -1,6 +1,6 @@
 import { existsSync } from "fs";
 import { mkdir, readFile, writeFile } from "fs/promises";
-import { join } from "path";
+import { resolve } from "path";
 
 /**
  * Exchange rates, and the one rule that matters: never invent one.
@@ -23,8 +23,11 @@ import { join } from "path";
  *   look like one it is sure about.
  */
 
-const DATA_DIR = process.env.TABUP_DATA_DIR?.trim() || join(process.cwd(), "data");
-const CACHE_FILE = join(DATA_DIR, ".exchange-rates-cache.json");
+const DATA_DIR = resolve(
+  /* turbopackIgnore: true */ process.cwd(),
+  process.env.TABUP_DATA_DIR?.trim() || "data"
+);
+const CACHE_FILE = resolve(DATA_DIR, ".exchange-rates-cache.json");
 
 /**
  * How long a cached "latest" may stand in before it is called approximate.

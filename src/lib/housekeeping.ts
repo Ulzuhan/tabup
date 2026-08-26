@@ -1,9 +1,8 @@
 import { readdir, stat, unlink, rmdir } from "fs/promises";
 import { existsSync } from "fs";
-import { join } from "path";
 import { lt } from "drizzle-orm";
 import { db, expenses, invites, passwordResets, sessions } from "@/db";
-import { RECEIPTS_DIR } from "./receipts";
+import { RECEIPTS_DIR, runtimeChild } from "./receipts";
 import { logError } from "./errors";
 
 /**
@@ -37,7 +36,7 @@ const ORPHAN_AFTER = 6 * 60 * 60 * 1000;
 
 /** Photos on disk that no expense points at, and the empty folders they leave behind. */
 async function sweepReceipts(): Promise<number> {
-  if (!existsSync(RECEIPTS_DIR)) return 0;
+  if (!existsSync(/* turbopackIgnore: true */ RECEIPTS_DIR)) return 0;
 
   const referenced = new Set(
     db
@@ -51,21 +50,21 @@ async function sweepReceipts(): Promise<number> {
   const cutoff = Date.now() - ORPHAN_AFTER;
   let removed = 0;
 
-  for (const tripDir of await readdir(RECEIPTS_DIR)) {
-    const dir = join(RECEIPTS_DIR, tripDir);
-    if (!(await stat(dir)).isDirectory()) continue;
+  for (const tripDir of await readdir(/* turbopackIgnore: true */ RECEIPTS_DIR)) {
+    const dir = runtimeChild(RECEIPTS_DIR, tripDir);
+    if (!(await stat(/* turbopackIgnore: true */ dir)).isDirectory()) continue;
 
-    const files = await readdir(dir);
+    const files = await readdir(/* turbopackIgnore: true */ dir);
     for (const file of files) {
       if (referenced.has(`${tripDir}/${file}`)) continue;
-      const info = await stat(join(dir, file));
+      const info = await stat(/* turbopackIgnore: true */ runtimeChild(dir, file));
       if (info.mtimeMs >= cutoff) continue;
-      await unlink(join(dir, file));
+      await unlink(/* turbopackIgnore: true */ runtimeChild(dir, file));
       removed++;
     }
 
     // A trip that was deleted leaves its folder behind; so does one whose photos all go.
-    if ((await readdir(dir)).length === 0) await rmdir(dir).catch(() => {});
+    if ((await readdir(/* turbopackIgnore: true */ dir)).length === 0) await rmdir(/* turbopackIgnore: true */ dir).catch(() => {});
   }
 
   return removed;
@@ -102,7 +101,13 @@ export async function sweep(): Promise<void> {
  * `unref` so this timer is never the reason the process stays alive: a server being asked
  * to stop should stop, not wait for a sweep that is not due for another five hours.
  */
+declare global {
+  var __tabup_housekeeping_started__: boolean | undefined;
+}
+
 export function startHousekeeping(): void {
+  if (globalThis.__tabup_housekeeping_started__) return;
+  globalThis.__tabup_housekeeping_started__ = true;
   void sweep();
   setInterval(() => void sweep(), 6 * 60 * 60 * 1000).unref();
 }

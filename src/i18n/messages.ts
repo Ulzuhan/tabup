@@ -402,6 +402,7 @@ export const es = {
 
     accounts: "Cuentas",
     accountsHint: "Cada uno puede recuperar su contraseña desde la pantalla de entrada; esto es para cuando no puede.",
+    accountsOidcHint: "El acceso y la recuperación se gestionan en Authentik.",
     adminRole: "Admin",
     joinedOn: "Desde el {date}",
     changePassword: "Cambiar contraseña",
@@ -956,6 +957,7 @@ export const en: Messages = {
 
     accounts: "Accounts",
     accountsHint: "People can reset their own password from the sign-in screen; these are for when they cannot.",
+    accountsOidcHint: "Sign-in and account recovery are managed in Authentik.",
     adminRole: "Admin",
     joinedOn: "Joined {date}",
     changePassword: "Change password",

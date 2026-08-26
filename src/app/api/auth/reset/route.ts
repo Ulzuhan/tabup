@@ -12,6 +12,7 @@ import {
   redeemPasswordReset,
 } from "@/lib/auth";
 import { logError } from "@/lib/errors";
+import { oidcConfigured } from "@/lib/oidc";
 
 /**
  * Setting a new password from a link the admin handed out.
@@ -28,6 +29,8 @@ import { logError } from "@/lib/errors";
 
 /** What the link is worth, so the page can say something useful before asking anything. */
 export async function GET(request: NextRequest) {
+  if (oidcConfigured()) return fail("not_found", 404);
+
   const token = request.nextUrl.searchParams.get("token") ?? "";
   const reset = readPasswordReset(token);
   // The address is shown so the person can see whose account they are about to change —
@@ -36,6 +39,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (oidcConfigured()) return fail("not_found", 404);
+
   const key = clientKey(request, "reset");
   if (tooManyAttempts(key)) {
     return fail("throttled", 429);

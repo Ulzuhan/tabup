@@ -4,6 +4,8 @@ import { calculateBalances, calculateSettlements, expenseShares } from "@/lib/ba
 import { authorizeTrip } from "@/lib/authorize";
 import { CURRENCIES } from "@/lib/types";
 import { PrintButton } from "./print-button";
+import { resolveLocale, intlLocale } from "@/i18n/server";
+import { PRINT_MESSAGES } from "@/i18n/print";
 
 export const metadata = { title: "TabUp" };
 
@@ -26,17 +28,20 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
   const trip = await getTrip(id);
   if (!trip) notFound();
 
+  const locale = await resolveLocale();
+  const intl = intlLocale(locale);
+  const text = PRINT_MESSAGES[locale];
   const balances = calculateBalances(trip);
   const settlements = calculateSettlements(trip);
   const total = trip.expenses.reduce((sum, e) => sum + e.amountBase, 0);
   const symbol = CURRENCIES.find((c) => c.code === trip.currency)?.symbol ?? trip.currency;
 
   const money = (n: number) =>
-    `${symbol}${new Intl.NumberFormat("es-ES", {
+    `${symbol}${new Intl.NumberFormat(intl, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(n)}`;
-  const day = (ms: number) => new Date(ms).toLocaleDateString("es-ES");
+  const day = (ms: number) => new Date(ms).toLocaleDateString(intl);
   const name = (memberId: string) =>
     trip.members.find((m) => m.id === memberId)?.name ?? memberId;
 
@@ -98,19 +103,19 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
 
         {trip.budget != null && (
           <p className="text-[13px] text-[#6b6f80]">
-            Presupuesto {money(trip.budget)} · {total > trip.budget ? "excedido en" : "quedan"}{" "}
+            {text.budget} {money(trip.budget)} · {total > trip.budget ? text.exceeded : text.remaining}{" "}
             {money(Math.abs(trip.budget - total))}
           </p>
         )}
 
-        <h2>Gastos</h2>
+        <h2>{text.expenses}</h2>
         <table>
           <thead>
             <tr>
-              <th>Fecha</th>
-              <th>Concepto</th>
-              <th>Pagó</th>
-              <th className="num">Importe</th>
+              <th>{text.date}</th>
+              <th>{text.description}</th>
+              <th>{text.paidBy}</th>
+              <th className="num">{text.amount}</th>
               {trip.members.map((m) => (
                 <th key={m.id} className="num">
                   {m.name}
@@ -156,15 +161,15 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
 
         {trip.payments.length > 0 && (
           <>
-            <h2>Pagos</h2>
+            <h2>{text.payments}</h2>
             <table>
               <thead>
                 <tr>
-                  <th>Fecha</th>
-                  <th>De</th>
-                  <th>Para</th>
-                  <th>Nota</th>
-                  <th className="num">Importe</th>
+                  <th>{text.date}</th>
+                  <th>{text.from}</th>
+                  <th>{text.to}</th>
+                  <th>{text.note}</th>
+                  <th className="num">{text.amount}</th>
                 </tr>
               </thead>
               <tbody>
@@ -184,14 +189,14 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
           </>
         )}
 
-        <h2>Balances</h2>
+        <h2>{text.balances}</h2>
         <table>
           <thead>
             <tr>
-              <th>Persona</th>
-              <th className="num">Pagó</th>
-              <th className="num">Le toca</th>
-              <th className="num">Balance</th>
+              <th>{text.person}</th>
+              <th className="num">{text.paid}</th>
+              <th className="num">{text.share}</th>
+              <th className="num">{text.balance}</th>
             </tr>
           </thead>
           <tbody>
@@ -209,9 +214,9 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
           </tbody>
         </table>
 
-        <h2>Quién paga a quién</h2>
+        <h2>{text.settlements}</h2>
         {settlements.length === 0 ? (
-          <p className="text-[13px]">Todo saldado.</p>
+          <p className="text-[13px]">{text.settled}</p>
         ) : (
           <table>
             <tbody>
@@ -228,7 +233,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         )}
 
         <p className="mt-8 text-[11px] text-[#9a9db0]">
-          TabUp · {new Date().toLocaleDateString("es-ES")}
+          TabUp · {new Date().toLocaleDateString(intl)}
         </p>
       </div>
     </>

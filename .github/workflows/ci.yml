@@ -45,6 +45,9 @@ jobs:
       - name: Test
         run: ./scripts/run-suites.sh
 
+      - name: Recurring dates outside UTC
+        run: TZ=Europe/Madrid npm run test:recurring
+
       - name: Server log on failure
         if: failure()
         run: tail -40 /tmp/*.log 2>/dev/null || true

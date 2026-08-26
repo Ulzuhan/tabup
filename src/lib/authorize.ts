@@ -42,7 +42,7 @@ export async function authorizeTrip(
   if (need === "write" && !canWrite(level)) {
     return {
       ok: false,
-      response: NextResponse.json({ error: "You have read-only access to this trip" }, { status: 403 }),
+      response: fail("not_allowed", 403),
     };
   }
 

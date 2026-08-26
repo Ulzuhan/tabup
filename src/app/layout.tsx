@@ -5,12 +5,13 @@ import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ServiceWorkerRegistrar } from "@/components/offline";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { I18nProvider } from "@/i18n/provider";
-import { LOCALE_COOKIE, isLocale, localeFromHeader } from "@/i18n/config";
+import { resolveLocale } from "@/i18n/server";
 import { ThemeSync } from "@/components/theme";
 import { THEME_COOKIE, isTheme } from "@/lib/theme";
 import { getCurrentUser, isAdmin, pendingUsers, publicUser } from "@/lib/auth";
+import { startHousekeeping } from "@/lib/housekeeping";
 import "./globals.css";
 
 const display = Space_Grotesk({ variable: "--font-display", weight: ["500", "700"], subsets: ["latin"] });
@@ -49,17 +50,6 @@ export const viewport: Viewport = {
 };
 
 /**
- * Resolves the language on the server so the first paint is already translated and
- * `lang` is correct — an explicit choice in the cookie wins, otherwise the browser's
- * Accept-Language decides.
- */
-async function resolveLocale() {
-  const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
-  if (isLocale(stored)) return stored;
-  return localeFromHeader((await headers()).get("accept-language"));
-}
-
-/**
  * The theme, resolved on the server for the same reason as the language: the first paint
  * has to be the right one. No cookie means "whatever the device says", which the CSS
  * already handles on its own.
@@ -88,6 +78,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  if (process.env.NEXT_PHASE !== "phase-production-build") startHousekeeping();
+
   const [locale, theme, session] = await Promise.all([
     resolveLocale(),
     resolveTheme(),

@@ -57,8 +57,8 @@ export function activeAt(item: Recurring, at: number): boolean {
 
 /** Whether it is being paid at any point during a given month. */
 export function activeInMonth(item: Recurring, year: number, month: number): boolean {
-  const first = new Date(year, month, 1).getTime();
-  const last = new Date(year, month + 1, 0, 23, 59, 59, 999).getTime();
+  const first = Date.UTC(year, month, 1);
+  const last = Date.UTC(year, month + 1, 1) - 1;
   if (item.startedAt > last) return false;
   return item.endedAt == null || item.endedAt >= first;
 }
@@ -91,7 +91,7 @@ export function nextCharge(item: Recurring, from = Date.now()): number | null {
 
   const start = new Date(Math.max(item.startedAt, from));
   const clampDay = (year: number, month: number) =>
-    Math.min(item.chargeDay, new Date(year, month + 1, 0).getDate());
+    Math.min(item.chargeDay, new Date(Date.UTC(year, month + 1, 0)).getUTCDate());
 
   let candidate: Date;
 
@@ -101,31 +101,31 @@ export function nextCharge(item: Recurring, from = Date.now()): number | null {
     const elapsed = Math.max(0, from - item.startedAt);
     candidate = new Date(item.startedAt + Math.ceil(elapsed / week) * week);
   } else if (item.period === "yearly") {
-    const month = (item.chargeMonth ?? new Date(item.startedAt).getMonth() + 1) - 1;
-    let year = start.getFullYear();
-    candidate = new Date(year, month, clampDay(year, month));
+    const month = (item.chargeMonth ?? new Date(item.startedAt).getUTCMonth() + 1) - 1;
+    let year = start.getUTCFullYear();
+    candidate = new Date(Date.UTC(year, month, clampDay(year, month)));
     if (candidate.getTime() < from) {
       year += 1;
-      candidate = new Date(year, month, clampDay(year, month));
+      candidate = new Date(Date.UTC(year, month, clampDay(year, month)));
     }
   } else {
     const step = item.period === "quarterly" ? 3 : 1;
     const base = new Date(item.startedAt);
-    let year = start.getFullYear();
-    let month = start.getMonth();
+    let year = start.getUTCFullYear();
+    let month = start.getUTCMonth();
 
     // Quarterly repeats from the starting month, not from January.
     if (step === 3) {
-      const offset = (((month - base.getMonth()) % 3) + 3) % 3;
+      const offset = (((month - base.getUTCMonth()) % 3) + 3) % 3;
       month -= offset;
     }
 
-    candidate = new Date(year, month, clampDay(year, month));
+    candidate = new Date(Date.UTC(year, month, clampDay(year, month)));
     if (candidate.getTime() < from) {
       month += step;
       year += Math.floor(month / 12);
       month = ((month % 12) + 12) % 12;
-      candidate = new Date(year, month, clampDay(year, month));
+      candidate = new Date(Date.UTC(year, month, clampDay(year, month)));
     }
   }
 
@@ -166,8 +166,8 @@ export function upcoming(items: Recurring[], days = 30, from = Date.now()): Upco
  * would hide the very spike worth knowing about.
  */
 export function chargedInMonth(items: Recurring[], year: number, month: number): number {
-  const first = new Date(year, month, 1).getTime();
-  const last = new Date(year, month + 1, 0, 23, 59, 59, 999).getTime();
+  const first = Date.UTC(year, month, 1);
+  const last = Date.UTC(year, month + 1, 1) - 1;
 
   let total = 0;
   for (const item of items) {

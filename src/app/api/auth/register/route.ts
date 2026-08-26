@@ -13,6 +13,7 @@ import {
   tooManyAttempts,
 } from "@/lib/auth";
 import { readInvite, redeemInvite } from "@/lib/store";
+import { oidcConfigured } from "@/lib/oidc";
 
 /**
  * Creates an account.
@@ -21,6 +22,8 @@ import { readInvite, redeemInvite } from "@/lib/store";
  * instance and the trip the new account joins on the way in.
  */
 export async function POST(request: NextRequest) {
+  if (oidcConfigured()) return fail("not_found", 404);
+
   // Closed by default once the instance has an owner. This is reachable from the
   // internet, and an open registration endpoint on a personal instance means anyone
   // who finds the URL can create accounts on it. The first account is always allowed

@@ -29,6 +29,8 @@ import { pipeline } from "node:stream/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+process.umask(0o077);
+
 const execFileAsync = promisify(execFile);
 
 const DB_PATH = process.env.TABUP_DB || join(process.cwd(), "data", "tabup.db");

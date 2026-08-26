@@ -14,6 +14,7 @@ import {
 } from "@/lib/auth";
 import { db, users } from "@/db";
 import { logError } from "@/lib/errors";
+import { oidcConfigured } from "@/lib/oidc";
 
 /**
  * Accounts, for the admin.
@@ -49,6 +50,10 @@ export async function POST(request: NextRequest) {
   if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
   try {
+    if (oidcConfigured() && (body.action === "reset-link" || body.action === "password")) {
+      return fail("not_allowed", 403);
+    }
+
     /**
      * A link, rather than a password read out over the phone.
      *

@@ -14,6 +14,8 @@
 # Needs a build first (`npm run build`). Exits non-zero if anything failed, which is what
 # CI reads.
 set -uo pipefail
+set -m
+
 cd "$(dirname "$0")/.."
 
 PORT="${PORT:-3910}"
@@ -35,7 +37,7 @@ server_pid=""
 stop() {
   [ -n "$server_pid" ] || return 0
   # The whole group, not the process: `next start` spawns a `next-server` worker, and
-  # killing only the parent leaves the worker holding the port. `setsid` above is what
+  # killing only the parent leaves the worker holding the port. Bash job control is what
   # makes the group exist to be killed.
   kill -- -"$server_pid" 2>/dev/null || kill "$server_pid" 2>/dev/null
   wait "$server_pid" 2>/dev/null
@@ -61,7 +63,7 @@ start() {
 
   TABUP_DB="$DB" TABUP_REGISTRATION="$mode" \
     TABUP_OLLAMA_URL="http://127.0.0.1:11500" \
-    setsid ./node_modules/.bin/next start -p "$PORT" >"$LOG" 2>&1 &
+    ./node_modules/.bin/next start -p "$PORT" >"$LOG" 2>&1 &
   server_pid=$!
 
   for _ in $(seq 1 90); do

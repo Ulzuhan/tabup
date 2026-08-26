@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
-import { join } from "path";
+import { join, resolve } from "path";
 import { mkdirSync } from "fs";
 import { randomBytes } from "crypto";
 import * as schema from "./schema";
@@ -12,15 +12,25 @@ import { EMOJIS } from "../lib/types";
  * Kept on globalThis because Next reloads modules in development: without this each
  * reload would open another handle to the same file and they would fight over locks.
  */
-const DB_PATH = process.env.TABUP_DB?.trim() || join(process.cwd(), "data", "tabup.db");
+const IS_PRODUCTION_BUILD = process.env.NEXT_PHASE === "phase-production-build";
+const DB_PATH = IS_PRODUCTION_BUILD
+  ? ":memory:"
+  : resolve(
+      /* turbopackIgnore: true */ process.cwd(),
+      process.env.TABUP_DB?.trim() || join("data", "tabup.db")
+    );
 
 declare global {
   var __tabup_db__: ReturnType<typeof create> | undefined;
 }
 
 function create() {
-  mkdirSync(join(DB_PATH, ".."), { recursive: true });
-  const sqlite = new Database(DB_PATH);
+  if (!IS_PRODUCTION_BUILD) {
+    mkdirSync(/* turbopackIgnore: true */ join(/* turbopackIgnore: true */ DB_PATH, ".."), {
+      recursive: true,
+    });
+  }
+  const sqlite = new Database(/* turbopackIgnore: true */ DB_PATH);
 
   // WAL lets readers work while a write is in progress, which is what makes several
   // people adding expenses at once feel instant instead of serialised.
@@ -38,7 +48,7 @@ function create() {
   // is the wrong moment to alter the file people's money is in: nobody is looking, the
   // running server still holds the old shape in memory, and there is no backup taken.
   // Migrations belong to a server that is starting up.
-  if (process.env.NEXT_PHASE !== "phase-production-build") migrate(sqlite);
+  if (!IS_PRODUCTION_BUILD) migrate(sqlite);
 
   return drizzle(sqlite, { schema });
 }

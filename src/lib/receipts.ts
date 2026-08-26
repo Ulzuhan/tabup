@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import { mkdir, readFile, unlink, writeFile } from "fs/promises";
 import { existsSync } from "fs";
-import { join, resolve } from "path";
+import { join, resolve, sep } from "path";
 import sharp from "sharp";
 import { CURRENCIES } from "./types";
 import { logError } from "./errors";
@@ -14,12 +14,19 @@ import { logError } from "./errors";
  * meant to stay small enough to run nightly without thinking about it.
  */
 
-const DATA_DIR = process.env.TABUP_DATA_DIR?.trim() || join(process.cwd(), "data");
+const CUSTOM_DATA_DIR = process.env.TABUP_DATA_DIR?.trim();
 /** Exported so housekeeping sweeps the same place uploads are written to. */
-export const RECEIPTS_DIR = join(DATA_DIR, "receipts");
+export const RECEIPTS_DIR = CUSTOM_DATA_DIR
+  ? resolve(CUSTOM_DATA_DIR, "receipts")
+  : join(/* turbopackIgnore: true */ process.cwd(), "data", "receipts");
 
 /** Bigger than any phone photo needs to be for this, small enough to bound abuse. */
 export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+
+/** Joins runtime-owned files without making them build dependencies. */
+export function runtimeChild(parent: string, child: string): string {
+  return `${parent}${sep}${child}`;
+}
 
 const OLLAMA = process.env.TABUP_OLLAMA_URL?.trim() || "http://127.0.0.1:11434";
 const OCR_MODEL = process.env.TABUP_OCR_MODEL?.trim() || "qwen3.5:397b-cloud";
@@ -36,19 +43,19 @@ function receiptPath(tripId: string, filename: string): string | null {
   if (!/^[0-9a-f]{8,32}$/.test(tripId)) return null;
   if (!/^[0-9a-f]{8,40}\.(jpe?g|png|webp)$/i.test(filename)) return null;
 
-  const path = resolve(join(RECEIPTS_DIR, tripId, filename));
-  return path.startsWith(resolve(RECEIPTS_DIR)) ? path : null;
+  const path = runtimeChild(runtimeChild(RECEIPTS_DIR, tripId), filename);
+  return path.startsWith(`${RECEIPTS_DIR}${sep}`) ? path : null;
 }
 
 export async function readReceipt(tripId: string, filename: string): Promise<Buffer | null> {
   const path = receiptPath(tripId, filename);
-  if (!path || !existsSync(path)) return null;
-  return readFile(path);
+  if (!path || !existsSync(/* turbopackIgnore: true */ path)) return null;
+  return readFile(/* turbopackIgnore: true */ path);
 }
 
 export async function deleteReceipt(tripId: string, filename: string): Promise<void> {
   const path = receiptPath(tripId, filename);
-  if (path && existsSync(path)) await unlink(path).catch(() => {});
+  if (path && existsSync(/* turbopackIgnore: true */ path)) await unlink(/* turbopackIgnore: true */ path).catch(() => {});
 }
 
 /**
@@ -66,8 +73,8 @@ export async function storeReceipt(
 ): Promise<{ filename: string; bytes: number; sanitised: Buffer } | null> {
   if (!/^[0-9a-f]{8,32}$/.test(tripId)) return null;
 
-  const dir = join(RECEIPTS_DIR, tripId);
-  await mkdir(dir, { recursive: true });
+  const dir = runtimeChild(RECEIPTS_DIR, tripId);
+  await mkdir(/* turbopackIgnore: true */ dir, { recursive: true });
 
   const filename = `${randomBytes(16).toString("hex")}.jpg`;
 
@@ -80,7 +87,7 @@ export async function storeReceipt(
       .jpeg({ quality: 82, mozjpeg: true })
       .toBuffer();
 
-    await writeFile(join(dir, filename), output);
+    await writeFile(/* turbopackIgnore: true */ runtimeChild(dir, filename), output);
     // Handed back, not just written: whatever else looks at this photo must look at the
     // stripped copy. Sending the original anywhere would defeat the point of stripping.
     return { filename, bytes: output.length, sanitised: output };

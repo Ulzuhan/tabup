@@ -51,7 +51,7 @@ interface ServerError {
  * Reachable only from the admin's own menu, and every API call re-checks the role:
  * hiding a page is not access control.
  */
-export function AdminPanel() {
+export function AdminPanel({ localAuth }: { localAuth: boolean }) {
   const t = useT();
   const serverError = useServerError();
   const locale = useIntlLocale();
@@ -248,7 +248,7 @@ export function AdminPanel() {
 
           {/* The link, once made. Sits above the list rather than inside a row: it is
               the thing to act on now, and it has to be easy to copy on a phone. */}
-          {resetLink && (
+          {localAuth && resetLink && (
             <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/[0.06] p-3">
               <div>
                 <p className="text-sm font-medium">{t("admin.resetLinkReady")}</p>
@@ -275,7 +275,10 @@ export function AdminPanel() {
 
           {/* ── Accounts ──────────────────────────────────────────────── */}
           <section>
-            <SectionHeading title={t("admin.accounts")} hint={t("admin.accountsHint")} />
+            <SectionHeading
+              title={t("admin.accounts")}
+              hint={t(localAuth ? "admin.accountsHint" : "admin.accountsOidcHint")}
+            />
 
             <ul className="space-y-2">
               {accounts.map((user) => (
@@ -302,6 +305,8 @@ export function AdminPanel() {
                         </p>
                       </div>
 
+                      {localAuth && (
+                        <>
                       {/* Two ways in, and the link is the one to reach for: it expires,
                           it works once, and the person chooses their own password
                           instead of being told one over a chat that keeps it forever. */}
@@ -330,6 +335,8 @@ export function AdminPanel() {
                         <KeyRound className="size-4" />
                         {t("admin.changePassword")}
                       </Button>
+                        </>
+                      )}
                     </CardContent>
                   </Card>
                 </li>
@@ -437,14 +444,14 @@ export function AdminPanel() {
         </div>
       )}
 
-      <PasswordDialog
+      {localAuth && <PasswordDialog
         user={resetting}
         onClose={() => setResetting(null)}
         onDone={(name) => {
           setResetting(null);
           toast.success(t("admin.passwordChanged", { name }));
         }}
-      />
+      />}
     </main>
   );
 }

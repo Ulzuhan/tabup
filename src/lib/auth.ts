@@ -26,10 +26,11 @@ const scryptAsync = promisify(scrypt) as (
   options: ScryptOptions
 ) => Promise<Buffer>;
 
-/** OWASP's floor for scrypt. Costs ~100ms per hash, which is the point. */
-const SCRYPT_N = 16384;
+/** One of OWASP's equivalent minimum scrypt profiles: N=2^15, r=8, p=3. */
+const SCRYPT_N = 32768;
 const SCRYPT_R = 8;
-const SCRYPT_P = 1;
+const SCRYPT_P = 3;
+const SCRYPT_MAXMEM = 64 * 1024 * 1024;
 const KEY_LENGTH = 64;
 
 export const SESSION_COOKIE = "tabup_session";
@@ -43,6 +44,7 @@ export async function hashPassword(password: string): Promise<string> {
     N: SCRYPT_N,
     r: SCRYPT_R,
     p: SCRYPT_P,
+    maxmem: SCRYPT_MAXMEM,
   });
   return `scrypt$${SCRYPT_N}$${SCRYPT_R}$${SCRYPT_P}$${salt.toString("hex")}$${key.toString("hex")}`;
 }
@@ -65,6 +67,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
       N: Number(n),
       r: Number(r),
       p: Number(p),
+      maxmem: SCRYPT_MAXMEM,
     });
     return timingSafeEqual(key, expected);
   } catch {
@@ -394,7 +397,18 @@ export async function authenticate(email: string, password: string): Promise<Use
     return null;
   }
 
-  return (await verifyPassword(password, user.passwordHash)) ? user : null;
+  if (!(await verifyPassword(password, user.passwordHash))) return null;
+
+  // Raise old hashes opportunistically after a successful login.
+  const currentPrefix = `scrypt$${SCRYPT_N}$${SCRYPT_R}$${SCRYPT_P}$`;
+  if (!user.passwordHash.startsWith(currentPrefix)) {
+    db.update(users)
+      .set({ passwordHash: await hashPassword(password) })
+      .where(eq(users.id, user.id))
+      .run();
+  }
+
+  return user;
 }
 
 /** What the client is allowed to see about itself. */

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { AdminPanel } from "./admin-panel";
+import { oidcConfigured } from "@/lib/oidc";
 
 export const metadata = { title: "TabUp" };
 
@@ -19,5 +20,5 @@ export const metadata = { title: "TabUp" };
  */
 export default async function AdminPage() {
   if (!isAdmin(await getCurrentUser())) notFound();
-  return <AdminPanel />;
+  return <AdminPanel localAuth={!oidcConfigured()} />;
 }

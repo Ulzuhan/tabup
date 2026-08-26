@@ -10,8 +10,11 @@ import {
   tooManyAttempts,
 } from "@/lib/auth";
 import { redeemInvite } from "@/lib/store";
+import { oidcConfigured } from "@/lib/oidc";
 
 export async function POST(request: NextRequest) {
+  if (oidcConfigured()) return fail("not_found", 404);
+
   let body: { email?: string; password?: string; inviteToken?: string };
   try {
     body = await request.json();
