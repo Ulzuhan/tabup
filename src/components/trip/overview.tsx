@@ -99,7 +99,7 @@ export function TripTotal({
   const personal = yourBalance !== null && !settled;
 
   return (
-    <Card className="edge-light mb-4">
+    <Card className="tb-total-card edge-light mb-4">
       <CardContent className="py-1 text-center">
         <p className="text-xs tracking-wider text-muted-foreground uppercase">
           {personal
@@ -149,7 +149,7 @@ export function BalancesCard({
   if (balances.length === 0) return null;
 
   return (
-    <Card className="mb-4">
+    <Card className="tb-balance-card mb-4">
       <CardContent className="space-y-2.5">
         <h2 className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
           {t("trip.balances")}
@@ -188,7 +188,7 @@ export function CategoryBreakdown({
   if (breakdown.length === 0) return null;
 
   return (
-    <Card className="mb-4">
+    <Card className="tb-category-card mb-4">
       <CardContent className="space-y-3">
         <h2 className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
           {t("trip.byCategory")}

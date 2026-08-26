@@ -45,7 +45,7 @@ export function TripHeader({
   const t = useT();
 
   return (
-    <header className="mb-6 flex items-start gap-3 pt-1">
+    <header className="tb-trip-header mb-6 flex items-start gap-3 pt-1">
       <Button
         variant="ghost"
         size="icon"

@@ -143,7 +143,7 @@ export function TripsView() {
   };
 
   return (
-    <div className="kc-workspace mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-16 sm:pt-8">
+    <div className="kc-workspace tb-home mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 pt-5 pb-16 sm:pt-8">
       <SectionTabs current="trips" />
 
       {/* Everything that is not the header or the navigation. There was no `main` in the
@@ -175,7 +175,7 @@ export function TripsView() {
         />
       ) : (
         <>
-          <section className="mb-9 text-center">
+          <section className="tb-home-hero mb-9 text-center">
             <h1 className="text-4xl font-semibold tracking-tight sm:text-[2.75rem]">
               <Wordmark />
             </h1>
@@ -184,12 +184,12 @@ export function TripsView() {
             </p>
           </section>
 
-          <Button size="lg" className="h-12 w-full text-base" onClick={() => setShowCreate(true)}>
+          <Button size="lg" className="tb-new-trip h-12 w-full text-base" onClick={() => setShowCreate(true)}>
             <Plus className="size-5" />
             {t("home.newTrip")}
           </Button>
 
-          <section className="mt-8">
+          <section className="tb-trip-section mt-8">
             {loading ? (
               <div className="space-y-2">
                 <Skeleton className="h-[68px] w-full rounded-xl" />
@@ -208,7 +208,7 @@ export function TripsView() {
                   )}
                 </div>
 
-                <ul className="space-y-2">
+                <ul className="tb-trip-grid space-y-2">
                   {trips.map((trip) => (
                     <li key={trip.id}>
                       <TripRow trip={trip} />
@@ -238,9 +238,9 @@ function TripRow({ trip }: { trip: TripSummary }) {
   return (
     <Link
       href={`/trip/${trip.id}`}
-      className="group flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 transition-colors outline-none hover:border-primary/30 hover:bg-secondary/60 focus-visible:ring-2 focus-visible:ring-ring"
+      className="tb-trip-card group flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 transition-colors outline-none hover:border-primary/30 hover:bg-secondary/60 focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary">
+      <div className="tb-trip-icon flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary">
         <TripKindIcon
           kind={trip.kind}
           className="size-[18px] text-muted-foreground transition-colors group-hover:text-primary"

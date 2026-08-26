@@ -426,7 +426,7 @@ export default function TripPage() {
   const owner = trip.access === "owner";
   const memberById = (mid: string) => trip.members.find((m) => m.id === mid);
   return (
-    <div className="kc-workspace mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-20">
+    <div className="kc-workspace tb-trip-page mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pt-5 pb-20">
       <TripHeader
         tripId={id}
         name={trip.name}
@@ -453,6 +453,7 @@ export default function TripPage() {
         <ClaimPrompt tripId={id} candidates={trip.unclaimed} onClaimed={loadTrip} />
       )}
 
+      <section className="tb-finance-grid">
       <TripTotal
         total={view?.totalExpenses ?? trip.totalExpenses}
         currency={trip.currency}
@@ -488,8 +489,9 @@ export default function TripPage() {
         currency={trip.currency}
       />
 
-      <Tabs defaultValue="expenses" className="flex-1">
-        <TabsList className="w-full">
+      </section>
+      <Tabs defaultValue="expenses" className="tb-activity-panel flex-1">
+        <TabsList className="tb-activity-tabs w-full">
           <TabsTrigger value="expenses" className="flex-1">
             {t("trip.expenses")}
           </TabsTrigger>
@@ -675,7 +677,7 @@ export default function TripPage() {
 
 function TripSkeleton() {
   return (
-    <div className="kc-workspace mx-auto w-full max-w-2xl px-4 pt-5 pb-20">
+    <div className="kc-workspace tb-trip-page mx-auto w-full max-w-6xl px-4 pt-5 pb-20">
       <div className="mb-6 flex items-center gap-3">
         <Skeleton className="size-9 rounded-lg" />
         <div className="flex-1 space-y-2">

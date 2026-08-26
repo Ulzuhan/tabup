@@ -1,0 +1,30 @@
+/* Product workspace: denser than the landing, with the same depth and restraint. */
+.tb-home-hero { position: relative; padding: 2.4rem 1.5rem 2.1rem; overflow: hidden; border: 1px solid color-mix(in oklab, var(--primary) 16%, var(--border)); border-radius: 1.5rem; background: radial-gradient(circle at 50% -25%, color-mix(in oklab, var(--primary) 19%, transparent), transparent 58%), linear-gradient(145deg, color-mix(in oklab, var(--card) 94%, var(--primary)), var(--card)); box-shadow: 0 22px 65px color-mix(in oklab, var(--foreground) 8%, transparent); }
+.tb-home-hero::after { content: ""; position: absolute; inset: auto 15% -42px; height: 70px; border-radius: 999px; background: var(--primary); filter: blur(55px); opacity: .12; pointer-events: none; }
+.tb-new-trip { max-width: 23rem; margin-inline: auto; box-shadow: 0 12px 30px color-mix(in oklab, var(--primary) 22%, transparent); }
+.tb-trip-section { padding: 1rem; border: 1px solid var(--border); border-radius: 1.35rem; background: color-mix(in oklab, var(--card) 88%, transparent); box-shadow: 0 18px 55px color-mix(in oklab, var(--foreground) 5%, transparent); }
+.tb-trip-card { min-height: 5.15rem; padding: 1rem; border-radius: 1rem; background: linear-gradient(135deg, var(--card), color-mix(in oklab, var(--card) 94%, var(--primary))); box-shadow: 0 8px 24px color-mix(in oklab, var(--foreground) 4%, transparent); }
+.tb-trip-card:hover { transform: translateY(-2px); box-shadow: 0 15px 35px color-mix(in oklab, var(--foreground) 8%, transparent); }
+.tb-trip-icon { width: 2.8rem; height: 2.8rem; background: color-mix(in oklab, var(--primary) 11%, var(--secondary)); }
+.tb-trip-header { padding: .85rem; border: 1px solid var(--border); border-radius: 1.15rem; background: color-mix(in oklab, var(--card) 90%, transparent); box-shadow: 0 10px 35px color-mix(in oklab, var(--foreground) 5%, transparent); }
+.tb-finance-grid { display: grid; gap: 1rem; align-items: stretch; }
+.tb-finance-grid > * { margin-bottom: 0; }
+.tb-finance-grid [data-slot="card"] { height: 100%; border-radius: 1.15rem; box-shadow: 0 12px 38px color-mix(in oklab, var(--foreground) 5%, transparent); }
+.tb-total-card { background: radial-gradient(circle at 50% 0, color-mix(in oklab, var(--primary) 13%, transparent), transparent 68%), var(--card); }
+.tb-activity-panel { margin-top: 1.35rem; padding: .8rem; border: 1px solid var(--border); border-radius: 1.25rem; background: color-mix(in oklab, var(--card) 92%, transparent); box-shadow: 0 18px 55px color-mix(in oklab, var(--foreground) 6%, transparent); }
+.tb-activity-tabs { height: auto; min-height: 2.8rem; padding: .25rem; border-radius: .85rem; }
+@media (min-width: 700px) { .tb-home-hero { padding-block: 3.3rem; } .tb-trip-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; } .tb-trip-section { padding: 1.25rem; } .tb-finance-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tb-total-card { grid-row: span 2; } .tb-category-card:last-child { grid-column: 1 / -1; } .tb-trip-header { padding: 1rem 1.15rem; } .tb-activity-panel { padding: 1rem; } }
+@media (min-width: 1024px) { .tb-finance-grid { grid-template-columns: 1.08fr .96fr .96fr; } .tb-total-card { grid-row: auto; } .tb-category-card:last-child { grid-column: auto; } }
+@media (max-width: 520px) { .tb-home-hero { padding: 2rem 1rem 1.8rem; } .tb-trip-section, .tb-activity-panel { margin-inline: -.25rem; padding: .65rem; } .tb-trip-card { min-height: 4.7rem; padding: .75rem; } .tb-trip-card > svg:last-child { display: none; } .tb-activity-tabs { overflow-x: auto; justify-content: flex-start; } .tb-activity-tabs [role="tab"] { min-width: max-content; padding-inline: .75rem; } }
+.tb-fixed-summary { display: grid; gap: 1rem; margin-top: 1rem; }
+.tb-fixed-summary > * { margin: 0; }
+.tb-fixed-summary [data-slot="card"] { height: 100%; border-radius: 1.15rem; box-shadow: 0 12px 38px color-mix(in oklab, var(--foreground) 5%, transparent); }
+.tb-fixed-total { background: radial-gradient(circle at 50% 0, color-mix(in oklab, var(--primary) 15%, transparent), transparent 66%), var(--card); }
+.tb-fixed-actions { margin-top: 1.35rem; padding: .75rem; border: 1px solid var(--border); border-radius: 1rem; background: color-mix(in oklab, var(--card) 92%, transparent); box-shadow: 0 12px 36px color-mix(in oklab, var(--foreground) 5%, transparent); }
+.tb-fixed-list { padding: .75rem; border: 1px solid var(--border); border-radius: 1.25rem; background: color-mix(in oklab, var(--card) 90%, transparent); box-shadow: 0 18px 55px color-mix(in oklab, var(--foreground) 6%, transparent); }
+.tb-fixed-item { min-height: 4.8rem; padding: .9rem; border-radius: 1rem; background: linear-gradient(135deg, var(--card), color-mix(in oklab, var(--card) 95%, var(--primary))); transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease; }
+.tb-fixed-item:hover { transform: translateY(-2px); border-color: color-mix(in oklab, var(--primary) 28%, var(--border)); box-shadow: 0 12px 30px color-mix(in oklab, var(--foreground) 7%, transparent); }
+.tb-fixed-empty { margin-top: .25rem; background: color-mix(in oklab, var(--card) 88%, transparent); }
+@media (min-width: 700px) { .tb-fixed-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tb-fixed-total { grid-row: span 2; } .tb-fixed-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; } .tb-fixed-list > li { margin: 0; } .tb-fixed-actions { max-width: 28rem; margin-left: auto; } }
+@media (min-width: 1024px) { .tb-fixed-summary { grid-template-columns: 1.08fr .96fr .96fr; } .tb-fixed-total { grid-row: auto; } .tb-fixed-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .tb-fixed-actions, .tb-fixed-list { margin-inline: -.25rem; padding: .65rem; } .tb-fixed-item { padding: .75rem; } .tb-fixed-item > div:last-child { width: 2rem; flex-direction: column; } }

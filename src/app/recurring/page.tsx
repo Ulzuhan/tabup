@@ -141,7 +141,7 @@ export default function RecurringPage() {
     new Date(ms).toLocaleDateString(locale, { day: "numeric", month: "short" });
 
   return (
-    <div className="kc-workspace mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-16 sm:pt-8">
+    <div className="kc-workspace tb-fixed-page mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pt-5 pb-16 sm:pt-8">
       <SectionTabs current="recurring" />
 
       <main className="flex flex-1 flex-col">
@@ -173,7 +173,8 @@ export default function RecurringPage() {
         </div>
       ) : (
         <>
-          <Card className="edge-light mt-4 mb-4">
+          <section className="tb-fixed-summary">
+          <Card className="tb-fixed-total edge-light mt-4 mb-4">
             <CardContent className="py-1 text-center">
               <p className="text-xs tracking-wider text-muted-foreground uppercase">
                 {t("recurring.total")}
@@ -189,7 +190,7 @@ export default function RecurringPage() {
           </Card>
 
           {thisMonth > 0 && (
-            <Card className="mb-4">
+            <Card className="tb-fixed-month mb-4">
               <CardContent className="flex items-center justify-between py-1">
                 <span className="text-sm text-muted-foreground">{t("recurring.thisMonth")}</span>
                 <Money amount={thisMonth} currency="EUR" className="font-medium" />
@@ -198,7 +199,7 @@ export default function RecurringPage() {
           )}
 
           {categories.length > 0 && (
-            <Card className="mb-4">
+            <Card className="tb-fixed-categories mb-4">
               <CardContent className="space-y-3">
                 <h2 className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
                   {t("trip.byCategory")}
@@ -227,7 +228,7 @@ export default function RecurringPage() {
           )}
 
           {next30.length > 0 && (
-            <Card className="mb-4">
+            <Card className="tb-fixed-upcoming mb-4">
               <CardContent className="space-y-2">
                 <h2 className="flex items-center gap-1.5 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                   <CalendarClock className="size-3.5" />
@@ -246,7 +247,8 @@ export default function RecurringPage() {
             </Card>
           )}
 
-          <div className="mb-3 flex gap-2">
+          </section>
+          <div className="tb-fixed-actions mb-3 flex gap-2">
             <Button className="h-11 flex-1" onClick={openNew}>
               <Plus className="size-4" />
               {t("recurring.add")}
@@ -265,7 +267,7 @@ export default function RecurringPage() {
           </div>
 
           {items.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border px-6 py-14 text-center">
+            <div className="tb-fixed-empty rounded-2xl border border-dashed border-border px-6 py-14 text-center">
               <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-secondary">
                 <Repeat className="size-6 text-muted-foreground" />
               </div>
@@ -275,14 +277,14 @@ export default function RecurringPage() {
               </p>
             </div>
           ) : (
-            <ul className="space-y-1.5">
+            <ul className="tb-fixed-list space-y-1.5">
               {items.map((item) => {
                 const cancelled = item.endedAt != null;
                 return (
                   <li
                     key={item.id}
                     className={cn(
-                      "group flex items-center gap-3 rounded-xl border border-border bg-card p-3",
+                      "tb-fixed-item group flex items-center gap-3 rounded-xl border border-border bg-card p-3",
                       cancelled && "opacity-55"
                     )}
                   >
