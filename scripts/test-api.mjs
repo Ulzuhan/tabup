@@ -235,16 +235,30 @@ async function main() {
    * refactor. Only the server-rendered shell is checked; the rest is a browser's job.
    */
   console.log("\nPage structure");
-  for (const path of ["/", "/login", "/recurring"]) {
+  for (const path of ["/", "/recurring"]) {
     const html = await (await fetch(`${BASE}${path}`, { headers: { cookie } })).text();
     check(`${path} has a main landmark`, html.includes("<main"), true);
     check(`${path} has a heading`, html.includes("<h1"), true);
   }
   check(
     "and the document says which language it is in",
-    /<html[^>]+lang="(es|en)"/.test(await (await fetch(`${BASE}/login`)).text()),
+    /<html[^>]+lang="(es|en)"/.test(await (await fetch(`${BASE}/`, { headers: { cookie } })).text()),
     true
   );
+
+  /**
+   * `/login` dejó de ser una página cuando la identidad se mudó a Authentik: ahora
+   * es un desvío al proveedor. Se comprobaba que tuviera `main`, `h1` y `lang`, y
+   * eso empezó a fallar por comprobar algo que ya no existe. Lo que sí importa de
+   * esta ruta es que siga desviando —los marcadores viejos y los enlaces internos
+   * dependen de ello— y que arrastre el `next`, para que quien iba a un sitio
+   * concreto acabe ahí y no en la portada.
+   */
+  const login = await fetch(`${BASE}/login?next=%2Frecurring`, { redirect: "manual" });
+  check("/login redirects instead of rendering", [302, 307, 308].includes(login.status), true);
+  const target = login.headers.get("location") || "";
+  check("...to the identity provider", target.includes("/api/auth/oidc"), true);
+  check("...carrying `next` through", target.includes(encodeURIComponent("/recurring")), true);
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
