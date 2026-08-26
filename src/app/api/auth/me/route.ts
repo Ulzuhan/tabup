@@ -50,7 +50,7 @@ export async function DELETE(request: NextRequest) {
   try {
     ({ password } = await request.json());
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return fail("bad_json", 400);
   }
 
   if (typeof password !== "string" || !(await verifyPassword(password, user.passwordHash))) {

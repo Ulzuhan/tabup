@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return fail("bad_json", 400);
   }
 
   const parsed = await parseBody(body);
@@ -129,11 +129,11 @@ export async function PATCH(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return fail("bad_json", 400);
   }
 
   const id = typeof body.id === "string" ? body.id : "";
-  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+  if (!id) return fail("missing_field", 400, { field: "id" });
 
   const parsed = await parseBody(body);
   if (parsed.error) return fail(parsed.error, 400);
@@ -166,9 +166,9 @@ export async function DELETE(request: NextRequest) {
   try {
     ({ id } = await request.json());
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return fail("bad_json", 400);
   }
-  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+  if (!id) return fail("missing_field", 400, { field: "id" });
 
   const removed = await deleteRecurring(user.id, id);
   if (!removed) return fail("not_found", 404);

@@ -47,7 +47,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return fail("bad_json", 400);
   }
 
   // Already seated: answering twice is a stale tab, not an error worth showing.
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     }
 
     if (typeof body.memberId !== "string") {
-      return NextResponse.json({ error: "memberId or create required" }, { status: 400 });
+      return fail("missing_field", 400);
     }
 
     const member = claimMember(id, body.memberId, auth.user.id);

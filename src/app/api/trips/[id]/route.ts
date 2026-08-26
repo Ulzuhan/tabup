@@ -333,7 +333,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     if (body.renameMember && typeof body.renameMember === "object") {
       const { id: memberId, name } = body.renameMember as { id?: string; name?: string };
       if (typeof memberId !== "string" || typeof name !== "string" || !name.trim()) {
-        return NextResponse.json({ error: "renameMember needs an id and a name" }, { status: 400 });
+        return fail("missing_field", 400);
       }
 
       const target = trip.members.find((m) => m.id === memberId);

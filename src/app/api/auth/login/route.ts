@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return fail("bad_json", 400);
   }
 
   const email = typeof body.email === "string" ? body.email : "";

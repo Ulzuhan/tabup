@@ -23,7 +23,7 @@ export async function authorizeTrip(
   if (!isValidId(tripId)) {
     return {
       ok: false,
-      response: NextResponse.json({ error: "Invalid trip ID format" }, { status: 400 }),
+      response: fail("bad_trip_id", 400),
     };
   }
 

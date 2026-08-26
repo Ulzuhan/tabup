@@ -42,10 +42,10 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       );
     }
     if (!trip.members.find((m) => m.id === from)) {
-      return NextResponse.json({ error: "Invalid 'from' member" }, { status: 400 });
+      return fail("invalid_member", 400, { field: "from" });
     }
     if (!trip.members.find((m) => m.id === to)) {
-      return NextResponse.json({ error: "Invalid 'to' member" }, { status: 400 });
+      return fail("invalid_member", 400, { field: "to" });
     }
     if (from === to) {
       return fail("settle_self", 400);
@@ -132,10 +132,10 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/trips
   try {
     ({ paymentId } = await request.json());
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return fail("bad_json", 400);
   }
   if (!paymentId) {
-    return NextResponse.json({ error: "paymentId required" }, { status: 400 });
+    return fail("missing_field", 400, { field: "paymentId" });
   }
 
   // Same rule as an expense: yours to undo, or the owner's. A payment id from another

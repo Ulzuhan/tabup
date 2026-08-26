@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return fail("bad_json", 400);
   }
 
   const password = String(body.password ?? "");
@@ -63,6 +63,8 @@ export async function POST(request: NextRequest) {
       recordAttempt(key);
       // `code` as well as `error`, like every other route: the page turns it into a
       // sentence, and "expired" was never a sentence in anybody's language.
+      // Este no pasa por fail(): el código no es fijo, sale del estado del token
+      // (expired | used | unknown), y ya viaja con la misma forma que fail() produce.
       return NextResponse.json({ error: result.state, code: result.state }, { status: 400 });
     }
 

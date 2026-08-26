@@ -61,6 +61,16 @@ export const ERROR_TEXT = {
   photo_too_large: "That photo is too large",
   not_an_image: "That does not look like an image",
 
+  // Cuando la petición viene mal formada
+  bad_json: "The request body was not valid JSON",
+  missing_field: "A required field is missing",
+  invalid_member: "That is not a member of this trip",
+  no_file: "No file was sent",
+  bad_trip_id: "That trip ID is not valid",
+  invite_expired: "This invitation is no longer valid",
+  not_a_subscription: "That is not a push subscription",
+  nothing_to_say: "Nothing to say, or no such expense",
+
   // When it is this end that broke
   save_failed: "Could not save that",
 } as const;

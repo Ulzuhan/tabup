@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!CURRENCIES.find((c) => c.code === currency)) {
-      return NextResponse.json({ error: "Invalid currency" }, { status: 400 });
+      return fail("invalid_currency", 400);
     }
 
     // Ids are generated inside the data layer, in the same transaction that inserts

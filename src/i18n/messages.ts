@@ -36,6 +36,14 @@ export const es = {
    * que sabe en qué idioma lee quien está mirando.
    */
   errors: {
+    bad_json: "La petición no llegó bien formada",
+    missing_field: "Falta un dato obligatorio",
+    invalid_member: "Esa persona no está en este viaje",
+    no_file: "No llegó ningún fichero",
+    bad_trip_id: "Ese identificador de viaje no vale",
+    invite_expired: "Esta invitación ya no sirve",
+    not_a_subscription: "Eso no es una suscripción de avisos",
+    nothing_to_say: "No hay nada que decir, o ese gasto no existe",
     signin_required: "Hay que iniciar sesión",
     wrong_credentials: "El correo o la contraseña no son correctos",
     pending_approval: "Tu cuenta todavía está esperando aprobación",
@@ -593,6 +601,14 @@ export const en: Messages = {
   },
 
   errors: {
+    bad_json: "The request did not arrive well formed",
+    missing_field: "A required field is missing",
+    invalid_member: "That is not a member of this trip",
+    no_file: "No file arrived",
+    bad_trip_id: "That trip ID is not valid",
+    invite_expired: "This invitation is no longer valid",
+    not_a_subscription: "That is not a push subscription",
+    nothing_to_say: "Nothing to say, or no such expense",
     signin_required: "You need to sign in",
     wrong_credentials: "That email or password is wrong",
     pending_approval: "Your account is still waiting to be approved",

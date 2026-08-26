@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token") ?? "";
   const invite = readInvite(token);
   if (!invite) {
-    return NextResponse.json({ error: "expired" }, { status: 404 });
+    return fail("invite_expired", 404);
   }
 
   const user = await getCurrentUser();
@@ -33,12 +33,12 @@ export async function POST(request: NextRequest) {
   try {
     ({ token } = await request.json());
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return fail("bad_json", 400);
   }
 
   const joined = await redeemInvite(token, user);
   if (!joined) {
-    return NextResponse.json({ error: "expired" }, { status: 404 });
+    return fail("invite_expired", 404);
   }
 
   // `memberId` is null only when the trip still holds names typed before they arrived

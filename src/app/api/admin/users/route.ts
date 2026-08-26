@@ -44,10 +44,10 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return fail("bad_json", 400);
   }
 
-  if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
+  if (!body.id) return fail("missing_field", 400, { field: "id" });
 
   try {
     if (oidcConfigured() && (body.action === "reset-link" || body.action === "password")) {

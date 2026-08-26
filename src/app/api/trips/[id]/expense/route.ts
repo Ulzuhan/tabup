@@ -88,7 +88,7 @@ function validateSplit(
 ): NextResponse | null {
   for (const sid of splitIds) {
     if (!trip.members.find((m) => m.id === sid)) {
-      return NextResponse.json({ error: `Invalid split member: ${sid}` }, { status: 400 });
+      return fail("invalid_member", 400, { member: sid });
     }
   }
   if (splitShares && typeof splitShares === "object") {
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
     const { description, amount, currency, paidBy, splitAmong, category } = body;
 
     if (!description || !amount || !paidBy) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return fail("missing_field", 400);
     }
 
     const parsedAmount = validateAmount(amount);
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
     }
 
     if (!trip.members.find((m) => m.id === paidBy)) {
-      return NextResponse.json({ error: "Invalid paidBy member" }, { status: 400 });
+      return fail("invalid_member", 400, { field: "paidBy" });
     }
 
     const parsedDate = body.date === undefined ? null : validateDate(body.date);
@@ -223,7 +223,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
     const { expenseId, description, amount, currency, paidBy, splitAmong, category } = body;
 
     if (!expenseId) {
-      return NextResponse.json({ error: "expenseId required" }, { status: 400 });
+      return fail("missing_field", 400, { field: "expenseId" });
     }
 
     const refusal = refuseRow(authorRule("expense", expenseId, id, caller), "Expense");
@@ -236,7 +236,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
 
     const newPaidBy = paidBy || existing.paidBy;
     if (!trip.members.find((m) => m.id === newPaidBy)) {
-      return NextResponse.json({ error: "Invalid paidBy member" }, { status: 400 });
+      return fail("invalid_member", 400, { field: "paidBy" });
     }
 
     const parsedDate = body.date === undefined ? null : validateDate(body.date);
@@ -327,10 +327,10 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/trips
   try {
     ({ expenseId } = await request.json());
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return fail("bad_json", 400);
   }
   if (!expenseId) {
-    return NextResponse.json({ error: "expenseId required" }, { status: 400 });
+    return fail("missing_field", 400, { field: "expenseId" });
   }
 
   const refusal = refuseRow(

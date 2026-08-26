@@ -52,10 +52,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return fail("bad_json", 400);
   }
   if (typeof body.expenseId !== "string" || typeof body.body !== "string") {
-    return NextResponse.json({ error: "expenseId and body required" }, { status: 400 });
+    return fail("missing_field", 400);
   }
 
   try {
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     // Either the expense is not in this trip — which has to read as not existing, like
     // every other id arriving in a body — or the comment was empty.
     if (!comment) {
-      return NextResponse.json({ error: "Nothing to say, or no such expense" }, { status: 400 });
+      return fail("nothing_to_say", 400);
     }
 
     logActivity(id, auth.user, "commentAdded", body.body.trim().slice(0, 60));
@@ -99,10 +99,10 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return fail("bad_json", 400);
   }
   if (typeof body.commentId !== "string") {
-    return NextResponse.json({ error: "commentId required" }, { status: 400 });
+    return fail("missing_field", 400, { field: "commentId" });
   }
 
   const result = deleteComment(id, body.commentId, {

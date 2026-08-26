@@ -76,7 +76,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/trips/[i
 
   const filename = request.nextUrl.searchParams.get("file");
   if (!filename) {
-    return NextResponse.json({ error: "file required" }, { status: 400 });
+    return fail("no_file", 400);
   }
 
   const image = await readReceipt(id, filename);

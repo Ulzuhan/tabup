@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     const auth = body?.subscription?.keys?.auth;
 
     if (typeof endpoint !== "string" || typeof p256dh !== "string" || typeof auth !== "string") {
-      return NextResponse.json({ error: "Not a push subscription" }, { status: 400 });
+      return fail("not_a_subscription", 400);
     }
 
     saveSubscription(user.id, { endpoint, keys: { p256dh, auth } });
@@ -64,6 +64,6 @@ export async function DELETE(request: NextRequest) {
     if (typeof endpoint === "string") removeSubscription(endpoint, user.id);
     return NextResponse.json({ subscribed: false });
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return fail("bad_json", 400);
   }
 }
