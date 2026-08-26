@@ -1,6 +1,8 @@
 import { KaiCorpFooter } from "@/components/kaicorp-footer";
+import { KaiCorpHeader } from "@/components/kaicorp-header";
+import { AccountMenu } from "@/components/account-menu";
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ServiceWorkerRegistrar } from "@/components/offline";
 import { cookies, headers } from "next/headers";
@@ -8,17 +10,12 @@ import { I18nProvider } from "@/i18n/provider";
 import { LOCALE_COOKIE, isLocale, localeFromHeader } from "@/i18n/config";
 import { ThemeSync } from "@/components/theme";
 import { THEME_COOKIE, isTheme } from "@/lib/theme";
+import { getCurrentUser, isAdmin, pendingUsers, publicUser } from "@/lib/auth";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const display = Space_Grotesk({ variable: "--font-display", weight: ["500", "700"], subsets: ["latin"] });
+const sans = Inter({ variable: "--font-sans", weight: ["400", "500"], subsets: ["latin"] });
+const mono = JetBrains_Mono({ variable: "--font-mono", weight: ["400", "500"], subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "TabUp — Shared Expense Tracker",
@@ -72,23 +69,49 @@ async function resolveTheme() {
   return isTheme(stored) ? stored : undefined;
 }
 
+/**
+ * Quién está dentro, resuelto aquí para que la cabecera salga ya con su nombre.
+ * Es la misma consulta que hacía `/api/auth/me` desde el navegador, un paso antes.
+ */
+async function resolveSession() {
+  const user = await getCurrentUser();
+  if (!user) return { user: null, pendingApprovals: 0 };
+  const admin = isAdmin(user);
+  return {
+    user: { ...publicUser(user), admin },
+    pendingApprovals: admin ? pendingUsers().length : 0,
+  };
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [locale, theme] = await Promise.all([resolveLocale(), resolveTheme()]);
+  const [locale, theme, session] = await Promise.all([
+    resolveLocale(),
+    resolveTheme(),
+    resolveSession(),
+  ]);
 
   return (
     <html
       lang={locale}
       data-theme={theme}
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      // `kc-light` viste de claro la cabecera y el pie de marca. Lo pone el
+      // servidor cuando la elección es explícita; con "system" lo decide
+      // `ThemeSync` en el navegador, igual que hace con `dark`.
+      className={`${display.variable} ${sans.variable} ${mono.variable} h-full antialiased${
+        theme === "light" ? " kc-light" : ""
+      }`}
     >
       <body className="brand-glow flex min-h-full flex-col bg-background text-foreground">
         <I18nProvider locale={locale}>
+          <KaiCorpHeader app="TabUp">
+            <AccountMenu user={session.user} pendingApprovals={session.pendingApprovals} />
+          </KaiCorpHeader>
           {children}
-          <KaiCorpFooter />
+          <KaiCorpFooter current="tabup" />
           <Toaster position="top-center" />
           <ServiceWorkerRegistrar />
           <ThemeSync />

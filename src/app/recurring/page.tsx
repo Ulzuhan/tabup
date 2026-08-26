@@ -5,7 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { CalendarClock, Download, Loader2, Pencil, Plus, Repeat, Trash2 } from "lucide-react";
 import { useT, useIntlLocale } from "@/i18n/provider";
-import { AppHeader, type SessionUser } from "@/components/app-header";
+import type { SessionUser } from "@/components/account-menu";
 import { SectionTabs, SectionTabsSpacer } from "@/components/section-tabs";
 import { CategoryIcon, categoryTint, useCategoryName } from "@/components/category-icon";
 import { Money, currencySymbol, formatAmount } from "@/components/money";
@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { clearSessionCache } from "@/lib/session-cache";
 import {
   Dialog,
   DialogContent,
@@ -40,7 +39,6 @@ export default function RecurringPage() {
 
   const [items, setItems] = useState<Recurring[]>([]);
   const [user, setUser] = useState<SessionUser | null>(null);
-  const [pendingApprovals, setPendingApprovals] = useState(0);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
@@ -54,7 +52,6 @@ export default function RecurringPage() {
       fetch("/api/recurring").then((r) => (r.ok ? r.json() : { items: [] })).catch(() => ({ items: [] })),
     ]);
     setUser(session.user ?? null);
-    setPendingApprovals(session.pendingApprovals ?? 0);
     setItems(list.items ?? []);
     setLoading(false);
   }, []);
@@ -62,13 +59,6 @@ export default function RecurringPage() {
   useEffect(() => {
     Promise.resolve().then(load);
   }, [load]);
-
-  const signOut = async () => {
-    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
-    // Same reason as on the trips screen: the cache is per browser, not per account.
-    clearSessionCache();
-    window.location.reload();
-  };
 
   const active = useMemo(() => items.filter((i) => i.endedAt == null), [items]);
   const perMonth = useMemo(() => monthlyTotal(items), [items]);
@@ -152,7 +142,6 @@ export default function RecurringPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-16 sm:pt-8">
-      <AppHeader user={user} loading={loading} onSignOut={signOut} pendingApprovals={pendingApprovals} />
       <SectionTabs current="recurring" />
 
       <main className="flex flex-1 flex-col">

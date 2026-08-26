@@ -46,14 +46,7 @@ export function Landing({ locale }: { locale: Locale; canRegister?: boolean }) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5">
-        <span className="text-lg font-semibold tracking-tight">
-          Tab<span className="text-primary">Up</span>
-        </span>
-        <Button variant="ghost" size="sm" render={<Link href="/login">{t.signIn}</Link>} />
-      </header>
-
-      {/* Between the header and the footer, so there is something to skip to. */}
+      {/* La barra superior la pone el layout: es la misma en los cinco servicios. */}
       <main className="flex flex-1 flex-col">
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
@@ -125,11 +118,12 @@ export function Landing({ locale }: { locale: Locale; canRegister?: boolean }) {
 
       </main>
 
-      <footer className="border-t border-border/60">
-        <div className="mx-auto w-full max-w-5xl px-5 py-6 text-center text-xs text-muted-foreground">
-          {t.footer}
-        </div>
-      </footer>
+      {/* Una frase de cierre, no un pie: el pie de la página es el de marca, que
+          pone el layout. Dos elementos `footer` dejarían dos puntos de referencia
+          a quien navegue por landmarks. */}
+      <p className="border-t border-border/60 px-5 py-6 text-center text-xs text-muted-foreground">
+        {t.footer}
+      </p>
     </div>
   );
 }

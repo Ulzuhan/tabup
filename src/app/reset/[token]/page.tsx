@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { KeyRound, Loader2 } from "lucide-react";
 import { useServerError, useT } from "@/i18n/provider";
-import { Wordmark } from "@/components/app-header";
+import { Wordmark } from "@/components/wordmark";
 import { clearSessionCache } from "@/lib/session-cache";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Compass, Loader2 } from "lucide-react";
 import { useServerError, useT } from "@/i18n/provider";
-import { Wordmark } from "@/components/app-header";
+import { Wordmark } from "@/components/wordmark";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

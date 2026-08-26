@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { clearSessionCache } from "@/lib/session-cache";
 import {
   ArrowRight,
   Compass,
@@ -17,7 +16,8 @@ import { TripKindIcon, TripKindPicker } from "@/components/trip-kind";
 import { useT } from "@/i18n/provider";
 import { Money } from "@/components/money";
 import { cn } from "@/lib/utils";
-import { AppHeader, Wordmark, type SessionUser } from "@/components/app-header";
+import { Wordmark } from "@/components/wordmark";
+import type { SessionUser } from "@/components/account-menu";
 import { SectionTabs, SectionTabsSpacer } from "@/components/section-tabs";
 import { MemberAvatar } from "@/components/member-avatar";
 import { Button } from "@/components/ui/button";
@@ -51,7 +51,6 @@ export function TripsView() {
   const [trips, setTrips] = useState<TripSummary[]>([]);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [usage, setUsage] = useState<{ trips: number; tripLimit: number | null } | null>(null);
-  const [pendingApprovals, setPendingApprovals] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [tripName, setTripName] = useState("");
@@ -75,7 +74,6 @@ export function TripsView() {
       if (cancelled) return;
 
       setUser(session.user ?? null);
-      setPendingApprovals(session.pendingApprovals ?? 0);
       setUsage(session.usage ?? null);
       setTrips([...(owned.trips ?? [])].sort((a, b) => b.createdAt - a.createdAt));
       setLoading(false);
@@ -86,14 +84,6 @@ export function TripsView() {
       cancelled = true;
     };
   }, []);
-
-  const signOut = async () => {
-    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
-    // The offline cache belongs to the browser, not to the account: leaving it behind
-    // hands your trips to whoever signs in next on this device.
-    clearSessionCache();
-    window.location.reload();
-  };
 
 
   const addMember = () => {
@@ -154,7 +144,6 @@ export function TripsView() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 pb-16 sm:pt-8">
-      <AppHeader user={user} loading={loading} onSignOut={signOut} showWordmark={false} pendingApprovals={pendingApprovals} />
       <SectionTabs current="trips" />
 
       {/* Everything that is not the header or the navigation. There was no `main` in the

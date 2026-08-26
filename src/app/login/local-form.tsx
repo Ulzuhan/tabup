@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Clock, Loader2 } from "lucide-react";
-import { Wordmark } from "@/components/app-header";
+import { Wordmark } from "@/components/wordmark";
 import { useServerError, useT } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

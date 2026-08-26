@@ -13,7 +13,7 @@ import {
 import type { Member } from "@/lib/types";
 import { useT } from "@/i18n/provider";
 import { MemberStack } from "@/components/member-avatar";
-import { LanguageItems } from "@/components/app-header";
+import { LanguageItems } from "@/components/language";
 import { ThemeItems } from "@/components/theme";
 import { Button } from "@/components/ui/button";
 import {

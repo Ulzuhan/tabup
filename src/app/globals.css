@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./kaicorp.css";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
@@ -152,9 +153,9 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-geist-sans);
+  --font-sans: var(--kc-font-sans);
+  --font-mono: var(--kc-font-mono);
+  --font-heading: var(--kc-font-sans);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -235,4 +236,10 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Titulares en la display de marca, como en kaicorplabs.com. */
+h1, h2, h3 {
+  font-family: var(--kc-font-display);
+  letter-spacing: -0.02em;
 }

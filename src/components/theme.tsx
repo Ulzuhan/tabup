@@ -26,7 +26,11 @@ export function ThemeSync() {
 
     const apply = () => {
       const chosen = root.dataset.theme;
-      root.classList.toggle("dark", chosen ? chosen === "dark" : media.matches);
+      const dark = chosen ? chosen === "dark" : media.matches;
+      root.classList.toggle("dark", dark);
+      // La cabecera y el pie de marca leen `kc-light`: sin esto se quedarían
+      // oscuros sobre una app en claro.
+      root.classList.toggle("kc-light", !dark);
     };
 
     apply();
@@ -48,10 +52,10 @@ export function setTheme(theme: Theme) {
   if (theme === "system") delete root.dataset.theme;
   else root.dataset.theme = theme;
 
-  root.classList.toggle(
-    "dark",
-    theme === "system" ? window.matchMedia("(prefers-color-scheme: dark)").matches : theme === "dark"
-  );
+  const dark =
+    theme === "system" ? window.matchMedia("(prefers-color-scheme: dark)").matches : theme === "dark";
+  root.classList.toggle("dark", dark);
+  root.classList.toggle("kc-light", !dark);
 
   const year = 60 * 60 * 24 * 365;
   const value = theme === "system" ? "" : theme;
