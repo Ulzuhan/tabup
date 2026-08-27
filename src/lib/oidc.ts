@@ -93,6 +93,18 @@ export function challengeFor(verifier: string): string {
 }
 
 // ─── Code for identity ──────────────────────────────────────────────
+/**
+ * Lo que se espera al proveedor antes de rendirse.
+ *
+ * Sin esto no hay ninguno: el `fetch` de Node no trae tiempo límite por defecto,
+ * así que un proveedor que acepta la conexión y luego calla deja retenido el
+ * manejador de la petición indefinidamente. Y esto está en el camino de entrada
+ * —cada intento de login pasa por aquí—, de modo que basta con que se cuelgue
+ * para ir comiéndose los manejadores del servidor. Diez segundos sobran para una
+ * máquina que está en este mismo equipo.
+ */
+const OIDC_TIMEOUT_MS = Number(process.env.TABUP_OIDC_TIMEOUT || 10_000);
+
 export interface OidcIdentity {
   sub: string;
   email: string;
@@ -114,6 +126,7 @@ export async function exchangeCode(
       client_secret: cfg.clientSecret,
       code_verifier: verifier,
     }),
+    signal: AbortSignal.timeout(OIDC_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -125,6 +138,7 @@ export async function exchangeCode(
 
   const info = await fetch(`${cfg.internalBase}${APP_PATH}/userinfo/`, {
     headers: { Authorization: `Bearer ${tokens.access_token}` },
+    signal: AbortSignal.timeout(OIDC_TIMEOUT_MS),
   });
   if (!info.ok) {
     throw new Error(`userinfo: ${info.status}`);

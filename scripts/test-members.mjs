@@ -478,6 +478,94 @@ async function main() {
   check("Alice is still Ali there", stillOwner.body.members[0].name, "Ali");
   check("signed in as herself", aliceEmail === aliceReg.body.user.email, true);
 
+  // ── The routes that came later ──────────────────────────────────────
+  //
+  // The isolation above covers expenses, payments and members — the three that
+  // were holes once. Comments, receipts, the activity log and the CSV export
+  // arrived afterwards and were never checked the same way. They hold today;
+  // this is here so that a change tomorrow cannot quietly stop them holding.
+  //
+  // Two shapes of attack, and both matter. Asking for Alice's trip directly is
+  // the obvious one. Routing the call through Frank's own trip is the one that
+  // actually broke things before: the permission comes from the URL, the id
+  // comes from the body, and everybody in a trip is handed the ids of
+  // everything in it.
+  console.log("\nThe later routes are no different");
+
+  // Frank is *in* this trip by now, so he may read it. The stranger has to be
+  // somebody with no connection to it at all — which is the point: a person who
+  // was never invited, holding ids that leaked some other way.
+  const ivan = client();
+  await ivan("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify({
+      name: "Ivan",
+      email: `ivan-${Date.now()}@example.com`,
+      password: "correct horse battery staple",
+    }),
+  });
+  const ivanTrip = await ivan("/api/trips", {
+    method: "POST",
+    body: JSON.stringify({ name: "Ivan's own", currency: "EUR" }),
+  });
+
+  check(
+    "an outsider cannot read the activity log",
+    (await ivan(`/api/trips/${tripId}/activity`)).status,
+    404
+  );
+  check("nor download the CSV", (await ivan(`/api/trips/${tripId}/export`)).status, 404);
+  check(
+    "nor read the comments on an expense",
+    (await ivan(`/api/trips/${tripId}/comment?expenseId=${targetExpense.body.id}`)).status,
+    404
+  );
+  check(
+    "nor fetch a receipt",
+    (await ivan(`/api/trips/${tripId}/receipt?expenseId=${targetExpense.body.id}`)).status,
+    404
+  );
+
+  // And the same ids spent on a trip he does own: the permission comes from the
+  // URL, the id from the body. That is the shape that broke things before.
+  check(
+    "commenting on another trip's expense through his own",
+    (
+      await ivan(`/api/trips/${ivanTrip.body.id}/comment`, {
+        method: "POST",
+        body: JSON.stringify({ expenseId: targetExpense.body.id, body: "mine now" }),
+      })
+    ).status !== 200,
+    true
+  );
+  check(
+    "and asking for a receipt of another trip's expense",
+    (await ivan(`/api/trips/${ivanTrip.body.id}/receipt?expenseId=${targetExpense.body.id}`)).status !== 200,
+    true
+  );
+
+  // Claiming: he is already seated in his own trip, so the call answers with his
+  // own member and never looks at the id he sent. What matters is the result.
+  const reclamado = await ivan(`/api/trips/${ivanTrip.body.id}/claim`, {
+    method: "POST",
+    body: JSON.stringify({ memberId: before.body.members[0].id }),
+  });
+  check(
+    "claiming a member of another trip gets him his own, not hers",
+    reclamado.body.member.id !== before.body.members[0].id,
+    true
+  );
+
+  // Alice's side is untouched by any of it.
+  const despues = await alice(`/api/trips/${tripId}`);
+  check("her expense is still there", despues.body.expenses.length >= 1, true);
+  const ivanId = (await ivan("/api/auth/me")).body.user.id;
+  check(
+    "and none of her members belongs to his account",
+    despues.body.members.some((m) => m.userId === ivanId),
+    false
+  );
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
 }

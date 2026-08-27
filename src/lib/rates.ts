@@ -131,11 +131,26 @@ export async function ratesFor(day?: string): Promise<RateTable | null> {
   };
 }
 
+/**
+ * Cuánto se espera a la tabla de cambio antes de seguir sin ella.
+ *
+ * Importa más de lo que parece: a esto no lo llama sólo `/api/rates`, lo llama
+ * `convertTo`, y por ahí pasa cada gasto anotado en otra divisa. Sin tiempo
+ * límite, un tercero que se cuelga deja colgado a quien está apuntando lo que
+ * acaba de pagar. Al vencer se devuelve `null` y arriba se tira de la copia en
+ * disco, marcada como no exacta.
+ */
+const RATE_TIMEOUT_MS = Number(process.env.TABUP_RATE_TIMEOUT || 5_000);
+
 async function fetchTable(day: string): Promise<Rates | null> {
   try {
-    const res = await fetch(`https://api.frankfurter.app/${day}?from=EUR`, {
+    // La dirección nueva. `api.frankfurter.app` todavía responde, pero con un 301
+    // hacia aquí: se apunta al destino para no depender de que mantengan esa
+    // redirección y para ahorrar el viaje de más en cada consulta.
+    const res = await fetch(`https://api.frankfurter.dev/v1/${day}?from=EUR`, {
       // Today's table is worth re-asking for through the day; a past one never changes.
       next: { revalidate: day === "latest" ? 3600 : 60 * 60 * 24 * 30 },
+      signal: AbortSignal.timeout(RATE_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const data = await res.json();

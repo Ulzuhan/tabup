@@ -454,6 +454,53 @@ async function main() {
     (await alice("/api/push", { method: "POST", body: JSON.stringify({ subscription: {} }) })).status,
     400
   );
+
+  // Adónde apunta la suscripción no es un dato cualquiera: es la dirección que este
+  // servidor acabará llamando. Sin filtro, una cuenta cualquiera lo apuntaba al
+  // 127.0.0.1 de esta máquina —donde están el proveedor de identidad y el resto de
+  // servicios— y el servidor abría la conexión por ella. Se comprobó con un señuelo
+  // en un puerto local: llegaba el intento de conexión.
+  const destinosVetados = [
+    ["la propia máquina", "https://127.0.0.1/push"],
+    ["la propia máquina por su nombre", "https://localhost/push"],
+    ["una máquina de la red interna", "https://nas/push"],
+    ["una dirección privada", "https://192.168.1.10/push"],
+    ["otro servicio de este equipo", "https://[::1]:9000/push"],
+    ["sin cifrar", "http://push.example.com/x"],
+    ["que ni siquiera es una dirección", "no-es-una-url"],
+  ];
+  for (const [que, endpoint] of destinosVetados) {
+    check(
+      `no acepta un destino que es ${que}`,
+      (
+        await alice("/api/push", {
+          method: "POST",
+          body: JSON.stringify({ subscription: { endpoint, keys: subscription.keys } }),
+        })
+      ).status,
+      400
+    );
+  }
+
+  // Y los de verdad siguen entrando: un filtro que rechaza todo no arregla nada,
+  // rompe los avisos.
+  for (const [navegador, endpoint] of [
+    ["Chrome", "https://fcm.googleapis.com/fcm/send/eBc1"],
+    ["Firefox", "https://updates.push.services.mozilla.com/wpush/v2/gAAAA"],
+    ["Safari", "https://web.push.apple.com/QBCD"],
+    ["Edge", "https://wns2-par02p.notify.windows.com/w/?token=Ab"],
+  ]) {
+    check(
+      `sí acepta el de ${navegador}`,
+      (
+        await alice("/api/push", {
+          method: "POST",
+          body: JSON.stringify({ subscription: { endpoint, keys: subscription.keys } }),
+        })
+      ).status,
+      200
+    );
+  }
   // An endpoint arriving in a body is a claim about a browser, not proof of holding one.
   // Unscoped, this deleted the row and answered 200, so anybody who learned somebody
   // else's endpoint could switch their notifications off and nothing would say why.

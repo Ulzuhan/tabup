@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail } from "@/lib/api-error";
 import { getCurrentUser } from "@/lib/auth";
-import { isSubscribed, publicKey, removeSubscription, saveSubscription } from "@/lib/push";
+import {
+  isSubscribed,
+  publicKey,
+  pushEndpointProblem,
+  removeSubscription,
+  saveSubscription,
+} from "@/lib/push";
 import { logError } from "@/lib/errors";
 
 /**
@@ -41,6 +47,12 @@ export async function POST(request: NextRequest) {
 
     if (typeof endpoint !== "string" || typeof p256dh !== "string" || typeof auth !== "string") {
       return fail("not_a_subscription", 400);
+    }
+
+    // El destino se comprueba aquí, y no más adentro, porque es lo único de esta
+    // petición que acaba convertido en una llamada saliente de este servidor.
+    if (pushEndpointProblem(endpoint)) {
+      return fail("bad_push_endpoint", 400);
     }
 
     saveSubscription(user.id, { endpoint, keys: { p256dh, auth } });

@@ -68,6 +68,48 @@ export function publicKey(): string {
  */
 const subject = () => process.env.TABUP_PUSH_SUBJECT?.trim() || "mailto:tabup@localhost";
 
+/**
+ * Si un destino de notificaciones es un sitio al que se puede llamar.
+ *
+ * Lo que se guarda aquí acaba siendo una petición que sale de este servidor, y el
+ * destino lo elige quien se suscribe. Sin este filtro, una cuenta cualquiera puede
+ * apuntar la suscripción al 127.0.0.1 de esta máquina —donde viven el proveedor de
+ * identidad y el resto de servicios— o a una dirección de la red interna, y hacer
+ * que el servidor llame por ella. Está comprobado: apuntando a un puerto local, el
+ * servidor abría la conexión.
+ *
+ * No se ve la respuesta (la petición es a ciegas), pero sí se distingue un puerto
+ * abierto de uno cerrado por el error que devuelve, y eso ya es un mapa de la red.
+ *
+ * Se exige https y un nombre de máquina público. Queda fuera del alcance de esto un
+ * nombre público que resuelva a una dirección privada; para cerrarlo del todo haría
+ * falta comprobar la IP tras resolver y en cada reintento, que es bastante más
+ * maquinaria de la que pide un servicio de este tamaño.
+ */
+export function pushEndpointProblem(endpoint: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return "not_a_url";
+  }
+  if (url.protocol !== "https:") return "not_https";
+
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+
+  // Una IP escrita a pelo no es un servicio de notificaciones de ningún navegador;
+  // sí es la forma de apuntar a la máquina de al lado.
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":")) return "host_is_an_ip";
+
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) {
+    return "host_is_local";
+  }
+  // Un nombre sin punto sólo se resuelve dentro de la red de esta máquina.
+  if (!host.includes(".")) return "host_is_internal";
+
+  return null;
+}
+
 export function saveSubscription(
   userId: string,
   sub: { endpoint: string; keys: { p256dh: string; auth: string } }

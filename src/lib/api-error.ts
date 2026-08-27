@@ -71,6 +71,7 @@ export const ERROR_TEXT = {
   bad_trip_id: "That trip ID is not valid",
   invite_expired: "This invitation is no longer valid",
   not_a_subscription: "That is not a push subscription",
+  bad_push_endpoint: "That is not somewhere notifications can be sent",
   nothing_to_say: "Nothing to say, or no such expense",
 
   // When it is this end that broke
