@@ -515,6 +515,72 @@ async function main() {
 
   // ── Login and logout ───────────────────────────────────────────────
   console.log("\nLogin and logout");
+  check(
+    "a sibling origin cannot force logout",
+    (await alice("/api/auth/logout", {
+      method: "POST",
+      headers: { Origin: "https://evil.example.com", "Sec-Fetch-Site": "same-site" },
+    })).status,
+    403
+  );
+  check(
+    "the refused logout keeps the session",
+    (await alice("/api/auth/me")).body.user?.email,
+    aliceEmail
+  );
+
+  /**
+   * Y la cabecera que decide de dónde viene la petición no puede escribirla quien
+   * llama.
+   *
+   * `X-Forwarded-Host` **no la reemplaza este despliegue**: comprobado en vivo
+   * contra el túnel, llega tal cual a la aplicación mientras `Host` sigue
+   * valiendo el nombre de verdad. Mientras se prefirió la primera, mandar
+   * `X-Forwarded-Host: malo.example` junto con `Origin: https://malo.example`
+   * hacía que la comprobación se saltara sola y devolviera 200.
+   *
+   * Aquí no se manda `Sec-Fetch-Site`, a propósito: eso deja a la comprobación de
+   * origen sola, que es lo que se quiere probar. Un navegador antiguo que no
+   * mande Fetch Metadata llega exactamente así.
+   */
+  // El `Origin` va con el MISMO esquema que ve el servidor de pruebas (http), a
+  // propósito. Con `https` la comprobación rechazaba por el esquema y no por el
+  // host, así que pasaba igual aunque se volviera a confiar en la cabecera: un
+  // test que no aísla lo que dice medir.
+  check(
+    "a forged X-Forwarded-Host does not get past the origin check",
+    (await alice("/api/auth/logout", {
+      method: "POST",
+      headers: { Origin: "http://malo.example", "X-Forwarded-Host": "malo.example" },
+    })).status,
+    403
+  );
+  check(
+    "and that refusal also keeps the session",
+    (await alice("/api/auth/me")).body.user?.email,
+    aliceEmail
+  );
+
+  // La tercera ruta que admite una petición simple. No lee el cuerpo, así que la
+  // exigencia de `application/json` no la cubre, y se quedó sin guardián: devolvía
+  // 200 y creaba la invitación a un viaje ajeno.
+  // `newTrip` devuelve la respuesta entera, no el viaje: sin `.body` el
+// identificador es `undefined` y la ruta contesta 400 por el id, no por el
+// origen — que es un fallo distinto del que se quiere comprobar.
+const suyo = (await newTrip(alice, "Con invitaciones")).body;
+  check(
+    "a sibling origin cannot mint an invite either",
+    (await alice(`/api/trips/${suyo.id}/invite`, {
+      method: "POST",
+      headers: { Origin: "https://evil.example.com", "Sec-Fetch-Site": "same-site" },
+    })).status,
+    403
+  );
+  check(
+    "but the owner still can",
+    (await alice(`/api/trips/${suyo.id}/invite`, { method: "POST" })).status,
+    200
+  );
   await alice("/api/auth/logout", { method: "POST" });
   check("logout ends the session", (await alice("/api/auth/me")).body.user, null);
   check("and the trip is out of reach", (await alice(`/api/trips/${aliceTrip.id}`)).status, 404);

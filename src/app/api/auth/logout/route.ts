@@ -1,6 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { fail } from "@/lib/api-error";
 import { destroySession } from "@/lib/auth";
 import { endSessionUrl, oidcConfig } from "@/lib/oidc";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 /**
  * POST /api/auth/logout — cierra la sesión de verdad.
@@ -20,7 +22,8 @@ import { endSessionUrl, oidcConfig } from "@/lib/oidc";
  * Sigue siendo POST y no GET: con GET, una imagen en cualquier página podría
  * cerrarte la sesión desde fuera.
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
+  if (!isSameOriginMutation(request)) return fail("cross_origin", 403);
   await destroySession();
 
   const cfg = oidcConfig();

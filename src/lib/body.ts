@@ -21,6 +21,7 @@
  * `request.json()`, así que las rutas siguen validando campo por campo como
  * hacían. Esto arregla el fallo al leer, no sustituye a esas comprobaciones.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function jsonBody(request: Request): Promise<any | null> {
   // Exigir `application/json` no es formalismo: es lo que cierra el CSRF entre los
   // servicios de este dominio.

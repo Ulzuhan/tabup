@@ -107,6 +107,18 @@ async function main() {
     return api(`/api/trips/${trip.id}/receipt${query}`, { method: "POST", body: form });
   };
 
+  const crossOriginForm = new FormData();
+  crossOriginForm.append("photo", new Blob([Buffer.from("not important")]), "ticket.jpg");
+  check(
+    "a sibling origin cannot force an upload",
+    (await api(`/api/trips/${trip.id}/receipt`, {
+      method: "POST",
+      body: crossOriginForm,
+      headers: { Origin: "https://evil.example.com", "Sec-Fetch-Site": "same-site" },
+    })).status,
+    403
+  );
+
   // A real JPEG carrying metadata, the way a phone photo does.
   const withExif = await sharp({
     create: { width: 900, height: 1200, channels: 3, background: "#ffffff" },

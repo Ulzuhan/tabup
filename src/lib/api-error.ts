@@ -30,6 +30,7 @@ export const ERROR_TEXT = {
   password_long: "Password must be at most 200 characters",
   throttled: "Too many attempts, try again later",
   not_allowed: "Not allowed",
+  cross_origin: "Cross-origin request refused",
 
   // What you may touch
   not_found: "Not found",

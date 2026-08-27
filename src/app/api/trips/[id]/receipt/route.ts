@@ -7,6 +7,7 @@ import {
   readReceiptFields,
   storeReceipt,
 } from "@/lib/receipts";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 /**
  * Uploading a receipt photo, and reading it.
@@ -16,6 +17,7 @@ import {
  * it carries the returned filename when it is created.
  */
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[id]/receipt">) {
+  if (!isSameOriginMutation(request)) return fail("cross_origin", 403);
   const { id } = await ctx.params;
   const auth = await authorizeTrip(id, "write");
   if (!auth.ok) return auth.response;
