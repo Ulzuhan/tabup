@@ -61,7 +61,7 @@ npm run start
 | `TABUP_OIDC_REDIRECT_URI` | unset | `https://your-host/api/auth/callback` |
 | `TABUP_OIDC_PUBLIC_BASE` | `https://auth.kaicorplabs.com` | Where the browser is sent |
 | `TABUP_OIDC_INTERNAL_BASE` | `http://127.0.0.1:9100` | Where the server talks to the provider, if that differs |
-| `TABUP_PUBLIC_HOST` | unset | Nombre público con el que se comprueba el origen. Sin poner, se usa el `Host` que llega. Sólo hace falta si el proxy lo reescribe con un nombre interno. |
+| `TABUP_PUBLIC_HOST` | unset | Public hostname the origin check compares against. Unset, the incoming `Host` is used, which is right behind a tunnel that preserves it — verified. Only needed behind a proxy that rewrites `Host` with an internal name. |
 
 The database file and its directory are created on first start. There is no separate
 migration step: the schema is applied on boot, and it is safe to run against a database
