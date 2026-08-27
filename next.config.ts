@@ -28,6 +28,11 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // El artefacto que se empaqueta: un árbol que se basta solo y arranca con
+  // `node .next/standalone/server.js`. No sustituye a `.next` — construye los dos —
+  // así que producción y suites deben ejecutar ESTE, o se prueba algo que nadie usa.
+  // Toma HOSTNAME y PORT del entorno; sin HOSTNAME escucha en 0.0.0.0.
+  output: "standalone",
   // `web-push` is CommonJS and pulls its crypto helpers in with plain `require`, which
   // the bundler has to resolve at build time and does not always manage. Left external,
   // it is simply required at runtime like any other server dependency.

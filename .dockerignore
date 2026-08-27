@@ -1,0 +1,12 @@
+.git
+.next
+node_modules
+data
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+.env
+.env.local
+npm-debug.log*
+docs/screenshots

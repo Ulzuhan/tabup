@@ -21,6 +21,10 @@ cd "$(dirname "$0")/.."
 PORT="${PORT:-3910}"
 export BASE="http://127.0.0.1:$PORT"
 DB="$(mktemp -d)/ci.db"
+# Su propio directorio de datos, no el del repositorio: sin esto la suite de
+# recibos siembra fotos en data/receipts/ de verdad — la misma avería que ya
+# tuvieron las suites de DocDrop y SecretDrop con sus almacenes.
+DATA_DIR="$(mktemp -d)"
 LOG="$(mktemp)"
 
 ALL=(api money auth members social races admin recurring receipts account)
@@ -70,11 +74,15 @@ start() {
   # sin explicar por qué. Pasó, y costó un rato entenderlo.
   #
   # Las pruebas ejercitan la lógica de la aplicación, no el flujo del proveedor.
-  TABUP_DB="$DB" TABUP_REGISTRATION="$mode" \
+  # El artefacto standalone, que es el que ejecuta producción y el que irá en la
+  # imagen — no `next start`, que sirve `.next` y es otro programa. Toma HOSTNAME
+  # y PORT del entorno; sin HOSTNAME escucharía en 0.0.0.0.
+  TABUP_DB="$DB" TABUP_DATA_DIR="$DATA_DIR" TABUP_REGISTRATION="$mode" \
     TABUP_OIDC_CLIENT_ID= TABUP_OIDC_CLIENT_SECRET= TABUP_OIDC_REDIRECT_URI= \
     TABUP_OIDC_PUBLIC_BASE= TABUP_OIDC_INTERNAL_BASE= \
     TABUP_OLLAMA_URL="http://127.0.0.1:11500" \
-    ./node_modules/.bin/next start -p "$PORT" >"$LOG" 2>&1 &
+    HOSTNAME=127.0.0.1 PORT="$PORT" \
+    node .next/standalone/server.js >"$LOG" 2>&1 &
   server_pid=$!
 
   for _ in $(seq 1 90); do
@@ -105,6 +113,7 @@ for suite in "${SUITES[@]}"; do
 done
 
 rm -f "$DB" "$DB"-wal "$DB"-shm "$LOG"
+rm -rf "$DATA_DIR"
 if [ $failed -ne 0 ]; then
   echo
   echo "HAY FALLOS"

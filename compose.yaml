@@ -1,0 +1,26 @@
+services:
+  tabup:
+    build: .
+    restart: unless-stopped
+    init: true
+    ports:
+      - "127.0.0.1:3457:3457"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - tabup-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=0700,uid=10001,gid=10001
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    # 1g y no 512m: los recibos se re-codifican con sharp, y una foto grande de
+    # móvil gasta memoria de verdad mientras se procesa.
+    mem_limit: 1g
+    cpus: 1.5
+
+volumes:
+  tabup-data:
