@@ -463,10 +463,40 @@ export function clearAttempts(key: string): void {
  * the whole instance out, which is a normal evening in a household.
  */
 export function clientKey(request: Request, suffix = ""): string {
-  const forwarded =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip")?.trim();
-  return `${forwarded || "local"}:${suffix}`;
+  return `${clientAddress(request) || "local"}:${suffix}`;
+}
+
+/**
+ * La dirección de quien llama, o null si no hay forma de saberla.
+ *
+ * La diferencia importa, porque `clientKey` mete a todos los que no sabe
+ * distinguir en un mismo saco, y eso convierte un contador en un cerrojo: diez
+ * intentos fallidos de cualquiera y la instancia entera cerrada un cuarto de
+ * hora, sin salida —el contador se limpia al acertar, y acertar es justo lo que
+ * está bloqueado—. Comprobado: doce intentos contra la cuenta de una persona y
+ * otra distinta, con su contraseña correcta, recibía 429.
+ *
+ * Lo que hacía que eso pasara siempre, incluso a solas: `next start` rellena él
+ * mismo `x-forwarded-for` con la dirección del socket, así que nunca falta. Sólo
+ * que cuando delante hay un proxy —y aquí siempre lo hay— esa dirección es la del
+ * proxy. Una de bucle local no identifica a nadie: significa "esto vino de algo
+ * que está en esta misma máquina".
+ *
+ * El orden también importa. `CF-Connecting-IP` la pone Cloudflare y la
+ * sobrescribe, mientras que el primer valor de `x-forwarded-for` es literalmente
+ * lo que el cliente haya querido escribir: quien quisiera saltarse el contador por
+ * dirección sólo tenía que inventarse una distinta en cada intento.
+ */
+export function clientAddress(request: Request): string | null {
+  const bruta =
+    request.headers.get("cf-connecting-ip")?.trim() ||
+    request.headers.get("x-real-ip")?.trim() ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  if (!bruta) return null;
+
+  const limpia = bruta.replace(/^::ffff:/, "");
+  if (limpia === "127.0.0.1" || limpia === "::1" || limpia === "localhost") return null;
+  return limpia;
 }
 
 // ── Registration policy ──────────────────────────────────────────────────

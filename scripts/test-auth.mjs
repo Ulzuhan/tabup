@@ -556,6 +556,37 @@ async function main() {
 
 
 
+  // ── Machacar una cuenta no puede cerrar la puerta a las demás ───────
+  //
+  // El contador por dirección tenía delante un proxy, así que la dirección era
+  // siempre la suya: todo el mundo compartía contador. Diez fallos de cualquiera
+  // y la instancia entera quedaba cerrada quince minutos, sin salida, porque el
+  // contador se limpia al acertar y acertar era justo lo bloqueado. Comprobado
+  // entonces: doce intentos contra una cuenta y otra persona distinta, con su
+  // contraseña correcta, recibía 429.
+  //
+  // Lo que lo hacía inevitable es que `next start` rellena `x-forwarded-for` él
+  // mismo con la dirección del socket, de modo que nunca falta y siempre es la
+  // del proxy.
+  console.log("\nUna cuenta machacada no cierra las demás");
+  const sufijo = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+  const victima = `victima-${sufijo}@example.com`;
+  const ajeno = `ajeno-${sufijo}@example.com`;
+  const clave = "una frase larga de prueba";
+
+  const dora = client();
+  await dora("/api/auth/register", { method: "POST", body: JSON.stringify({ name: "Dora", email: victima, password: clave }) });
+  const elena = client();
+  await elena("/api/auth/register", { method: "POST", body: JSON.stringify({ name: "Elena", email: ajeno, password: clave }) });
+
+  const entrar = (quien, email, password) => quien("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+  check("Elena entra sin problema de partida", (await entrar(elena, ajeno, clave)).status, 200);
+
+  for (let i = 0; i < 12; i++) await entrar(client(), victima, `equivocada-${i}`);
+
+  check("la cuenta machacada sí queda frenada", (await entrar(dora, victima, clave)).status, 429);
+  check("pero quien no tiene nada que ver entra igual", (await entrar(elena, ajeno, clave)).status, 200);
+
   // ── Cleanup ────────────────────────────────────────────────────────
   await alice(`/api/trips/${aliceTrip.id}`, { method: "DELETE" });
 

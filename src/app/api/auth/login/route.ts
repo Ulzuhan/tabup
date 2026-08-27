@@ -4,7 +4,7 @@ import { jsonBody } from "@/lib/body";
 import {
   authenticate,
   clearAttempts,
-  clientKey,
+  clientAddress,
   createSession,
   publicUser,
   recordAttempt,
@@ -25,13 +25,20 @@ export async function POST(request: NextRequest) {
 
   // Throttled per address and per account, so one attacker cannot lock everyone out by
   // hammering a single inbox, and one IP cannot spray many accounts.
-  const ipKey = clientKey(request, "login");
+  // Sólo por dirección cuando hay una dirección. Detrás de un proxy que no pone
+  // cabeceras, todos los que llaman son indistinguibles y compartirían contador:
+  // diez fallos de cualquiera cerraban la instancia entera durante quince minutos,
+  // sin salida, porque el contador se limpia al acertar y acertar estaba bloqueado.
+  // El contador por cuenta —que es el que frena probar contraseñas de verdad—
+  // sigue puesto siempre.
+  const direccion = clientAddress(request);
+  const ipKey = direccion ? `${direccion}:login` : null;
   const accountKey = `account:${email.toLowerCase()}`;
-  if (tooManyAttempts(ipKey) || tooManyAttempts(accountKey)) {
+  if ((ipKey && tooManyAttempts(ipKey)) || tooManyAttempts(accountKey)) {
     return fail("throttled", 429);
   }
 
-  recordAttempt(ipKey);
+  if (ipKey) recordAttempt(ipKey);
   recordAttempt(accountKey);
 
   const user = await authenticate(email, password);
@@ -51,7 +58,7 @@ export async function POST(request: NextRequest) {
   // caller — so leaving it to accumulate on success meant correct sign-ins piling up
   // until the instance locked out the people using it properly.
   clearAttempts(accountKey);
-  clearAttempts(ipKey);
+  if (ipKey) clearAttempts(ipKey);
 
 
   await createSession(user.id);
