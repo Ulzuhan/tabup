@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exchangeCode, oidcConfig } from "@/lib/oidc";
+import { safeNext, exchangeCode, oidcConfig } from "@/lib/oidc";
 import { createSession, linkOrCreateFromIdentity } from "@/lib/auth";
 
 /**
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     return fail();
   }
 
-  const next = stored.next?.startsWith("/") && !stored.next.startsWith("//") ? stored.next : "/";
+  const next = safeNext(stored.next);
   const res = back(next);
   res.cookies.delete("tabup_oidc");
   return res;
