@@ -1,0 +1,88 @@
+name: Publish container image
+
+# Publishes to GitHub Container Registry. GHCR needs no extra secrets: the token
+# GitHub injects into the job is enough, provided packages: write is granted below.
+#
+# Which tags each event owns, and why they no longer overlap:
+#
+#   push to main   :main and :sha-<short>   — what is not released yet
+#   push tag v*    :<version>, :<major>.<minor>, :<major> and :latest   — a release
+#
+# A branch push and a tag push are two separate runs, so they are two independent
+# builds of the same source. While both of them minted :latest and :sha-<short>,
+# releasing (push main, push the tag seconds later) left :latest and :1.0.1 on
+# DIFFERENT digests of the same commit — there was no way to tell by digest that
+# latest was the release — and both runs raced to write :sha-<short>, where the
+# slower one won.
+#
+# Now the release build is the only one that mints :latest, and it is the same
+# build that mints the semver ladder, so they are the same digest by construction.
+# Pushing to main still publishes an image to try out; it just cannot claim to be
+# the release any more.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # QEMU is what allows building the arm64 image on an amd64 runner, so the
+      # image also runs on a Raspberry Pi or an ARM server. Note: the arm64 build has
+      # not been run locally (that needs binfmt handlers registered on the host), so
+      # the first run of this workflow is what actually proves it.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=ref,event=branch
+            type=sha,format=short,enable=${{ !startsWith(github.ref, 'refs/tags/v') }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          # Solo amd64. Construir arm64 aquí significa hacerlo bajo QEMU, y un
+          # build de Next.js emulado tarda horas en vez de minutos: las
+          # ejecuciones anteriores parecían rápidas solo porque la caché de
+          # GitHub las salvaba, y en cuanto cambió el código se quedaron
+          # colgadas. Nadie usa la imagen arm64 — el servidor donde esto corre
+          # es x86_64.
+          #
+          # Si algún día hiciera falta, la forma correcta NO es volver a QEMU:
+          # es un `matrix` con `ubuntu-24.04-arm` (gratis en repos públicos)
+          # construyendo cada arquitectura en su propia máquina y uniendo los
+          # digests en un manifiesto.
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Layer cache in the registry, so later builds do not reinstall
+          # dependencies from scratch.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

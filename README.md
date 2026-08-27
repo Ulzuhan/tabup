@@ -1,6 +1,7 @@
 # TabUp
 
 [![CI](https://github.com/Ulzuhan/tabup/actions/workflows/ci.yml/badge.svg)](https://github.com/Ulzuhan/tabup/actions/workflows/ci.yml)
+[![Container image](https://github.com/Ulzuhan/tabup/actions/workflows/docker.yml/badge.svg)](https://github.com/Ulzuhan/tabup/pkgs/container/tabup)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Shared expense tracking for trips: who paid what, in which currency, and who owes whom
