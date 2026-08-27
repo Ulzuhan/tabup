@@ -307,6 +307,42 @@ async function main() {
   }
   check("ninguna ruta revienta con un cuerpo mal formado", revientan, 0);
 
+  /**
+   * Escribir exige decir `application/json`, y eso es lo que corta el CSRF.
+   *
+   * El navegador deja salir una petición a otro sitio sin preguntar antes sólo
+   * con `text/plain`, `multipart/form-data` o el tipo de un formulario. Los cinco
+   * servicios comparten dominio, así que entre ellos son el MISMO sitio para el
+   * navegador y la cookie de sesión viaja igual: una página hermana con un fallo
+   * podía escribir aquí en nombre de quien estuviese dentro. Estaba comprobado —
+   * con `text/plain` y un cuerpo JSON, el viaje se creaba.
+   *
+   * Con `application/json` el navegador tiene que preguntar primero, y esa
+   * pregunta no se contesta.
+   */
+  console.log("\nEl tipo del cuerpo al escribir");
+  const conTipo = async (tipo) =>
+    (
+      await api("/api/trips", {
+        method: "POST",
+        headers: { "Content-Type": tipo },
+        body: JSON.stringify({ name: `tipo ${tipo}`, currency: "EUR" }),
+      })
+    ).status;
+  for (const tipo of [
+    "text/plain;charset=UTF-8",
+    "application/x-www-form-urlencoded",
+    "multipart/form-data",
+    "text/html",
+    "",
+  ]) {
+    check(`un cuerpo anunciado como ${tipo || "(nada)"} no escribe`, await conTipo(tipo), 400);
+  }
+  // Y las formas legítimas siguen entrando: hay clientes que añaden el juego de
+  // caracteres, y rechazarlos rompería la aplicación sin arreglar nada.
+  check("con application/json sí escribe", await conTipo("application/json"), 200);
+  check("y con el juego de caracteres detrás, también", await conTipo("application/json; charset=utf-8"), 200);
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
 }

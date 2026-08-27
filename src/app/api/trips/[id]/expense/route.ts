@@ -358,12 +358,9 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/trips
   const auth = await authorizeTrip(id, "write");
   if (!auth.ok) return auth.response;
 
-  let expenseId: string;
-  try {
-    ({ expenseId } = await request.json());
-  } catch {
-    return fail("bad_json", 400);
-  }
+  const cuerpo = await jsonBody(request);
+  if (!cuerpo) return fail("bad_json", 400);
+  const { expenseId } = cuerpo;
   if (!expenseId) {
     return fail("missing_field", 400, { field: "expenseId" });
   }

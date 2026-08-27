@@ -72,7 +72,9 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    const { endpoint } = await request.json();
+    const cuerpo = await jsonBody(request);
+    if (!cuerpo) return fail("bad_json", 400);
+    const { endpoint } = cuerpo;
     // Scoped to the caller: the endpoint arrives in the body, so on its own it is a claim
     // about a browser rather than proof of owning one.
     if (typeof endpoint === "string") removeSubscription(endpoint, user.id);

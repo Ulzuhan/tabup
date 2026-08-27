@@ -22,6 +22,23 @@
  * hacían. Esto arregla el fallo al leer, no sustituye a esas comprobaciones.
  */
 export async function jsonBody(request: Request): Promise<any | null> {
+  // Exigir `application/json` no es formalismo: es lo que cierra el CSRF entre los
+  // servicios de este dominio.
+  //
+  // El navegador deja salir una petición a otro sitio sin preguntar antes sólo si
+  // el tipo es `text/plain`, `multipart/form-data` o el de un formulario. Con
+  // cualquiera de esos, una página hermana —que para el navegador es el MISMO
+  // sitio, porque comparten dominio, así que la cookie viaja— podía escribir aquí
+  // en nombre de quien estuviese dentro. Comprobado: con `text/plain` y un cuerpo
+  // JSON, el viaje se creaba.
+  //
+  // Con `application/json` el navegador está obligado a preguntar primero, y esa
+  // pregunta no se contesta, así que la petición no llega a salir.
+  const tipo = request.headers.get("content-type") ?? "";
+  if (!/^application\/json\s*(;|$)/i.test(tipo.trim())) {
+    return null;
+  }
+
   let parsed: unknown;
   try {
     parsed = await request.json();

@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth";
 import { deleteAccount, FREE_TRIP_LIMIT, ownedTripCount } from "@/lib/store";
 import { fail } from "@/lib/api-error";
+import { jsonBody } from "@/lib/body";
 import { logError } from "@/lib/errors";
 
 /** Who is signed in, and how much of the free plan they have used. */
@@ -46,12 +47,9 @@ export async function DELETE(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return fail("signin_required", 401);
 
-  let password = "";
-  try {
-    ({ password } = await request.json());
-  } catch {
-    return fail("bad_json", 400);
-  }
+  const cuerpo = await jsonBody(request);
+  if (!cuerpo) return fail("bad_json", 400);
+  const { password } = cuerpo;
 
   if (typeof password !== "string" || !(await verifyPassword(password, user.passwordHash))) {
     return fail("wrong_credentials", 403);

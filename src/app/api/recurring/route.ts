@@ -157,12 +157,9 @@ export async function DELETE(request: NextRequest) {
   const user = await requireUser();
   if (!user) return fail("signin_required", 401);
 
-  let id = "";
-  try {
-    ({ id } = await request.json());
-  } catch {
-    return fail("bad_json", 400);
-  }
+  const cuerpo = await jsonBody(request);
+  if (!cuerpo) return fail("bad_json", 400);
+  const { id } = cuerpo;
   if (!id) return fail("missing_field", 400, { field: "id" });
 
   const removed = await deleteRecurring(user.id, id);

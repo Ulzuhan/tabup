@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail } from "@/lib/api-error";
+import { jsonBody } from "@/lib/body";
 import { getCurrentUser } from "@/lib/auth";
 import { readInvite, redeemInvite } from "@/lib/store";
 
@@ -29,12 +30,9 @@ export async function POST(request: NextRequest) {
     return fail("signin_required", 401);
   }
 
-  let token = "";
-  try {
-    ({ token } = await request.json());
-  } catch {
-    return fail("bad_json", 400);
-  }
+  const cuerpo = await jsonBody(request);
+  if (!cuerpo) return fail("bad_json", 400);
+  const { token } = cuerpo;
 
   const joined = await redeemInvite(token, user);
   if (!joined) {
