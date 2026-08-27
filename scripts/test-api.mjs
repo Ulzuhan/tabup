@@ -260,6 +260,53 @@ async function main() {
   const login = await fetch(`${BASE}/login`, { redirect: "manual" });
   check("without a provider configured, /login renders instead of redirecting", login.status, 200);
 
+  /**
+   * Un cuerpo que no se entiende es un 400, nunca un 500.
+   *
+   * Esto no es cosmética. Un 500 se anota en el registro de errores del
+   * administrador, así que cualquiera con cuenta podía llenarlo de basura y
+   * enterrar ahí los avisos de verdad. Once de las dieciocho rutas caían, por dos
+   * motivos distintos: un cuerpo ilegible hacía lanzar a `json()`, y el texto
+   * `null` —que es JSON perfectamente válido— pasaba el `catch` y reventaba
+   * después, al leer un campo de la nada.
+   */
+  console.log("\nCuerpos que no se entienden");
+  const suyo = await newTrip();
+  const rutas = [
+    ["POST", "/api/trips"],
+    ["PATCH", `/api/trips/${suyo.id}`],
+    ["POST", `/api/trips/${suyo.id}/expense`],
+    ["PATCH", `/api/trips/${suyo.id}/expense`],
+    ["POST", `/api/trips/${suyo.id}/payment`],
+    ["POST", `/api/trips/${suyo.id}/comment`],
+    ["POST", `/api/trips/${suyo.id}/claim`],
+    ["POST", "/api/join"],
+    ["POST", "/api/push"],
+    ["POST", "/api/recurring"],
+    ["POST", "/api/auth/login"],
+    ["POST", "/api/auth/register"],
+    ["POST", "/api/auth/reset"],
+    ["POST", "/api/admin/users"],
+  ];
+  const cuerpos = [
+    ["a medias", "{no-es-json"],
+    ["vacío", ""],
+    ["texto suelto", "hola"],
+    ["el texto null", "null"],
+    ["una lista", "[1,2]"],
+  ];
+  let revientan = 0;
+  for (const [metodo, ruta] of rutas) {
+    for (const [que, cuerpo] of cuerpos) {
+      const { status } = await api(ruta, { method: metodo, body: cuerpo });
+      if (status >= 500) {
+        revientan++;
+        console.log(`     ${metodo} ${ruta} con ${que} → ${status}`);
+      }
+    }
+  }
+  check("ninguna ruta revienta con un cuerpo mal formado", revientan, 0);
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
 }

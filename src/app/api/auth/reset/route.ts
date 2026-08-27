@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail } from "@/lib/api-error";
+import { jsonBody } from "@/lib/body";
 import {
   clearAttempts,
   isApproved,
@@ -46,12 +47,9 @@ export async function POST(request: NextRequest) {
     return fail("throttled", 429);
   }
 
-  let body: { token?: string; password?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return fail("bad_json", 400);
-  }
+  // `null` es JSON válido: pasaba el catch y reventaba al leer un campo.
+  const body: { token?: string; password?: string } | null = await jsonBody(request);
+  if (!body) return fail("bad_json", 400);
 
   const password = String(body.password ?? "");
   const problem = passwordProblem(password);

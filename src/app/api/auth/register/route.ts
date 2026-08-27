@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail } from "@/lib/api-error";
+import { jsonBody } from "@/lib/body";
 import {
   clientKey,
   createSession,
@@ -28,12 +29,9 @@ export async function POST(request: NextRequest) {
   // internet, and an open registration endpoint on a personal instance means anyone
   // who finds the URL can create accounts on it. The first account is always allowed
   // so a fresh install can be set up; after that, opening it up is a deliberate act.
-  let body: { email?: string; name?: string; password?: string; inviteToken?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return fail("bad_json", 400);
-  }
+  // `null` es JSON válido: pasaba el catch y reventaba al leer un campo.
+  const body: { email?: string; name?: string; password?: string; inviteToken?: string } | null = await jsonBody(request);
+  if (!body) return fail("bad_json", 400);
 
   /**
    * A valid invitation is permission to register.

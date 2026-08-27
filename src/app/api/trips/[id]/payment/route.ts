@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail } from "@/lib/api-error";
+import { jsonBody } from "@/lib/body";
 import {
   addPayment,
   authorRule,
@@ -32,7 +33,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
   }
 
   try {
-    const body = await request.json();
+    const body = await jsonBody(request);
+    if (!body) return fail("bad_json", 400);
     const { from, to, amount, note } = body;
 
     if (!from || !to || !amount) {

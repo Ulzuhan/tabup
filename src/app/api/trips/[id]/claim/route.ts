@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail } from "@/lib/api-error";
+import { jsonBody } from "@/lib/body";
 import { claimMember, logActivity, memberForUser, seatUser, unlinkedMembers } from "@/lib/store";
 import { authorizeTrip } from "@/lib/authorize";
 import { logError } from "@/lib/errors";
@@ -43,12 +44,9 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     return fail("signin_required", 401);
   }
 
-  let body: { memberId?: string; create?: boolean; name?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return fail("bad_json", 400);
-  }
+  // `null` es JSON válido: pasaba el catch y reventaba al leer un campo.
+  const body: { memberId?: string; create?: boolean; name?: string } | null = await jsonBody(request);
+  if (!body) return fail("bad_json", 400);
 
   // Already seated: answering twice is a stale tab, not an error worth showing.
   const existing = memberForUser(id, auth.user.id);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail } from "@/lib/api-error";
+import { jsonBody } from "@/lib/body";
 import {
   authenticate,
   clearAttempts,
@@ -15,12 +16,9 @@ import { oidcConfigured } from "@/lib/oidc";
 export async function POST(request: NextRequest) {
   if (oidcConfigured()) return fail("not_found", 404);
 
-  let body: { email?: string; password?: string; inviteToken?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return fail("bad_json", 400);
-  }
+  // `null` es JSON válido: pasaba el catch y reventaba al leer un campo.
+  const body: { email?: string; password?: string; inviteToken?: string } | null = await jsonBody(request);
+  if (!body) return fail("bad_json", 400);
 
   const email = typeof body.email === "string" ? body.email : "";
   const password = typeof body.password === "string" ? body.password : "";

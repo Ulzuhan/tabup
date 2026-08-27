@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail } from "@/lib/api-error";
+import { jsonBody } from "@/lib/body";
 import {
   addComment,
   deleteComment,
@@ -48,12 +49,9 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     return fail("signin_required", 401);
   }
 
-  let body: { expenseId?: string; body?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return fail("bad_json", 400);
-  }
+  // `null` es JSON válido: pasaba el catch y reventaba al leer un campo.
+  const body: { expenseId?: string; body?: string } | null = await jsonBody(request);
+  if (!body) return fail("bad_json", 400);
   if (typeof body.expenseId !== "string" || typeof body.body !== "string") {
     return fail("missing_field", 400);
   }
@@ -95,12 +93,9 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
   const auth = await authorizeTrip(id, "write");
   if (!auth.ok) return auth.response;
 
-  let body: { commentId?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return fail("bad_json", 400);
-  }
+  // `null` es JSON válido: pasaba el catch y reventaba al leer un campo.
+  const body: { commentId?: string } | null = await jsonBody(request);
+  if (!body) return fail("bad_json", 400);
   if (typeof body.commentId !== "string") {
     return fail("missing_field", 400, { field: "commentId" });
   }

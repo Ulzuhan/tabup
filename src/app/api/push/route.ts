@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail } from "@/lib/api-error";
+import { jsonBody } from "@/lib/body";
 import { getCurrentUser } from "@/lib/auth";
 import {
   isSubscribed,
@@ -40,7 +41,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
+    const body = await jsonBody(request);
+    if (!body) return fail("bad_json", 400);
     const endpoint = body?.subscription?.endpoint;
     const p256dh = body?.subscription?.keys?.p256dh;
     const auth = body?.subscription?.keys?.auth;

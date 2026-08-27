@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail } from "@/lib/api-error";
+import { jsonBody } from "@/lib/body";
 import {
   addExpense,
   authorRule,
@@ -150,7 +151,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
   const { trip, caller, user } = loaded;
 
   try {
-    const body = await request.json();
+    const body = await jsonBody(request);
+    if (!body) return fail("bad_json", 400);
     const { description, amount, currency, paidBy, splitAmong, category } = body;
 
     if (!description || !amount || !paidBy) {
@@ -251,7 +253,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
   const { trip, caller, user } = loaded;
 
   try {
-    const body = await request.json();
+    const body = await jsonBody(request);
+    if (!body) return fail("bad_json", 400);
     const { expenseId, description, amount, currency, paidBy, splitAmong, category } = body;
 
     if (!expenseId) {

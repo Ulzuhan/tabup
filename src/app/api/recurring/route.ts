@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail, type ErrorCode } from "@/lib/api-error";
+import { jsonBody } from "@/lib/body";
 import { getCurrentUser } from "@/lib/auth";
 import type { RecurringInput } from "@/lib/store";
 import {
@@ -106,12 +107,9 @@ export async function POST(request: NextRequest) {
   const user = await requireUser();
   if (!user) return fail("signin_required", 401);
 
-  let body: Record<string, unknown>;
-  try {
-    body = await request.json();
-  } catch {
-    return fail("bad_json", 400);
-  }
+  // `null` es JSON válido: pasaba el catch y reventaba al leer un campo.
+  const body: Record<string, unknown> | null = await jsonBody(request);
+  if (!body) return fail("bad_json", 400);
 
   const parsed = await parseBody(body);
   if (parsed.error) return fail(parsed.error, 400);
@@ -125,12 +123,9 @@ export async function PATCH(request: NextRequest) {
   const user = await requireUser();
   if (!user) return fail("signin_required", 401);
 
-  let body: Record<string, unknown>;
-  try {
-    body = await request.json();
-  } catch {
-    return fail("bad_json", 400);
-  }
+  // `null` es JSON válido: pasaba el catch y reventaba al leer un campo.
+  const body: Record<string, unknown> | null = await jsonBody(request);
+  if (!body) return fail("bad_json", 400);
 
   const id = typeof body.id === "string" ? body.id : "";
   if (!id) return fail("missing_field", 400, { field: "id" });

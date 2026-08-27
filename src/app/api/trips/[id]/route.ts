@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail } from "@/lib/api-error";
+import { jsonBody } from "@/lib/body";
 import { eq } from "drizzle-orm";
 import {
   accessLevel,
@@ -159,7 +160,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/trips/
   const isOwner = auth.level === "owner";
 
   try {
-    const body = await request.json();
+    const body = await jsonBody(request);
+    if (!body) return fail("bad_json", 400);
 
     /**
      * Checked before anything is written, not as each branch is reached.

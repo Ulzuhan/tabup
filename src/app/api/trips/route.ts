@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail } from "@/lib/api-error";
+import { jsonBody } from "@/lib/body";
 import { atTripLimit, createTrip, FREE_TRIP_LIMIT, listTrips } from "@/lib/store";
 import { getCurrentUser } from "@/lib/auth";
 import { CURRENCIES, EMOJIS, isTripKind } from "@/lib/types";
@@ -17,7 +18,8 @@ export async function POST(request: NextRequest) {
       return fail("trip_limit", 402, { limit: FREE_TRIP_LIMIT });
     }
 
-    const body = await request.json();
+    const body = await jsonBody(request);
+    if (!body) return fail("bad_json", 400);
     const { name, currency = "EUR", members } = body;
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
