@@ -30,12 +30,12 @@ export interface OidcConfig {
   appSlug: string;
 }
 
-function validUrl(raw: string | undefined): string | null {
+function validUrl(raw: string | undefined, { allowHttp = false } = {}): string | null {
   if (!raw) return null;
   try {
     const url = new URL(raw.trim());
     const loopback = ["127.0.0.1", "localhost", "::1"].includes(url.hostname);
-    if (url.protocol !== "https:" && !(loopback && url.protocol === "http:")) return null;
+    if (url.protocol !== "https:" && !((allowHttp || loopback) && url.protocol === "http:")) return null;
     if (url.username || url.password || url.search || url.hash) return null;
     return url.toString().replace(/\/+$/, "");
   } catch { return null; }
@@ -49,7 +49,12 @@ export function oidcConfig(): OidcConfig | null {
   // heredaba sin saberlo. INTERNAL cae a PUBLIC si no se fija, que es lo
   // correcto cuando el proveedor no comparte máquina con la aplicación.
   const publicBase = validUrl(process.env.TABUP_OIDC_PUBLIC_BASE);
-  const internalBase = validUrl(process.env.TABUP_OIDC_INTERNAL_BASE ?? process.env.TABUP_OIDC_PUBLIC_BASE);
+  // La pata interna admite http con cualquier hostname: es el tramo
+  // servidor→proveedor, y un alias de red de contenedores (authentik-server)
+  // o un nombre de LAN son el caso normal — exigir loopback aquí dejaba el
+  // login en 503 dentro de un contenedor (medido en QR-Forge). El https
+  // obligatorio sigue intacto para todo lo que visita el navegador.
+  const internalBase = validUrl(process.env.TABUP_OIDC_INTERNAL_BASE ?? process.env.TABUP_OIDC_PUBLIC_BASE, { allowHttp: true });
   const redirectUri = validUrl(process.env.TABUP_OIDC_REDIRECT_URI);
 
   // El cierre de sesión de Authentik cuelga del slug con el que se dio de alta
