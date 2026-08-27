@@ -1,4 +1,9 @@
 FROM node:22-bookworm-slim AS build
+# better-sqlite3 se compila con node-gyp cuando no hay binario precompilado para
+# esta versión de Node, y la imagen slim no trae ni Python ni toolchain. Solo en
+# la etapa de build: al runtime viaja el .node ya compilado, dentro del standalone.
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
