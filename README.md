@@ -56,11 +56,11 @@ npm run start
 | `TABUP_BACKUP_KEEP` | `14` | Snapshots to keep |
 | `TABUP_BACKUP_REMOTE` | unset | rsync target for offsite copies |
 | `TABUP_PUSH_SUBJECT` | `mailto:tabup@localhost` | Contact a push service can complain to; part of VAPID |
-| `TABUP_OIDC_CLIENT_ID` | unset | Setting these three delegates sign-in to an identity provider; see [Two ways in](#two-ways-in) |
+| `TABUP_OIDC_CLIENT_ID` | unset | Setting these, plus `TABUP_OIDC_PUBLIC_BASE`, delegates sign-in to an identity provider; see [Two ways in](#two-ways-in) |
 | `TABUP_OIDC_CLIENT_SECRET` | unset | |
 | `TABUP_OIDC_REDIRECT_URI` | unset | `https://your-host/api/auth/callback` |
-| `TABUP_OIDC_PUBLIC_BASE` | `https://auth.kaicorplabs.com` | Where the browser is sent |
-| `TABUP_OIDC_INTERNAL_BASE` | `http://127.0.0.1:9100` | Where the server talks to the provider, if that differs |
+| `TABUP_OIDC_PUBLIC_BASE` | unset | The provider as the browser sees it. There is no default provider: each URL arrives by environment and is validated |
+| `TABUP_OIDC_INTERNAL_BASE` | falls back to `PUBLIC_BASE` | The provider as this server sees it, when that differs — e.g. loopback to a provider on the same machine |
 | `TABUP_PUBLIC_HOST` | unset | Public hostname the origin check compares against. Unset, the incoming `Host` is used, which is right behind a tunnel that preserves it — verified. Only needed behind a proxy that rewrites `Host` with an internal name. |
 
 The database file and its directory are created on first start. There is no separate
@@ -355,8 +355,10 @@ Sign-in is decided by configuration, not by a code change.
 passwords live in TabUp's own database, hashed with scrypt. Nothing else is needed —
 which is the point of it being the default.
 
-**Or an identity provider,** when `TABUP_OIDC_CLIENT_ID`, `TABUP_OIDC_CLIENT_SECRET`
-and `TABUP_OIDC_REDIRECT_URI` are set. Then `/login` stops rendering a form and sends
+**Or an identity provider,** when `TABUP_OIDC_CLIENT_ID`, `TABUP_OIDC_CLIENT_SECRET`,
+`TABUP_OIDC_REDIRECT_URI` and `TABUP_OIDC_PUBLIC_BASE` are set. Any standard OIDC
+provider works — Authentik, Keycloak, Zitadel, Auth0 — this repository is not tied to
+one. Then `/login` stops rendering a form and sends
 people to the provider instead, `/api/auth/callback` brings them back, and the local
 password paths are simply never reached. That is how the deployment this was written
 for runs it: one account opens five different services, so a login form per service
@@ -387,6 +389,11 @@ the provider's business and these values are not consulted.
 The very first account is always allowed regardless — otherwise a fresh install could
 never be set up — and it becomes the **admin**, who is the only one who can see or act
 on account requests.
+
+Which cuts the other way: **a fresh install exposed to the internet before anyone has
+registered belongs to whoever arrives first.** Create the first account before putting
+it behind a public hostname, or keep it bound to localhost until you have — the unit
+file and compose file in this repository already bind to loopback.
 
 A pending account is a real account with `approved_at` still null, rather than a row in
 a separate requests table: it already has a hashed password and a claimed email address,

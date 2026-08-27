@@ -30,12 +30,27 @@ export interface OidcConfig {
   appSlug: string;
 }
 
+function validUrl(raw: string | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw.trim());
+    const loopback = ["127.0.0.1", "localhost", "::1"].includes(url.hostname);
+    if (url.protocol !== "https:" && !(loopback && url.protocol === "http:")) return null;
+    if (url.username || url.password || url.search || url.hash) return null;
+    return url.toString().replace(/\/+$/, "");
+  } catch { return null; }
+}
+
 export function oidcConfig(): OidcConfig | null {
   const clientId = process.env.TABUP_OIDC_CLIENT_ID?.trim();
   const clientSecret = process.env.TABUP_OIDC_CLIENT_SECRET?.trim();
-  const publicBase = (process.env.TABUP_OIDC_PUBLIC_BASE ?? "https://auth.kaicorplabs.com").replace(/\/+$/, "");
-  const internalBase = (process.env.TABUP_OIDC_INTERNAL_BASE ?? "http://127.0.0.1:9100").replace(/\/+$/, "");
-  const redirectUri = process.env.TABUP_OIDC_REDIRECT_URI?.trim();
+  // Sin proveedor por defecto: cada URL llega por entorno y se valida. El
+  // default anterior era nuestro IdP, y quien desplegara esto en otro sitio lo
+  // heredaba sin saberlo. INTERNAL cae a PUBLIC si no se fija, que es lo
+  // correcto cuando el proveedor no comparte máquina con la aplicación.
+  const publicBase = validUrl(process.env.TABUP_OIDC_PUBLIC_BASE);
+  const internalBase = validUrl(process.env.TABUP_OIDC_INTERNAL_BASE ?? process.env.TABUP_OIDC_PUBLIC_BASE);
+  const redirectUri = validUrl(process.env.TABUP_OIDC_REDIRECT_URI);
 
   // El cierre de sesión de Authentik cuelga del slug con el que se dio de alta
   // la aplicación, y ese slug lo elige quien la despliega. Estaba escrito a mano:
@@ -43,7 +58,7 @@ export function oidcConfig(): OidcConfig | null {
   // valor por defecto mantiene el comportamiento actual.
   const appSlug = (process.env.TABUP_OIDC_APP_SLUG ?? "tabup").trim().replace(/^\/+|\/+$/g, "");
 
-  if (!clientId || !clientSecret || !redirectUri) return null;
+  if (!clientId || !clientSecret || !publicBase || !internalBase || !redirectUri) return null;
   return { publicBase, internalBase, clientId, clientSecret, redirectUri, appSlug };
 }
 
