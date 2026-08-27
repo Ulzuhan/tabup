@@ -1,6 +1,6 @@
 {
   "name": "tabup",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Self-hosted shared expense tracking: who paid what, in which currency, and who owes whom.",
   "license": "MIT",
   "author": "Ulzuhan",
