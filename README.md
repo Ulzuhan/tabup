@@ -49,6 +49,8 @@ npm run start
 | `TABUP_OLLAMA_URL` | `http://127.0.0.1:11434` | Where the receipt-reading model lives |
 | `TABUP_OCR_MODEL` | `qwen3.5:397b-cloud` | Vision model used to read receipts |
 | `TABUP_OCR_TIMEOUT` | `60000` | Milliseconds before giving up on the model |
+| `TABUP_RATE_TIMEOUT` | `5000` | Milliseconds before giving up on the exchange-rate table. Every expense in a foreign currency goes through it, so a third party that hangs would otherwise hang whoever is writing down what they just paid |
+| `TABUP_OIDC_TIMEOUT` | `10000` | Milliseconds before giving up on the identity provider. This is on the sign-in path: without a timeout, a provider that accepts the connection and then goes quiet holds a request handler open for good, and enough of those eat the server's handlers |
 | `TABUP_FREE_TRIP_LIMIT` | unset | Caps how many trips an account may own; no cap by default |
 | `TABUP_BACKUP_DIR` | `~/backups/tabup` | Where `backup-db.mjs` writes snapshots |
 | `TABUP_BACKUP_KEEP` | `14` | Snapshots to keep |
