@@ -782,9 +782,12 @@ same origin and verify `Origin` when present, against the `Host` the tunnel sets
 than the `X-Forwarded-Host` a caller can write. This distinction matters between sibling applications on the same
 parent domain, where `sameSite=lax` alone still sends the session cookie.
 
-Not covered: there is no email verification.
-Losing a password is handled by the admin issuing a link, which is the section above —
-there is no self-service reset, because there is no email to send it to.
+Not covered — **by TabUp's own accounts**: there is no email verification, and losing a
+password is handled by the admin issuing a link (the section above). There is no
+self-service reset because this application never sends email. With an identity provider
+configured none of that machinery is even reachable (the local paths return 404), and
+both concerns move to the provider: verification at enrollment and self-service password
+recovery are standard provider features, and the deployment this was written for has both.
 
 ---
 
