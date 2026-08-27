@@ -446,11 +446,11 @@ One at a time, against a server you are already running:
 TABUP_DB=/tmp/test.db PORT=3999 TABUP_REGISTRATION=open npm run start &
 export BASE=http://127.0.0.1:3999
 
-npm run test:api        # 25 — splitting, balances, validation, concurrency, page structure
-npm run test:auth       # 83 — accounts, ownership, who may change what, invitations
-npm run test:money      # 40 — currencies, rates, whole cents, settling, CSV
-npm run test:members    # 55 — members and accounts, and isolation between trips
-npm run test:social     # 58 — balances, authorship, comments, the feed, kinds, push
+npm run test:api        # 34 — splitting, balances, validation, concurrency, page structure
+npm run test:auth       # 86 — accounts, ownership, who may change what, invitations
+npm run test:money      # 55 — currencies, rates, whole cents, settling, CSV
+npm run test:members    # 64 — members and accounts, and isolation between trips
+npm run test:social     # 69 — balances, authorship, comments, the feed, kinds, push
 npm run test:races      # 18 — two people doing the same thing at the same instant
 npm run test:account    # 24 — closing an account, and what it does to everyone else
 npm run test:recurring  # 17 — fixed costs; pure functions, no server needed
@@ -461,7 +461,7 @@ what it tests starts with "whoever registers first is the admin":
 
 ```bash
 rm -f data/test.db* && TABUP_DB=data/test.db TABUP_REGISTRATION=approval npm run start &
-npm run test:admin      # 36 — approvals, passwords, recovery links, the error log
+npm run test:admin      # 46 — approvals, passwords, recovery links, the error log
 ```
 
 `test:receipts` stands up a fake Ollama on port 11500 and needs the app pointed at it,
