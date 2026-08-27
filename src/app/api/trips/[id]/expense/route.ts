@@ -62,10 +62,33 @@ function refuseRow(check: ReturnType<typeof authorRule>, noun: string): NextResp
   return fail("author_only", 403);
 }
 
+/**
+ * Un importe, o null si no lo es.
+ *
+ * Antes esto era `parseFloat(String(raw))`, que se traga lo que sea y devuelve
+ * la parte que entienda. El caso que importa es la coma decimal: **`"12,50"` se
+ * convertía en 12**, y la respuesta era un 200 como si todo hubiera ido bien.
+ * En una aplicación de dinero usada en español eso es exactamente el error que
+ * la gente va a cometer, y desaparecía medio euro sin decir nada. `"100abc"`
+ * daba 100 y `"1.2.3"` daba 1.2, por el mismo motivo.
+ *
+ * Ahora una cadena tiene que ser un número entero y completo. Se acepta la coma
+ * decimal —es lo que se teclea aquí— convirtiéndola, no truncando por ella.
+ */
 function validateAmount(raw: unknown): number | null {
-  const parsed = parseFloat(String(raw));
-  if (!isFinite(parsed) || parsed <= 0 || parsed > 1e9) return null;
-  return parsed;
+  let n: number;
+  if (typeof raw === "number") {
+    n = raw;
+  } else if (typeof raw === "string") {
+    const limpio = raw.trim().replace(",", ".");
+    // `Number("")` es 0 y `Number("12abc")` es NaN: lo primero se descarta con
+    // el `<= 0` de abajo, lo segundo aquí.
+    n = Number(limpio);
+  } else {
+    return null;
+  }
+  if (!isFinite(n) || n <= 0 || n > 1e9) return null;
+  return n;
 }
 
 /**
@@ -86,6 +109,15 @@ function validateSplit(
   splitIds: string[],
   splitShares: unknown
 ): NextResponse | null {
+  // Un gasto repartido entre NADIE descuadra el viaje para siempre: quien pagó
+  // queda con saldo a favor, la parte de todos es cero, los saldos dejan de
+  // sumar cero y no se ofrece ninguna liquidación que lo arregle. Comprobado:
+  // 60 € entre nadie deja los saldos sumando 60 y la lista de pagos vacía.
+  // Se rechaza aquí, que es por donde pasan POST y PATCH.
+  if (splitIds.length === 0) {
+    return fail("split_empty", 400);
+  }
+
   for (const sid of splitIds) {
     if (!trip.members.find((m) => m.id === sid)) {
       return fail("invalid_member", 400, { member: sid });

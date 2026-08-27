@@ -61,7 +61,18 @@ start() {
   local mode=open
   [ "$1" = admin ] && mode=approval
 
+  # Las variables OIDC se desactivan A PROPÓSITO para el servidor de pruebas.
+  #
+  # Con un proveedor configurado, /api/auth/register y /api/auth/login devuelven
+  # 404 —es deliberado: la identidad la lleva el proveedor y una contraseña
+  # antigua no debe poder esquivar su MFA—. Pero las suites crean sus cuentas por
+  # ahí, así que heredar el entorno de producción las hace fallar todas con 404
+  # sin explicar por qué. Pasó, y costó un rato entenderlo.
+  #
+  # Las pruebas ejercitan la lógica de la aplicación, no el flujo del proveedor.
   TABUP_DB="$DB" TABUP_REGISTRATION="$mode" \
+    TABUP_OIDC_CLIENT_ID= TABUP_OIDC_CLIENT_SECRET= TABUP_OIDC_REDIRECT_URI= \
+    TABUP_OIDC_PUBLIC_BASE= TABUP_OIDC_INTERNAL_BASE= \
     TABUP_OLLAMA_URL="http://127.0.0.1:11500" \
     ./node_modules/.bin/next start -p "$PORT" >"$LOG" 2>&1 &
   server_pid=$!

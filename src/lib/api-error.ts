@@ -47,6 +47,8 @@ export const ERROR_TEXT = {
 
   // Money
   amount_range: "Amount must be a positive finite number up to 1 billion",
+  split_empty: "An expense has to be split between at least one person",
+  amount_not_a_number: "That amount is not a number. Use a dot for decimals: 12.50",
   budget_range: "Budget must be a positive number up to 1 billion",
   invalid_date: "Invalid date",
   settle_self: "Cannot settle with yourself",

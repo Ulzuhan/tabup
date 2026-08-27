@@ -36,6 +36,8 @@ export const es = {
    * que sabe en qué idioma lee quien está mirando.
    */
   errors: {
+    split_empty: "Un gasto tiene que repartirse entre alguien",
+    amount_not_a_number: "Ese importe no es un número. Usa el punto para los decimales: 12.50",
     bad_json: "La petición no llegó bien formada",
     missing_field: "Falta un dato obligatorio",
     invalid_member: "Esa persona no está en este viaje",
@@ -601,6 +603,8 @@ export const en: Messages = {
   },
 
   errors: {
+    split_empty: "An expense has to be split between at least one person",
+    amount_not_a_number: "That amount is not a number. Use a dot for decimals: 12.50",
     bad_json: "The request did not arrive well formed",
     missing_field: "A required field is missing",
     invalid_member: "That is not a member of this trip",

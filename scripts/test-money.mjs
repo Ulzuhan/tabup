@@ -354,6 +354,82 @@ async function main() {
     404
   );
 
+  // ── An amount the server refuses to guess at ────────────────────────
+  //
+  // `parseFloat` used to take whatever it could make sense of and drop the rest.
+  // The case that matters is the decimal comma — the one people type in Spanish:
+  // "12,50" became 12, and the answer was a cheerful 200. Half a euro gone, with
+  // nothing on screen to say so. "100abc" became 100 and "1.2.3" became 1.2 for
+  // the same reason.
+  //
+  // These are here rather than left to a careful reading because a wrong amount
+  // does not look wrong. It looks like an amount.
+  console.log("\nAmounts that are not numbers");
+  const amounts = await api("/api/trips", {
+    method: "POST",
+    body: JSON.stringify({ name: "Amounts", currency: "EUR", members: [{ name: "B" }] }),
+  });
+  const amountsTrip = amounts.body;
+  const amountIds = amountsTrip.members.map((m) => m.id);
+
+  const addAmount = (amount) =>
+    api(`/api/trips/${amountsTrip.id}/expense`, {
+      method: "POST",
+      body: JSON.stringify({
+        description: "x",
+        amount,
+        paidBy: amountIds[0],
+        date: Date.now(),
+        splitAmong: amountIds,
+      }),
+    });
+
+  const comma = await addAmount("12,50");
+  check("a decimal comma is understood, not truncated", comma.body.amount, 12.5);
+  check("digits followed by letters are refused", (await addAmount("100abc")).status, 400);
+  check("two decimal points are refused", (await addAmount("1.2.3")).status, 400);
+  check("an empty amount is refused", (await addAmount("")).status, 400);
+  check("a number still works", (await addAmount(12.5)).body.amount, 12.5);
+  check("and so does one with spaces around it", (await addAmount(" 50 ")).body.amount, 50);
+
+  // ── An expense split between nobody ─────────────────────────────────
+  //
+  // This one broke the books permanently. Whoever paid was left in credit, every
+  // share was zero, the balances stopped summing to zero, and no settlement was
+  // ever offered to fix it: 60 € split among nobody left the trip owing 60 € to
+  // the void. The API accepted it with a 200.
+  console.log("\nSplit between nobody");
+  const empty = await api("/api/trips", {
+    method: "POST",
+    body: JSON.stringify({ name: "Empty", currency: "EUR", members: [{ name: "B" }] }),
+  });
+  const emptyTrip = empty.body;
+  const emptyIds = emptyTrip.members.map((m) => m.id);
+
+  check(
+    "an expense split among nobody is refused",
+    (
+      await api(`/api/trips/${emptyTrip.id}/expense`, {
+        method: "POST",
+        body: JSON.stringify({
+          description: "nobody",
+          amount: 60,
+          paidBy: emptyIds[0],
+          date: Date.now(),
+          splitAmong: [],
+        }),
+      })
+    ).status,
+    400
+  );
+
+  const stillBalanced = (await api(`/api/trips/${emptyTrip.id}`)).body;
+  check(
+    "so the balances still sum to zero",
+    Math.round((stillBalanced.balances || []).reduce((sum, b) => sum + b.balance, 0) * 100),
+    0
+  );
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);
 }

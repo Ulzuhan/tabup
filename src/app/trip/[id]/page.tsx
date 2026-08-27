@@ -79,6 +79,20 @@ const emptyExpense = (currency: string, members: Member[], you: string | null): 
   date: today(),
 });
 
+/**
+ * El importe que teclea la persona, como número.
+ *
+ * Era `parseFloat(draft.amount)`, y con la coma decimal —la que se usa en
+ * español— `"12,50"` se convertía en 12 antes siquiera de salir del navegador.
+ * Medio euro desaparecido sin un solo aviso. Se convierte la coma en vez de
+ * truncar por ella, y lo que no sea un número entero devuelve NaN para que el
+ * envío se detenga en lugar de mandar basura.
+ */
+function importe(bruto: string): number {
+  const limpio = bruto.trim().replace(",", ".");
+  return limpio === "" ? NaN : Number(limpio);
+}
+
 export default function TripPage() {
   const t = useT();
   const serverError = useServerError();
@@ -177,7 +191,7 @@ export default function TripPage() {
         // would have typed anyway — and is the difference between asking for a
         // description and demanding one.
         description: expenseDraft.description.trim() || categoryName(expenseDraft.category),
-        amount: parseFloat(expenseDraft.amount),
+        amount: importe(expenseDraft.amount),
         currency: expenseDraft.currency,
         paidBy: expenseDraft.paidBy,
         splitAmong: expenseDraft.splitAmong,
@@ -238,7 +252,7 @@ export default function TripPage() {
     const paymentBody = {
       from: paymentDraft.from,
       to: paymentDraft.to,
-      amount: parseFloat(paymentDraft.amount),
+      amount: importe(paymentDraft.amount),
       currency: paymentDraft.currency || trip?.currency,
       note: paymentDraft.note.trim() || undefined,
       date: paymentDraft.date ? new Date(paymentDraft.date).getTime() : Date.now(),
