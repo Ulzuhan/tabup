@@ -392,6 +392,38 @@ async function main() {
   check("a number still works", (await addAmount(12.5)).body.amount, 12.5);
   check("and so does one with spaces around it", (await addAmount(" 50 ")).body.amount, 50);
 
+  // El mismo importe, por las otras dos puertas.
+  //
+  // Esto se arregló primero sólo en los gastos, y el validador se quedó dentro de
+  // esa ruta: pagos y recurrentes siguieron con `parseFloat` durante semanas. Medido
+  // entonces: un pago de "12,50" guardaba 12, uno de "12abc" guardaba 12 tan
+  // tranquilo, y uno de "0,99" se rechazaba entero —parseFloat("0,99") es 0, y 0 no
+  // pasa el `> 0`—, de modo que pagar noventa y nueve céntimos con coma era
+  // imposible. Un arreglo de clase no vale si se queda en un sitio.
+  const pagar = (amount) =>
+    api(`/api/trips/${amountsTrip.id}/payment`, {
+      method: "POST",
+      body: JSON.stringify({ from: amountIds[0], to: amountIds[1], amount }),
+    });
+  check("a payment understands a decimal comma too", (await pagar("12,50")).body.amount, 12.5);
+  check("and ninety-nine cents can be paid at all", (await pagar("0,99")).body.amount, 0.99);
+  check("a payment of digits and letters is refused", (await pagar("12abc")).status, 400);
+  check("and one of nothing at all", (await pagar("")).status, 400);
+
+  const recurrente = (amount, name) =>
+    api("/api/recurring", {
+      method: "POST",
+      body: JSON.stringify({ name, amount, currency: "EUR", period: "monthly" }),
+    });
+  const conComa = await recurrente("12,50", "alquiler");
+  check("a recurring amount keeps its cents", conComa.status, 200);
+  check(
+    "and they are the ones that were typed",
+    (await api("/api/recurring")).body.items.find((r) => r.name === "alquiler")?.amount,
+    12.5
+  );
+  check("a recurring amount of digits and letters is refused", (await recurrente("9zzz", "basura")).status, 400);
+
   // ── An expense split between nobody ─────────────────────────────────
   //
   // This one broke the books permanently. Whoever paid was left in credit, every

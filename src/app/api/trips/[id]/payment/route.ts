@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail } from "@/lib/api-error";
+import { parseAmount } from "@/lib/amount";
 import { jsonBody } from "@/lib/body";
 import {
   addPayment,
@@ -58,8 +59,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/trips/[
       return fail("invalid_date", 400);
     }
 
-    const parsedAmount = parseFloat(String(amount));
-    if (!isFinite(parsedAmount) || parsedAmount <= 0 || parsedAmount > 1e9) {
+    const parsedAmount = parseAmount(amount);
+    if (parsedAmount === null) {
       return fail("amount_range", 400);
     }
 

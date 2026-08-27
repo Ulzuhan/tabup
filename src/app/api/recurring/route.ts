@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail, type ErrorCode } from "@/lib/api-error";
+import { parseAmount } from "@/lib/amount";
 import { jsonBody } from "@/lib/body";
 import { getCurrentUser } from "@/lib/auth";
 import type { RecurringInput } from "@/lib/store";
@@ -43,8 +44,8 @@ async function parseBody(
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name || name.length > 100) return { error: "name_required" as const };
 
-  const amount = parseFloat(String(body.amount));
-  if (!isFinite(amount) || amount <= 0 || amount > 1e9) {
+  const amount = parseAmount(body.amount);
+  if (amount === null) {
     return { error: "amount_range" as const };
   }
 
