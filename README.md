@@ -62,6 +62,7 @@ npm run start
 | `TABUP_OIDC_REDIRECT_URI` | unset | `https://your-host/api/auth/callback` |
 | `TABUP_OIDC_PUBLIC_BASE` | unset | The provider as the browser sees it. There is no default provider: each URL arrives by environment and is validated |
 | `TABUP_OIDC_INTERNAL_BASE` | falls back to `PUBLIC_BASE` | The provider as this server sees it, when that differs — e.g. loopback to a provider on the same machine |
+| `TABUP_ACCOUNT_URL` | unset | The provider's own account page — email, password, second factor, sessions. None of that belongs to TabUp, and without this the app links nowhere: it appears in the account menu and in Settings. Authentik serves it at `/if/user/` |
 | `TABUP_ENROLL_URL` | unset | Where somebody with no account is sent to ask for one: your provider's enrolment flow. Shown on the landing page and on an invitation. Unset means no button at all, which is right when the provider has no self-service sign-up — the alternative, a default baked into the source, pointed everyone who deployed this at *our* provider |
 | `TABUP_PUBLIC_HOST` | unset | Public hostname the origin check compares against. Unset, the incoming `Host` is used, which is right behind a tunnel that preserves it — verified. Only needed behind a proxy that rewrites `Host` with an internal name. |
 
@@ -88,6 +89,39 @@ A week is 52 charges a year, not 48, so weekly items convert at ×52/12. A charg
 
 Fixed costs require an account and are never shared: there is no link that grants access
 to them, and every query is scoped by user id.
+
+## Your profile
+
+What you bring with you to every group, as opposed to what you are inside one. The
+distinction is the whole point: until now the only adjustable thing was your alias in a
+group, so somebody in five groups said their name five times and accepted five times
+whatever face the joining order gave them.
+
+| | What it changes | Who sees it |
+| --- | --- | --- |
+| **Your name** | The name you are seated with in a new group. Your alias inside a group still overrides it, and changing one does not touch the other | Everyone in your groups |
+| **Your face** | The emoji on your column. Taken already in that group? You get another one — two identical columns cannot be told apart at a glance | Everyone in your groups |
+| **Default currency** | What the new-group form opens with. Worth caring about: a group's currency **cannot** be changed afterwards, because its expenses are already converted into it | Nobody |
+| **How you get paid** | Free text — a bank transfer detail, a payment handle, whatever you use. It is what settling up was missing: the app worked out "you owe Ana 23" and left you there | Only whoever is settling up with you, and only then. It is fetched per person, from its own route, rather than riding along with the member list |
+| **Notifications** | One switch per kind of thing: expenses, comments, settling up | Nobody |
+
+Being added to a group is announced regardless: it happens once per group, it is never
+noise, and it is the only notification you did not cause yourself.
+
+**Your email, password, second factor and sessions are not here.** They belong to the
+identity provider, and the app links out to it (`TABUP_ACCOUNT_URL`) rather than
+pretending otherwise.
+
+All of it lives on a settings page rather than in the account menu. A menu is fine while
+the settings are three switches with nothing to explain; once what you are adjusting is
+what other people see of you, each one needs room to say who it affects — and that is a
+page. The menu keeps the four lines that are actually navigation: who you are, settings,
+your account at the provider, sign out.
+
+**Taking your data with you** is on the same page: one JSON file with your groups —
+their expenses, splits, payments, people and history — and your fixed costs. Not the
+receipt photos: those are files, and they are one tap away in each expense. It is the
+sibling of closing your account, which is right underneath it.
 
 ## Money in more than one currency
 
@@ -461,7 +495,7 @@ Every write is a transaction. It either lands completely or not at all.
 No test framework. Most run against a live server:
 
 All of them at once, each against its own server and its own empty database — which is
-what CI runs on every push:
+what CI runs on every push (eleven of them):
 
 ```bash
 npm run build
@@ -482,6 +516,7 @@ npm run test:social     # 69 — balances, authorship, comments, the feed, kinds
 npm run test:races      # 18 — two people doing the same thing at the same instant
 npm run test:account    # 26 — closing an account, and what it does to everyone else
 npm run test:recurring  # 17 — fixed costs; pure functions, no server needed
+npm run test:profile    # 29 — the profile, and where each part of it shows up
 ```
 
 `test:admin` needs its own empty database and `TABUP_REGISTRATION=approval`, because

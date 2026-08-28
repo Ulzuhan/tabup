@@ -6,6 +6,7 @@ import {
   pendingUsers,
   publicUser,
   registrationOpen,
+  updateProfile,
   verifyPassword,
 } from "@/lib/auth";
 import { deleteAccount, FREE_TRIP_LIMIT, ownedTripCount } from "@/lib/store";
@@ -30,6 +31,31 @@ export async function GET() {
       tripLimit: user.plan === "free" ? FREE_TRIP_LIMIT : null,
     },
   });
+}
+
+/**
+ * Cambiar el propio perfil: cómo te llamas, con qué cara te sientas, en qué moneda
+ * abres un grupo, cómo te pagan y de qué quieres enterarte.
+ *
+ * Todo esto era del grupo o de nadie. El nombre lo ponía el proveedor y solo se podía
+ * cambiar el alias dentro de cada grupo —cinco grupos, cinco veces—; la cara la repartía
+ * el orden de llegada; la moneda venía fijada a euros en el formulario y un grupo no
+ * puede cambiarla después; y los avisos eran un interruptor de todo o nada.
+ *
+ * Se manda solo lo que cambia: un campo ausente no se toca, que es lo que permite a la
+ * página de ajustes guardar una sección sin arrastrar las demás.
+ */
+export async function PATCH(request: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) return fail("signin_required", 401);
+
+  const cuerpo = await jsonBody(request);
+  if (!cuerpo) return fail("bad_json", 400);
+
+  const resultado = updateProfile(user.id, cuerpo);
+  if (!resultado.ok) return fail(resultado.code, 400);
+
+  return NextResponse.json({ user: publicUser(resultado.user) });
 }
 
 /**

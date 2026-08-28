@@ -6,6 +6,7 @@ import { eq, sql, isNull, isNotNull, and } from "drizzle-orm";
 import { db, users, sessions, trips, passwordResets } from "@/db";
 import type { UserRow } from "@/db";
 import type { ErrorCode } from "./api-error";
+import { CURRENCIES, EMOJIS } from "./types";
 import { oidcConfigured } from "./oidc";
 
 /**
@@ -310,6 +311,13 @@ export async function createUser(
     // Whoever sets the instance up runs it: there is nobody else to approve them.
     role: isFirst ? "admin" : "user",
     approvedAt: isFirst || options.approved ? now : null,
+    // El perfil, en sus valores por defecto. Ver `users` en el esquema.
+    emoji: null,
+    defaultCurrency: "EUR",
+    payTo: null,
+    notifyExpenses: true,
+    notifyComments: true,
+    notifySettlements: true,
     // Local account: not tied to an identity in the provider (yet — signing in
     // through it later with the same email links the two).
     oidcSub: null,
@@ -376,12 +384,22 @@ export async function linkOrCreateFromIdentity(identity: {
   const row = {
     id: randomBytes(16).toString("hex"),
     email,
+    // El nombre del proveedor es el punto de partida, no la última palabra: se puede
+    // cambiar en los ajustes y no se vuelve a pisar (aquí solo se escribe al crear).
     name: (identity.name ?? email.split("@")[0]).trim().slice(0, 80),
     passwordHash: `oidc$${randomBytes(32).toString("hex")}`,
     createdAt: now,
     plan: "free",
     role: count === 0 ? "admin" : "user",
     approvedAt: now,
+    // El perfil arranca en sus valores por defecto: sin cara elegida (se reparte por
+    // posición como siempre), euros, sin forma de pago publicada y con los tres avisos.
+    emoji: null,
+    defaultCurrency: "EUR",
+    payTo: null,
+    notifyExpenses: true,
+    notifyComments: true,
+    notifySettlements: true,
     oidcSub: identity.sub,
   };
   db.insert(users).values(row).run();
@@ -414,7 +432,87 @@ export async function authenticate(email: string, password: string): Promise<Use
 
 /** What the client is allowed to see about itself. */
 export function publicUser(user: UserRow) {
-  return { id: user.id, email: user.email, name: user.name, plan: user.plan };
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    plan: user.plan,
+    // El perfil viaja con la sesión: la cabecera, el formulario de crear grupo y la
+    // página de ajustes lo necesitan, y es de quien pregunta — esto solo se le manda a
+    // la propia cuenta, nunca describe a otra persona.
+    emoji: user.emoji,
+    defaultCurrency: user.defaultCurrency,
+    payTo: user.payTo,
+    notifyExpenses: user.notifyExpenses,
+    notifyComments: user.notifyComments,
+    notifySettlements: user.notifySettlements,
+  };
+}
+
+/**
+ * Lo que una persona puede cambiar de sí misma.
+ *
+ * Cada campo se valida y se recorta aquí, y lo que no llega no se toca: la página de
+ * ajustes manda solo lo que cambió, y un `undefined` no debe borrar nada.
+ */
+export interface ProfileUpdate {
+  name?: unknown;
+  emoji?: unknown;
+  defaultCurrency?: unknown;
+  payTo?: unknown;
+  notifyExpenses?: unknown;
+  notifyComments?: unknown;
+  notifySettlements?: unknown;
+}
+
+export function updateProfile(
+  userId: string,
+  input: ProfileUpdate
+): { ok: true; user: UserRow } | { ok: false; code: ErrorCode } {
+  const cambios: Partial<UserRow> = {};
+
+  if (input.name !== undefined) {
+    const name = typeof input.name === "string" ? input.name.trim() : "";
+    if (name.length < 1 || name.length > 80) return { ok: false, code: "name_length" };
+    cambios.name = name;
+  }
+
+  if (input.emoji !== undefined) {
+    // Null es una respuesta válida: «la que toque», que es el reparto por posición.
+    if (input.emoji === null || input.emoji === "") {
+      cambios.emoji = null;
+    } else {
+      // De la lista de la aplicación y no cualquier texto: es lo que se pinta en un
+      // círculo de 28 píxeles al lado de un nombre, y ahí no cabe una frase.
+      const elegido = EMOJIS.find((e) => e === input.emoji);
+      if (!elegido) return { ok: false, code: "invalid_emoji" };
+      cambios.emoji = elegido;
+    }
+  }
+
+  if (input.defaultCurrency !== undefined) {
+    const code = typeof input.defaultCurrency === "string" ? input.defaultCurrency : "";
+    if (!CURRENCIES.find((c) => c.code === code)) return { ok: false, code: "invalid_currency" };
+    cambios.defaultCurrency = code;
+  }
+
+  if (input.payTo !== undefined) {
+    const payTo = typeof input.payTo === "string" ? input.payTo.trim() : "";
+    if (payTo.length > 140) return { ok: false, code: "pay_to_long" };
+    // Vacío significa «no publico nada», que tiene que poder deshacerse.
+    cambios.payTo = payTo || null;
+  }
+
+  for (const clave of ["notifyExpenses", "notifyComments", "notifySettlements"] as const) {
+    if (input[clave] !== undefined) cambios[clave] = Boolean(input[clave]);
+  }
+
+  if (Object.keys(cambios).length > 0) {
+    db.update(users).set(cambios).where(eq(users.id, userId)).run();
+  }
+
+  const user = db.select().from(users).where(eq(users.id, userId)).get();
+  return user ? { ok: true, user } : { ok: false, code: "not_found" };
 }
 
 // ── Login throttling ─────────────────────────────────────────────────────

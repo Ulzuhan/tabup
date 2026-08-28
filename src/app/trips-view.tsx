@@ -55,6 +55,9 @@ export function TripsView() {
   const [showCreate, setShowCreate] = useState(false);
   const [tripName, setTripName] = useState("");
   const [kind, setKind] = useState<TripKind>("trip");
+  // La moneda con la que se abre el formulario. Estaba fijada a EUR aquí, y la de un
+  // grupo no se puede cambiar después: quien vive en pesos creaba todos sus grupos mal
+  // y no tenía arreglo. Ahora es la de su perfil, y se recoge al llegar la sesión.
   const [currency, setCurrency] = useState("EUR");
   // Empty: you are already in the trip, and everyone else can arrive by invitation.
   const [members, setMembers] = useState<string[]>([]);
@@ -74,6 +77,7 @@ export function TripsView() {
       if (cancelled) return;
 
       setUser(session.user ?? null);
+      if (session.user?.defaultCurrency) setCurrency(session.user.defaultCurrency);
       setUsage(session.usage ?? null);
       setTrips([...(owned.trips ?? [])].sort((a, b) => b.createdAt - a.createdAt));
       setLoading(false);

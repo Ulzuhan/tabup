@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { Globe, LogOut, Trash2, User as UserIcon, UserCheck } from "lucide-react";
+import { ExternalLink, Globe, LogOut, SlidersHorizontal, User as UserIcon, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,8 +12,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useT } from "@/i18n/provider";
 import { ThemeItems } from "@/components/theme";
-import { PushToggle } from "@/components/push-toggle";
-import { DeleteAccountDialog } from "@/components/delete-account";
 import { LanguageItems } from "@/components/language";
 import { clearSessionCache } from "@/lib/session-cache";
 
@@ -24,6 +21,10 @@ export interface SessionUser {
   name: string;
   plan: string;
   admin?: boolean;
+  /** Del perfil: con la que se abre el formulario de crear grupo. Ver /settings. */
+  defaultCurrency?: string;
+  /** Del perfil: la cara elegida, que también se lleva puesta en la cabecera. */
+  emoji?: string | null;
 }
 
 /**
@@ -37,17 +38,14 @@ export interface SessionUser {
 export function AccountMenu({
   user,
   pendingApprovals = 0,
-  providerAccounts = false,
+  accountUrl = null,
 }: {
   user: SessionUser | null;
   pendingApprovals?: number;
-  /** Las cuentas las lleva un proveedor de identidad: cambia cómo se confirma el borrado. */
-  providerAccounts?: boolean;
+  /** La página de la cuenta en el proveedor, cuando quien despliega la publica. */
+  accountUrl?: string | null;
 }) {
   const t = useT();
-  // Fuera del menú a propósito: elegir la opción lo cierra, y un diálogo montado
-  // dentro se desmontaría con él.
-  const [deleting, setDeleting] = useState(false);
 
   const signOut = async () => {
     const res = await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
@@ -100,8 +98,11 @@ export function AccountMenu({
         <DropdownMenuTrigger
           render={
             <Button variant="ghost" size="sm" className="gap-2 rounded-full pr-3 pl-2">
+              {/* Tu cara si la elegiste, y si no la inicial de siempre: es el mismo
+                  dibujo que llevas en los grupos, y verlo aquí es lo que hace que
+                  elegirla signifique algo fuera de la página de ajustes. */}
               <span className="relative flex size-6 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
-                {user.name.slice(0, 1).toUpperCase()}
+                {user.emoji ?? user.name.slice(0, 1).toUpperCase()}
                 {pendingApprovals > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-primary ring-2 ring-background" />
                 )}
@@ -122,43 +123,47 @@ export function AccountMenu({
             <p className="truncate text-xs text-muted-foreground">{user.email}</p>
           </div>
           <DropdownMenuSeparator />
+          {/*
+            Cuatro líneas, y las cuatro son navegación: quién eres, dónde se cambia lo
+            tuyo, dónde vive tu cuenta de verdad y la salida.
+
+            Aquí había nueve, y con ellas el idioma, el aspecto, los avisos y el borrado
+            de la cuenta. Un menú vale mientras los ajustes son tres interruptores sin
+            nada que explicar; en cuanto lo que se ajusta es lo que otra gente ve de ti
+            —tu nombre en sus grupos, tu cara, cómo te pagan— hace falta sitio para decir
+            a quién afecta cada cosa, y eso es una página. Están todos en /settings.
+          */}
           {user.admin && (
-            <>
-              <DropdownMenuItem render={<Link href="/admin" />}>
-                <UserCheck className="size-4" />
-                {t("admin.title")}
-                {pendingApprovals > 0 && (
-                  <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-                    {pendingApprovals}
-                  </span>
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
+            <DropdownMenuItem render={<Link href="/admin" />}>
+              <UserCheck className="size-4" />
+              {t("admin.title")}
+              {pendingApprovals > 0 && (
+                <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                  {pendingApprovals}
+                </span>
+              )}
+            </DropdownMenuItem>
           )}
-          <LanguageItems />
-          <DropdownMenuSeparator />
-          <ThemeItems />
-          <DropdownMenuSeparator />
-          <PushToggle />
+          <DropdownMenuItem render={<Link href="/settings" />}>
+            <SlidersHorizontal className="size-4" />
+            {t("settings.title")}
+          </DropdownMenuItem>
+          {accountUrl && (
+            <DropdownMenuItem
+              render={<a href={accountUrl} target="_blank" rel="noreferrer" />}
+            >
+              <ExternalLink className="size-4" />
+              {t("settings.providerAccount")}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={signOut}>
             <LogOut className="size-4" />
             {t("auth.signOut")}
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onClick={() => setDeleting(true)}>
-            <Trash2 className="size-4" />
-            {t("account.deleteTitle")}
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <DeleteAccountDialog
-        open={deleting}
-        onOpenChange={setDeleting}
-        providerAccounts={providerAccounts}
-        email={user.email}
-      />
+
     </>
   );
 }

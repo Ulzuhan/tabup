@@ -1,6 +1,6 @@
 import webpush from "web-push";
 import { and, eq, inArray, ne } from "drizzle-orm";
-import { db, appSettings, pushSubscriptions, tripAccess, trips } from "@/db";
+import { db, appSettings, pushSubscriptions, tripAccess, trips, users } from "@/db";
 
 /**
  * Notifications, sent by this server and nobody else.
@@ -191,8 +191,35 @@ export interface Notification {
  * Fire and forget by design: the caller has already saved somebody's money and must not
  * wait on, or fail because of, a push service on the other side of the internet.
  */
+/**
+ * Qué preferencia gobierna cada clase de aviso.
+ *
+ * `joined` no está y no se puede apagar: pasa una vez por grupo, nunca es ruido, y es
+ * el único que la persona no provoca ella misma. Ver `users` en el esquema.
+ */
+const PREFERENCIA = {
+  expense: users.notifyExpenses,
+  payment: users.notifySettlements,
+  comment: users.notifyComments,
+} as const;
+
 export function notify(userIds: string[], notification: Notification): void {
   if (userIds.length === 0) return;
+
+  // Un interruptor único obligaba a elegir entre enterarse de todo o de nada, y lo
+  // segundo es lo que acaba pasando. Se filtra por persona antes de mirar sus
+  // navegadores: quien apagó esta clase de aviso no entra en la consulta.
+  const columna = PREFERENCIA[notification.action as keyof typeof PREFERENCIA];
+  if (columna) {
+    const quieren = db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(inArray(users.id, userIds), eq(columna, true)))
+      .all()
+      .map((r) => r.id);
+    if (quieren.length === 0) return;
+    userIds = quieren;
+  }
 
   const subs = db
     .select()

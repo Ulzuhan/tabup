@@ -32,7 +32,7 @@ function decodeKey(base64url: string): ArrayBuffer {
  * whether permission was refused; the server knows whether it still has the row. Either
  * can be true without the other, and the toggle has to show what will actually happen.
  */
-export function PushToggle() {
+export function PushToggle({ variant = "menu" }: { variant?: "menu" | "row" }) {
   const t = useT();
   const [state, setState] = useState<"unavailable" | "off" | "on" | "denied" | null>(null);
   const [busy, setBusy] = useState(false);
@@ -134,6 +134,33 @@ export function PushToggle() {
     }
   };
 
+  const Icono = state === "on" ? BellOff : Bell;
+  const etiqueta = state === "on" ? t("push.turnOff") : t("push.turnOn");
+
+  // Fuera de un menú —en los ajustes— tiene que ser un botón normal: un elemento de
+  // menú suelto no es pulsable con teclado ni se anuncia como lo que es.
+  if (variant === "row") {
+    if (state === "denied") {
+      return (
+        <p className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
+          <BellOff className="size-4" />
+          {t("push.blocked")}
+        </p>
+      );
+    }
+    return (
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => (state === "on" ? turnOff() : turnOn())}
+        className="flex w-full items-center gap-2 rounded-lg px-4 py-3 text-left text-sm transition-colors hover:bg-secondary disabled:opacity-60"
+      >
+        <Icono className="size-4" />
+        {etiqueta}
+      </button>
+    );
+  }
+
   if (state === "denied") {
     return (
       <DropdownMenuItem disabled>
@@ -154,8 +181,8 @@ export function PushToggle() {
         else turnOn();
       }}
     >
-      {state === "on" ? <BellOff className="size-4" /> : <Bell className="size-4" />}
-      {state === "on" ? t("push.turnOff") : t("push.turnOn")}
+      <Icono className="size-4" />
+      {etiqueta}
     </DropdownMenuItem>
   );
 }

@@ -212,12 +212,31 @@ export function safeNext(raw: string | undefined | null): string {
  * flujo de Authentik es exactamente `.../if/flow/<slug>/` —con barra— y puede
  * llevar parámetros.
  */
+/**
+ * La página de la cuenta en el proveedor: correo, contraseña, segundo factor, sesiones.
+ *
+ * Nada de eso es de TabUp desde que la identidad está delegada, y hasta ahora la
+ * aplicación simplemente callaba: quien quisiera cambiar su contraseña tenía que saberse
+ * la dirección del proveedor de memoria. Se enlaza si quien despliega dice dónde está.
+ *
+ * Por entorno y no deducida del `PUBLIC_BASE`: la ruta es cosa de cada proveedor
+ * —Authentik la sirve en `/if/user/`— y este repositorio no se ata a ninguno.
+ */
+export function accountUrl(): string | null {
+  return externalUrl(process.env.TABUP_ACCOUNT_URL);
+}
+
 export function enrollUrl(): string | null {
-  const raw = process.env.TABUP_ENROLL_URL?.trim();
-  if (!raw) return null;
+  return externalUrl(process.env.TABUP_ENROLL_URL);
+}
+
+/** La regla común a los dos enlaces que salen de la aplicación hacia el proveedor. */
+function externalUrl(raw: string | undefined): string | null {
+  const valor = raw?.trim();
+  if (!valor) return null;
 
   try {
-    const url = new URL(raw);
+    const url = new URL(valor);
     // https, porque es un enlace donde alguien va a escribir una contraseña. El
     // loopback en http se admite por lo mismo que en el proveedor: desarrollo.
     const loopback = ["127.0.0.1", "localhost", "::1"].includes(url.hostname);

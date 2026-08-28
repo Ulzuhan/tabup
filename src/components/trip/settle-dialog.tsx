@@ -1,6 +1,8 @@
 "use client";
 
-import { ArrowDown, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { ArrowDown, Copy, Loader2 } from "lucide-react";
 import { CURRENCIES } from "@/lib/types";
 import type { Member } from "@/lib/types";
 import { MemberAvatar } from "@/components/member-avatar";
@@ -39,6 +41,7 @@ export interface PaymentDraft {
 export function SettleDialog({
   open,
   onOpenChange,
+  tripId,
   members,
   currency,
   draft,
@@ -48,6 +51,7 @@ export function SettleDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  tripId: string;
   members: Member[];
   currency: string;
   draft: PaymentDraft;
@@ -56,6 +60,33 @@ export function SettleDialog({
   onSubmit: () => void;
 }) {
   const t = useT();
+  /**
+   * Cómo cobra quien va a recibir el dinero.
+   *
+   * Hasta aquí la aplicación decía «debes 23 a Ana» y ahí soltaba a la gente: el número
+   * correcto y ninguna forma de dárselos. Se pide al elegir a quién se paga —una ruta
+   * aparte, por persona— porque es justo el momento en que hace falta y el único en que
+   * ese dato tiene por qué salir de sus ajustes.
+   */
+  // Se guarda de quién es, no solo el dato: mientras llega la respuesta de la persona
+  // nueva seguiría en pantalla la forma de cobrar de la anterior, y eso en una pantalla
+  // de pagar dinero es exactamente el fallo que no se puede permitir.
+  const [cobro, setCobro] = useState<{ memberId: string; payTo: string | null } | null>(null);
+  useEffect(() => {
+    if (!open || !draft.to) return;
+    const destino = draft.to;
+    let cancelado = false;
+    fetch(`/api/trips/${tripId}/pay-to?member=${encodeURIComponent(destino)}`)
+      .then((r) => (r.ok ? r.json() : { payTo: null }))
+      .then((d) => !cancelado && setCobro({ memberId: destino, payTo: d.payTo ?? null }))
+      .catch(() => !cancelado && setCobro({ memberId: destino, payTo: null }));
+    return () => {
+      cancelado = true;
+    };
+  }, [open, draft.to, tripId]);
+
+  const payTo = cobro?.memberId === draft.to ? cobro.payTo : null;
+
   const sameMember = draft.from === draft.to;
   const valid = draft.from && draft.to && !sameMember && parseFloat(draft.amount) > 0;
 
@@ -134,6 +165,30 @@ export function SettleDialog({
               </Select>
             </div>
           </div>
+
+          {payTo && !sameMember && (
+            <div className="rounded-xl border border-border bg-secondary/40 px-3 py-2.5">
+              <p className="text-xs text-muted-foreground">
+                {t("settle.payTo", { name: nameOf(draft.to) })}
+              </p>
+              <div className="mt-1 flex items-center gap-2">
+                <p className="min-w-0 flex-1 break-all text-sm font-medium">{payTo}</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(payTo);
+                    toast.success(t("common.copied"));
+                  }}
+                >
+                  <Copy className="size-3.5" />
+                  {t("common.copy")}
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="settle-amount">{t("settle.amount")}</Label>

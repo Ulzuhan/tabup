@@ -243,6 +243,13 @@ function migrate(sqlite: Database.Database) {
   addColumn(sqlite, "invites", "member_id", "TEXT REFERENCES members(id) ON DELETE SET NULL");
   addColumn(sqlite, "invites", "email", "TEXT");
   addColumn(sqlite, "expenses", "created_by", "TEXT REFERENCES users(id) ON DELETE SET NULL");
+  // El perfil: lo que una persona trae puesto a cada grupo nuevo, y cómo se le avisa.
+  addColumn(sqlite, "users", "emoji", "TEXT");
+  addColumn(sqlite, "users", "default_currency", "TEXT NOT NULL DEFAULT 'EUR'");
+  addColumn(sqlite, "users", "pay_to", "TEXT");
+  addColumn(sqlite, "users", "notify_expenses", "INTEGER NOT NULL DEFAULT 1");
+  addColumn(sqlite, "users", "notify_comments", "INTEGER NOT NULL DEFAULT 1");
+  addColumn(sqlite, "users", "notify_settlements", "INTEGER NOT NULL DEFAULT 1");
   addColumn(sqlite, "payments", "created_by", "TEXT REFERENCES users(id) ON DELETE SET NULL");
   addColumn(sqlite, "payments", "currency", "TEXT");
   addColumn(sqlite, "payments", "amount_base", "REAL");

@@ -55,6 +55,53 @@ export const users = sqliteTable("users", {
    */
   approvedAt: integer("approved_at"),
   /**
+   * How this person appears by default, and how they are told about things.
+   *
+   * Todo esto es de la cuenta y no del grupo, y ésa es la diferencia que faltaba: hasta
+   * ahora lo único ajustable era el alias dentro de un grupo, así que quien entraba en
+   * cinco tenía que decir cinco veces cómo se llama y aceptar cinco veces la cara que le
+   * tocó por orden de llegada. Un perfil es lo que se trae puesto a cada grupo nuevo.
+   */
+
+  /**
+   * La cara con la que se sienta en un grupo nuevo.
+   *
+   * Null significa «la que toque»: el emoji se repartía por posición
+   * (`EMOJIS[n % EMOJIS.length]`), de modo que tu cara en el grupo dependía del orden en
+   * que entraste. Sigue siendo el reparto por defecto para quien no elija.
+   */
+  emoji: text("emoji"),
+  /**
+   * La moneda con la que se abre el formulario de crear grupo.
+   *
+   * Estaba fijada a EUR en el estado del formulario, y la moneda de un grupo **no se
+   * puede cambiar después**: quien vive en pesos creaba todos sus grupos mal y no tenía
+   * arreglo salvo borrarlos. Se guarda aquí para no volver a elegirla cada vez.
+   */
+  defaultCurrency: text("default_currency").notNull().default("EUR"),
+  /**
+   * Cómo se le paga: un Bizum, un IBAN, lo que esa persona quiera escribir.
+   *
+   * Texto libre a propósito — la aplicación no valida un IBAN ni habla con ningún banco,
+   * solo enseña lo que su dueño escribió a quien va a saldar con él. Es el final que le
+   * faltaba a saldar cuentas: la app decía «debes 23 a Ana» y ahí te soltaba.
+   *
+   * Lo ve quien comparte grupo con esa persona, y solo al ir a pagarle: se pide por su
+   * propia ruta en vez de viajar en el grupo entero, para que sea un acto deliberado y
+   * no un dato que se reparte con la lista de miembros.
+   */
+  payTo: text("pay_to"),
+  /**
+   * Qué avisos quiere. Uno por clase de cosa, porque un interruptor único obliga a
+   * elegir entre enterarse de todo o de nada.
+   *
+   * «Te han metido en un grupo» no está aquí y no se puede apagar: pasa una vez por
+   * grupo, nunca es ruido, y es el único aviso que la persona no puede provocar.
+   */
+  notifyExpenses: integer("notify_expenses", { mode: "boolean" }).notNull().default(true),
+  notifyComments: integer("notify_comments", { mode: "boolean" }).notNull().default(true),
+  notifySettlements: integer("notify_settlements", { mode: "boolean" }).notNull().default(true),
+  /**
    * The `sub` claim of the Authentik account this one is tied to.
    *
    * Null on accounts that predate the move to a shared identity provider: the

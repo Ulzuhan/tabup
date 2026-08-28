@@ -27,6 +27,8 @@ export const ERROR_TEXT = {
   email_taken: "That email is already registered",
   invalid_email: "Enter a valid email address",
   name_length: "Name must be 1-80 characters",
+  invalid_emoji: "That is not one of the available emoji",
+  pay_to_long: "Payment details must be at most 140 characters",
   password_short: "Password must be at least 8 characters",
   password_long: "Password must be at most 200 characters",
   throttled: "Too many attempts, try again later",

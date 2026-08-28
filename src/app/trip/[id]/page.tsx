@@ -621,6 +621,7 @@ export default function TripPage() {
       />
 
       <SettleDialog
+        tripId={id}
         open={settleOpen}
         onOpenChange={setSettleOpen}
         members={trip.members}

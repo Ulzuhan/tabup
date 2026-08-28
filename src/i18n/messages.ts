@@ -54,6 +54,8 @@ export const es = {
     email_taken: "Ese correo ya tiene cuenta",
     invalid_email: "Ese correo no parece válido",
     name_length: "El nombre tiene que tener entre 1 y 80 caracteres",
+    invalid_emoji: "Ese emoji no es de los que hay",
+    pay_to_long: "Eso no puede pasar de 140 caracteres",
     password_short: "La contraseña tiene que tener al menos 8 caracteres",
     password_long: "La contraseña no puede pasar de 200 caracteres",
     throttled: "Demasiados intentos. Prueba dentro de un rato.",
@@ -95,6 +97,49 @@ export const es = {
     deleteConfirmEmail: "Escribe {email} para confirmar",
     deleteAction: "Borrar la cuenta",
     deleteFailed: "No se ha podido borrar la cuenta",
+  },
+
+  settings: {
+    title: "Ajustes",
+    subtitle: "Quién eres para el resto, y de qué te enteras.",
+    saved: "Guardado",
+
+    you: "Tú",
+    name: "Tu nombre",
+    nameHint:
+      "Con el que entras en un grupo nuevo. Dentro de cada grupo puedes llamarte de otra forma, y eso no cambia éste.",
+    emoji: "Tu cara",
+    emojiHint:
+      "Te acompaña a los grupos nuevos. Si en uno ya la lleva otra persona, se te da otra: dos columnas iguales no se distinguen de un vistazo.",
+    emojiAny: "La que toque",
+    email: "Correo",
+    emailHint: "El correo, la contraseña y el segundo factor son del proveedor de identidad.",
+    providerAccount: "Tu cuenta en el proveedor",
+
+    preferences: "Preferencias",
+    defaultCurrency: "Moneda por defecto",
+    defaultCurrencyHint:
+      "Con la que se abre un grupo nuevo. Ojo: la de un grupo no se puede cambiar después, porque sus gastos ya están convertidos a ella.",
+    language: "Idioma",
+
+    payTo: "Cómo te pagan",
+    payToLabel: "Bizum, IBAN o lo que prefieras",
+    payToHint:
+      "Lo ve quien vaya a saldar contigo, y solo en ese momento. Déjalo vacío para no enseñar nada.",
+    payToPlaceholder: "Bizum 600 000 000",
+
+    notifications: "Avisos",
+    notificationsHint: "Primero el permiso del navegador; después, de qué quieres enterarte.",
+    notifyExpenses: "Gastos nuevos",
+    notifyComments: "Comentarios",
+    notifySettlements: "Pagos y liquidaciones",
+    notifyJoinedAlways:
+      "Que te metan en un grupo se avisa siempre: pasa una vez y no lo provocas tú.",
+
+    data: "Tus datos",
+    export: "Descargar todo lo mío",
+    exportHint: "Un fichero con tus grupos, sus gastos y pagos, y tus gastos fijos.",
+    exportAction: "Descargar",
   },
 
   home: {
@@ -235,6 +280,7 @@ export const es = {
     to: "Para",
     whoPaid: "Quién pagó",
     whoReceived: "Quién recibió",
+    payTo: "Cómo cobra {name}",
     amount: "Importe",
     note: "Nota",
     optional: "opcional",
@@ -630,6 +676,8 @@ export const en: Messages = {
     email_taken: "That email already has an account",
     invalid_email: "That email does not look right",
     name_length: "The name has to be 1 to 80 characters",
+    invalid_emoji: "That emoji is not one of the available ones",
+    pay_to_long: "That cannot be longer than 140 characters",
     password_short: "The password has to be at least 8 characters",
     password_long: "The password cannot be over 200 characters",
     throttled: "Too many attempts. Try again in a while.",
@@ -669,6 +717,49 @@ export const en: Messages = {
     deleteConfirmEmail: "Type {email} to confirm",
     deleteAction: "Delete the account",
     deleteFailed: "The account could not be deleted",
+  },
+
+  settings: {
+    title: "Settings",
+    subtitle: "Who you are to everyone else, and what you hear about.",
+    saved: "Saved",
+
+    you: "You",
+    name: "Your name",
+    nameHint:
+      "The one you join a new group with. Inside a group you can be called something else, and that does not change this one.",
+    emoji: "Your face",
+    emojiHint:
+      "It comes with you to new groups. If somebody there already has it you get another one: two identical columns cannot be told apart at a glance.",
+    emojiAny: "Whichever",
+    email: "Email",
+    emailHint: "Your email, password and second factor belong to the identity provider.",
+    providerAccount: "Your account at the provider",
+
+    preferences: "Preferences",
+    defaultCurrency: "Default currency",
+    defaultCurrencyHint:
+      "What a new group opens with. Note a group's own currency cannot be changed afterwards, because its expenses are already converted into it.",
+    language: "Language",
+
+    payTo: "How you get paid",
+    payToLabel: "Bank transfer details, or whatever you prefer",
+    payToHint:
+      "Shown to whoever is settling up with you, and only then. Leave it empty to show nothing.",
+    payToPlaceholder: "ES12 3456 7890 1234 5678",
+
+    notifications: "Notifications",
+    notificationsHint: "First the browser's permission, then what you want to hear about.",
+    notifyExpenses: "New expenses",
+    notifyComments: "Comments",
+    notifySettlements: "Payments and settling up",
+    notifyJoinedAlways:
+      "Being added to a group is always announced: it happens once and you did not cause it.",
+
+    data: "Your data",
+    export: "Download everything of mine",
+    exportHint: "One file with your groups, their expenses and payments, and your fixed costs.",
+    exportAction: "Download",
   },
 
   home: {
@@ -809,6 +900,7 @@ export const en: Messages = {
     to: "To",
     whoPaid: "Who paid",
     whoReceived: "Who received",
+    payTo: "How {name} gets paid",
     amount: "Amount",
     note: "Note",
     optional: "optional",

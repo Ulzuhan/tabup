@@ -38,7 +38,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Ten suites, each against its own server and its own empty database — see the
+      # Eleven suites, each against its own server and its own empty database — see the
       # script for why one shared server does not work. They talk to the Frankfurter rate
       # API for the currency assertions, which is the one thing here that can fail for
       # reasons that have nothing to do with this code.

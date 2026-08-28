@@ -316,6 +316,29 @@ export function memberEmails(tripId: string): Record<string, string> {
   return Object.fromEntries(rows.map((r) => [r.memberId, r.email]));
 }
 
+/**
+ * Cómo se le paga a una persona del grupo, si lo ha publicado.
+ *
+ * Por su propia ruta y no dentro del grupo, a propósito: es un dato que solo hace falta
+ * en el momento de pagarle, y meterlo en la lista de miembros lo repartiría entre todos
+ * cada vez que alguien abre el grupo. Aquí se pide por una persona concreta, y solo
+ * contesta a quien comparte grupo con ella —eso lo comprueba la ruta.
+ *
+ * Null cuando esa columna no es de ninguna cuenta (un nombre a secas), cuando la cuenta
+ * se fue, o cuando esa persona no ha escrito nada: las tres cosas significan lo mismo
+ * para quien pregunta, que es «no hay nada que enseñar».
+ */
+export function payToFor(tripId: string, memberId: string): string | null {
+  if (!isValidId(tripId) || !isValidId(memberId)) return null;
+  const fila = db
+    .select({ payTo: users.payTo })
+    .from(members)
+    .innerJoin(users, eq(members.userId, users.id))
+    .where(and(eq(members.id, memberId), eq(members.tripId, tripId)))
+    .get();
+  return fila?.payTo ?? null;
+}
+
 /** How many trips an account owns; the free plan is capped on this. */
 export function ownedTripCount(userId: string): number {
   return db.select().from(trips).where(eq(trips.ownerId, userId)).all().length;
@@ -666,6 +689,13 @@ export async function createTrip(input: CreateTripInput): Promise<Trip> {
   const id = generateId();
   const now = Date.now();
 
+  // La cara del dueño, que es el primer asiento del grupo: la suya si la eligió — aquí
+  // no hay nadie con quien chocar todavía — y si no, la primera de la lista, como antes.
+  const emojiDueno = input.ownerId
+    ? db.select({ emoji: users.emoji }).from(users).where(eq(users.id, input.ownerId)).get()
+        ?.emoji || EMOJIS[0]
+    : EMOJIS[0];
+
   db.transaction((tx) => {
     tx.insert(trips)
       .values({
@@ -687,7 +717,7 @@ export async function createTrip(input: CreateTripInput): Promise<Trip> {
         id: generateId(),
         tripId: id,
         name: input.ownerName,
-        emoji: EMOJIS[0],
+        emoji: emojiDueno,
         position: 0,
         userId: input.ownerId,
       })
@@ -1229,6 +1259,33 @@ function stillInTrip(tripId: string, userId: string): boolean {
   );
 }
 
+/**
+ * La cara con la que una cuenta se sienta en un grupo.
+ *
+ * Se repartía por el orden de llegada —`EMOJIS[n % EMOJIS.length]`—, así que tu cara
+ * dependía de si entraste el tercero o el cuarto. Ahora manda la que esa persona haya
+ * elegido en su perfil; si no ha elegido ninguna, o si en este grupo ya la lleva otro,
+ * se vuelve al reparto por posición, que es lo que garantiza que dos columnas nunca se
+ * confundan de un vistazo.
+ */
+function emojiParaAsiento(tripId: string, userId: string, posicion: number): string {
+  const elegido = db
+    .select({ emoji: users.emoji })
+    .from(users)
+    .where(eq(users.id, userId))
+    .get()?.emoji;
+
+  if (elegido) {
+    const ocupado = db
+      .select({ id: members.id })
+      .from(members)
+      .where(and(eq(members.tripId, tripId), eq(members.emoji, elegido)))
+      .get();
+    if (!ocupado) return elegido;
+  }
+  return EMOJIS[posicion % EMOJIS.length];
+}
+
 export async function addMember(
   tripId: string,
   name: string,
@@ -1276,7 +1333,7 @@ export async function seatUser(
   let name = base;
   for (let n = 2; memberNameTaken(tripId, name); n++) name = `${base.slice(0, 46)} ${n}`;
 
-  return addMember(tripId, name, EMOJIS[count % EMOJIS.length], user.id);
+  return addMember(tripId, name, emojiParaAsiento(tripId, user.id, count), user.id);
 }
 
 // ─── Members and accounts ────────────────────────────────────────────

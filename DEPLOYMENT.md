@@ -8,6 +8,7 @@ TabUp conserva datos duraderos en SQLite y fotos de recibos en disco. Debe ejecu
 2. Ejecuta `docker compose up -d --build`.
 3. Publica únicamente el proxy TLS; Compose enlaza la aplicación a `127.0.0.1:3457`.
 4. Con proveedor: `TABUP_ENROLL_URL` decide dónde se pide cuenta. Sin fijarla no se ofrece el botón —que es lo correcto si tu proveedor no tiene alta autoservicio— y con ella aparece en la portada y en cada invitación.
+5. `TABUP_ACCOUNT_URL` es la página de la cuenta en tu proveedor (Authentik: `/if/user/`). Correo, contraseña y segundo factor son suyos; sin esta variable la aplicación no enlaza a ninguna parte y quien quiera cambiar su contraseña tiene que saberse la dirección de memoria.
 
 El contenedor corre como UID 10001, sin capacidades, con raíz de solo lectura y un volumen escribible para la base y los recibos. El esquema se crea o completa solo al arrancar; nunca destruye una base existente.
 

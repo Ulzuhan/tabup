@@ -27,7 +27,7 @@ DB="$(mktemp -d)/ci.db"
 DATA_DIR="$(mktemp -d)"
 LOG="$(mktemp)"
 
-ALL=(api money auth members social races admin recurring receipts account)
+ALL=(api money auth members social races admin recurring receipts account profile)
 SUITES=("${@:-${ALL[@]}}")
 [ $# -gt 0 ] && SUITES=("$@")
 
