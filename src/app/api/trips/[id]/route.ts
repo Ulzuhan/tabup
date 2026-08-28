@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fail } from "@/lib/api-error";
+import { isSameOriginMutation } from "@/lib/request-origin";
 import { jsonBody } from "@/lib/body";
 import { eq } from "drizzle-orm";
 import {
@@ -125,7 +126,14 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/trips/[
   });
 }
 
-export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/trips/[id]">) {
+export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/trips/[id]">) {
+  // La misma regla que en `invite`, y por el mismo motivo: esta ruta no lee cuerpo, así
+  // que la exigencia de `application/json` —que es lo que obliga al navegador a pedir
+  // permiso antes de escribir aquí desde otro sitio— no la cubre. Hoy no era explotable:
+  // DELETE no es un método simple y el navegador lo preflight-a igualmente, y nada
+  // contesta ese preflight. Pero eso es una defensa de otro, no de esta casa, y la regla
+  // de la casa es que toda mutación pase por una de las dos comprobaciones.
+  if (!isSameOriginMutation(request)) return fail("cross_origin", 403);
   const { id } = await ctx.params;
   const auth = await authorizeTrip(id, "own");
   if (!auth.ok) return auth.response;

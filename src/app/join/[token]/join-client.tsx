@@ -20,6 +20,7 @@ import { clearSessionCache } from "@/lib/session-cache";
 /** Ya hay sesión: un toque y dentro. */
 export function JoinButton({ token, userName }: { token: string; userName: string }) {
   const t = useT();
+  const serverError = useServerError();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,9 +37,13 @@ export function JoinButton({ token, userName }: { token: string; userName: strin
       });
       const data = await res.json();
       if (!res.ok) {
-        // La invitación ha caducado entre que se pintó la página y se pulsó.
-        // Recargar deja que el servidor cuente lo que pasa, que es su trabajo.
-        router.refresh();
+        // Dos casos, y el servidor contesta lo mismo a los dos a propósito: la
+        // invitación ha caducado, o a quien pulsa lo sacaron de este grupo y su
+        // enlace de siempre ya no lo devuelve dentro. Se dice y se para. Recargar
+        // no valía: la invitación sigue viva, así que la página volvería a pintar
+        // el mismo botón y el mismo error, en bucle.
+        setError(serverError(data, "join.expired"));
+        setBusy(false);
         return;
       }
       // Igual que en la pantalla de entrada: este navegador pudo ser de otra persona.

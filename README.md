@@ -473,13 +473,13 @@ One at a time, against a server you are already running:
 TABUP_DB=/tmp/test.db PORT=3999 TABUP_REGISTRATION=open npm run start &
 export BASE=http://127.0.0.1:3999
 
-npm run test:api        # 34 — splitting, balances, validation, concurrency, page structure
+npm run test:api        # 38 — splitting, balances, validation, concurrency, page structure, CSRF
 npm run test:auth       # 92 — accounts, ownership, who may change what, invitations
 npm run test:money      # 55 — currencies, rates, whole cents, settling, CSV
 npm run test:members    # 64 — members and accounts, and isolation between trips
 npm run test:social     # 69 — balances, authorship, comments, the feed, kinds, push
 npm run test:races      # 18 — two people doing the same thing at the same instant
-npm run test:account    # 24 — closing an account, and what it does to everyone else
+npm run test:account    # 26 — closing an account, and what it does to everyone else
 npm run test:recurring  # 17 — fixed costs; pure functions, no server needed
 ```
 
@@ -718,6 +718,14 @@ activity feed goes null — what they wrote stays and the name on it stops point
 Deliberately **not** refused over a balance. Being owed twelve euros is a good reason to
 warn somebody and a bad reason to tell them they may not leave.
 
+**The admin role does not leave with them either.** It is handed out exactly once — to
+the first account that ever exists — and there is no way to appoint another from inside
+the app, so an admin who closed their account left the instance without one for good, and
+with it the server error log out of reach. It passes to the oldest remaining account, by
+the same reasoning that hands over a group: whoever has been here longest is the least
+surprising person to find themselves holding it. If no account remains there is nothing to
+do and nothing to fix — the next one created is the first again, and is born an admin.
+
 ## Accessibility
 
 Audited in a real browser rather than by reading, which is the only way to find out that a
@@ -830,10 +838,15 @@ machine itself, but both are now the fallback rather than the procedure.
   injected script therefore cannot load code from another host or post expenses to one.
 
 There is no synchronizer CSRF token. JSON writes require `application/json`, forcing a
-CORS preflight outside this origin; the three simple requests (multipart receipt upload,
-logout and minting an invite) additionally reject Fetch Metadata from anything but the
-same origin and verify `Origin` when present, against the `Host` the tunnel sets rather
-than the `X-Forwarded-Host` a caller can write. This distinction matters between sibling applications on the same
+CORS preflight outside this origin; the writes that carry **no body at all** — multipart
+receipt upload, logout, minting an invite and deleting a group — cannot rely on that, so
+they additionally reject Fetch Metadata from anything but the same origin and verify
+`Origin` when present, against the `Host` the tunnel sets rather than the
+`X-Forwarded-Host` a caller can write. Deleting a group was the odd one out until now: it
+was safe in practice, because a cross-origin `DELETE` is never a simple request and the
+preflight goes unanswered, but that is somebody else's defence rather than this
+application's, and the rule here is that every mutation passes one of the two checks.
+`npm run test:api` is what keeps that true. This distinction matters between sibling applications on the same
 parent domain, where `sameSite=lax` alone still sends the session cookie.
 
 Not covered — **by TabUp's own accounts**: there is no email verification, and losing a

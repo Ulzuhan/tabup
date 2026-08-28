@@ -36,8 +36,10 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: st
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  // Read access is enough: this is about identity, not about writing anything of
-  // consequence. A read-only guest is still a person the trip may owe money to.
+  // Estar dentro basta: esto va de identidad, no de escribir nada de consecuencia.
+  // (Decía "un invitado de solo lectura sigue siendo alguien a quien el grupo puede
+  // deber dinero", y ese invitado no existe: los niveles de solo lectura se fueron con
+  // los roles. Quien está dentro, escribe.)
   const auth = await authorizeTrip(id, "read");
   if (!auth.ok) return auth.response;
   if (!auth.user) {

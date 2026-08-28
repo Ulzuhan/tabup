@@ -166,6 +166,16 @@ async function main() {
   const after = await bea(`/api/trips/${shared.id}`);
   check("the group still opens", after.status, 200);
   check("and Bea is running it now", after.body.access, "owner");
+
+  /**
+   * Ana era la administradora por haber sido la primera cuenta, y ese papel se
+   * repartía una sola vez: sin esto, cerrar su cuenta dejaba la instancia sin
+   * administrador para siempre —no hay forma de nombrar a otro desde dentro— y con
+   * ella el registro de errores del servidor fuera de alcance. Pasa a la cuenta más
+   * antigua que queda, que es Bea por el mismo criterio que el grupo.
+   */
+  check("the admin role went with the group, not with her", (await bea("/api/auth/me")).body.user.admin, true);
+  check("and only to one of them", (await caro("/api/auth/me")).body.user.admin, false);
   check("Caro can still open it too", (await caro(`/api/trips/${shared.id}`)).status, 200);
 
   const anaColumn = after.body.members.find((m) => m.name === "Ana");

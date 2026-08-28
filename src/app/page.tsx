@@ -1,5 +1,5 @@
 import { cookies, headers } from "next/headers";
-import { getCurrentUser, registrationOpen } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { enrollUrl, oidcConfigured } from "@/lib/oidc";
 import { LOCALE_COOKIE, isLocale, localeFromHeader } from "@/i18n/config";
 import { Landing } from "@/components/landing";
@@ -29,10 +29,6 @@ export default async function Home() {
   // así que cualquier otra instancia mandaba a sus visitantes a pedir cuenta en casa
   // ajena.
   return (
-    <Landing
-      locale={locale}
-      canRegister={registrationOpen()}
-      enrollUrl={oidcConfigured() ? enrollUrl() : "/login?new=1"}
-    />
+    <Landing locale={locale} enrollUrl={oidcConfigured() ? enrollUrl() : "/login?new=1"} />
   );
 }

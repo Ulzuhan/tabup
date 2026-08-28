@@ -1177,7 +1177,41 @@ export async function deleteAccount(
     .where(eq(members.userId, userId))
     .run().changes;
 
+  // Leído antes de borrar, por lo mismo.
+  const wasAdmin =
+    db.select({ role: users.role }).from(users).where(eq(users.id, userId)).get()?.role === "admin";
+
   db.delete(users).where(eq(users.id, userId)).run();
+
+  /**
+   * El papel de administrador tampoco se va con la cuenta.
+   *
+   * Es el mismo razonamiento que el traspaso de los grupos, dos pantallas más arriba: un
+   * papel que solo tiene una persona convierte a esa persona en un punto único de fallo.
+   * Y aquí no había salida, porque el papel se reparte una sola vez —la primera cuenta
+   * que existe— y no hay ninguna forma de nombrar a otro desde dentro de la aplicación.
+   * Si quien lo tenía cerraba su cuenta, la instancia se quedaba sin administrador para
+   * siempre y con ello sin poder mirar los fallos del servidor, que es lo único que esa
+   * pantalla enseña cuando la identidad la lleva un proveedor.
+   *
+   * Pasa a la cuenta más antigua que quede, por el mismo criterio que el grupo: quien
+   * lleva más tiempo es a quien menos sorprende encontrárselo. Si no queda ninguna no
+   * hay nada que hacer, y tampoco hace falta: la siguiente cuenta que se cree será la
+   * primera otra vez, y nace administradora.
+   */
+  if (wasAdmin) {
+    const otroAdmin = db.select({ id: users.id }).from(users).where(eq(users.role, "admin")).get();
+    if (!otroAdmin) {
+      const heredero = db
+        .select({ id: users.id })
+        .from(users)
+        .orderBy(asc(users.createdAt))
+        .get();
+      if (heredero) {
+        db.update(users).set({ role: "admin" }).where(eq(users.id, heredero.id)).run();
+      }
+    }
+  }
 
   return { handedOver, tripsDeleted, seatsKept };
 }

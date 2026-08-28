@@ -271,7 +271,11 @@ async function main() {
    * después, al leer un campo de la nada.
    */
   console.log("\nCuerpos que no se entienden");
-  const suyo = await newTrip();
+  // `.body`, no el sobre: `newTrip()` devuelve `{status, body}`, así que `suyo.id` era
+  // `undefined` y estas rutas se estaban probando contra `/api/trips/undefined`. Todas
+  // contestaban 400 por el identificador —nunca 500— así que el recuento salía a cero
+  // sin haber llegado a ninguno de los siete manejadores que dice comprobar.
+  const suyo = (await newTrip()).body;
   const rutas = [
     ["POST", "/api/trips"],
     ["PATCH", `/api/trips/${suyo.id}`],
@@ -342,6 +346,38 @@ async function main() {
   // caracteres, y rechazarlos rompería la aplicación sin arreglar nada.
   check("con application/json sí escribe", await conTipo("application/json"), 200);
   check("y con el juego de caracteres detrás, también", await conTipo("application/json; charset=utf-8"), 200);
+
+  /**
+   * Y las que no llevan cuerpo, por la otra puerta.
+   *
+   * La exigencia de `application/json` no cubre a las rutas que no leen nada: no hay
+   * cuerpo que anunciar, así que una página hermana —mismo dominio, misma cookie— podía
+   * lanzarles una petición simple y el navegador la dejaba salir. Pasó con las
+   * invitaciones: devolvía 200 y creaba una para un grupo ajeno. Ésas llevan la
+   * comprobación de origen, y esto es lo que impide que se caiga sin que nadie lo note.
+   *
+   * `sec-fetch-site: same-site` es exactamente lo que manda el navegador desde un
+   * subdominio hermano, que es el caso que importa aquí.
+   */
+  console.log("\nEscrituras sin cuerpo, desde otro sitio");
+  const desdeFuera = async (metodo, ruta) =>
+    (
+      await api(ruta, {
+        method: metodo,
+        headers: { "sec-fetch-site": "same-site", origin: "https://hermano.example" },
+      })
+    ).status;
+  const sinCuerpo = [
+    ["POST", `/api/trips/${suyo.id}/invite`],
+    ["DELETE", `/api/trips/${suyo.id}`],
+    ["POST", "/api/auth/logout"],
+  ];
+  for (const [metodo, ruta] of sinCuerpo) {
+    check(`${metodo} ${ruta.replace(suyo.id, "<grupo>")} desde un hermano se rechaza`, await desdeFuera(metodo, ruta), 403);
+  }
+  // Y desde aquí sigue funcionando: el grupo se borra de verdad, que es la mitad que
+  // una comprobación de origen mal puesta rompe en silencio.
+  check("y desde el propio sitio sí borra", (await api(`/api/trips/${suyo.id}`, { method: "DELETE" })).status, 200);
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);

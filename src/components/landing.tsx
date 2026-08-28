@@ -28,7 +28,6 @@ export function Landing({
   enrollUrl,
 }: {
   locale: Locale;
-  canRegister?: boolean;
   /**
    * Dónde se pide cuenta. Con proveedor, su flujo de alta (`TABUP_ENROLL_URL`);
    * sin él, el formulario propio. Lo decide el servidor, que es quien sabe si hay
