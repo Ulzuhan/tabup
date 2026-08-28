@@ -21,7 +21,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/join/", "/reset/", "/trip/", "/admin", "/api/", "/recurring"],
+      disallow: ["/join/", "/reset/", "/trip/", "/admin", "/api/", "/recurring", "/settings"],
     },
     ...(base ? { sitemap: `${base}/sitemap.xml`, host: base } : {}),
   };
