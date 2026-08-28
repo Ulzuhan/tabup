@@ -15,13 +15,17 @@ import {
 } from "@/lib/auth";
 import { db, users } from "@/db";
 import { logError } from "@/lib/errors";
-import { oidcConfigured } from "@/lib/oidc";
 
 /**
  * Accounts, for the admin.
  *
  * Every handler re-checks the role rather than trusting that the UI hid the page: the
  * only thing standing between a normal account and approving itself is this check.
+ */
+/**
+ * Y con un proveedor de identidad no lo es nadie, así que estas dos rutas quedan
+ * cerradas para todo el mundo por la misma puerta: las cuentas son del proveedor y no
+ * hay nada que aprobar ni ninguna contraseña que reponer desde aquí. Ver `isAdmin`.
  */
 async function requireAdmin() {
   const user = await getCurrentUser();
@@ -30,33 +34,16 @@ async function requireAdmin() {
 
 const snapshot = () => ({ pending: pendingUsers(), users: approvedUsers() });
 
-/**
- * Con un proveedor de identidad, aquí no se administran cuentas.
- *
- * Quién puede entrar, quién deja de poder y quién recupera su contraseña son
- * decisiones del proveedor, y esta era la última puerta por la que se podían tomar
- * desde dentro de TabUp: aprobar y rechazar seguían abiertos aunque el formulario de
- * registro llevara meses devolviendo 404. Una cuenta local aprobada aquí tampoco
- * podría entrar —el login también es 404 con proveedor—, así que lo único que hacía
- * era sostener una pantalla que decía administrar algo que no administra.
- *
- * 403 y no 404: la ruta existe, y quien la llama es el administrador. No hay nada
- * que ocultarle, solo un sitio distinto al que ir.
- */
-const identityIsElsewhere = () => oidcConfigured();
-
 export async function GET() {
   if (!(await requireAdmin())) {
     return fail("not_allowed", 403);
   }
-  if (identityIsElsewhere()) return fail("not_allowed", 403);
   return NextResponse.json(snapshot());
 }
 
 export async function POST(request: NextRequest) {
   const admin = await requireAdmin();
   if (!admin) return fail("not_allowed", 403);
-  if (identityIsElsewhere()) return fail("not_allowed", 403);
 
   // `null` es JSON válido: pasaba el catch y reventaba al leer un campo.
   const body: { id?: string; action?: string; password?: string } | null = await jsonBody(request);

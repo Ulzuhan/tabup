@@ -410,10 +410,6 @@ export const es = {
   admin: {
     title: "Administración",
     subtitle: "Quién entra, quién es quién y qué se ha roto.",
-    // Con proveedor solo queda lo tercero: lo demás lo lleva él.
-    subtitleOidc: "Qué se ha roto sin que nadie estuviera mirando.",
-    identityElsewhere:
-      "Las cuentas, las altas y las contraseñas se gestionan en el proveedor de identidad, no aquí.",
     requests: "Solicitudes de cuenta",
     requestsHint: "Gente que ha pedido entrar en este servidor.",
     none: "No hay solicitudes pendientes",
@@ -997,9 +993,6 @@ export const en: Messages = {
   admin: {
     title: "Administration",
     subtitle: "Who gets in, who is who, and what has broken.",
-    subtitleOidc: "What has broken while nobody was watching.",
-    identityElsewhere:
-      "Accounts, sign-ups and passwords are managed in the identity provider, not here.",
     requests: "Account requests",
     requestsHint: "People who have asked to join this server.",
     none: "No pending requests",

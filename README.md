@@ -405,7 +405,8 @@ the provider's business and these values are not consulted.
 
 The very first account is always allowed regardless — otherwise a fresh install could
 never be set up — and it becomes the **admin**, who is the only one who can see or act
-on account requests.
+on account requests. That role exists for this and nothing else, so **with a provider
+configured there is no admin at all** — see [Operations](#operations).
 
 Which cuts the other way: **a fresh install exposed to the internet before anyone has
 registered belongs to whoever arrives first.** Create the first account before putting
@@ -718,13 +719,14 @@ activity feed goes null — what they wrote stays and the name on it stops point
 Deliberately **not** refused over a balance. Being owed twelve euros is a good reason to
 warn somebody and a bad reason to tell them they may not leave.
 
-**The admin role does not leave with them either.** It is handed out exactly once — to
-the first account that ever exists — and there is no way to appoint another from inside
-the app, so an admin who closed their account left the instance without one for good, and
-with it the server error log out of reach. It passes to the oldest remaining account, by
-the same reasoning that hands over a group: whoever has been here longest is the least
-surprising person to find themselves holding it. If no account remains there is nothing to
-do and nothing to fix — the next one created is the first again, and is born an admin.
+**With local accounts, the admin role does not leave with them either.** It is handed out
+exactly once — to the first account that ever exists — and there is no way to appoint
+another from inside the app, so an admin who closed their account left the instance
+without one for good, and with it the approvals queue unattended. It passes to the oldest
+remaining account, by the same reasoning that hands over a group: whoever has been here
+longest is the least surprising person to find themselves holding it. If no account
+remains there is nothing to do and nothing to fix — the next one created is the first
+again, and is born an admin. With a provider none of this arises: there is no admin.
 
 ## Accessibility
 
@@ -769,11 +771,22 @@ starting it again.
 
 **The admin panel holds three things** — who is waiting to be let in, who is already in,
 and what has failed on the server while nobody was watching — and **with an identity
-provider only the third is there**. The first two were of the local-accounts era: with a
-provider there are no requests to approve here and nothing that can be done to an account
-from here, so `/api/admin/users` refuses and the panel says where the accounts live
-instead of showing a copy of them it cannot act on. `scripts/reset-password.mjs` also
-stops meaning anything, since local sign-in answers 404.
+provider it does not exist at all**. Not emptied: absent. The role is handed out for one
+reason, to let people in, and delegating identity takes that reason away entirely; what
+would be left is an account with authority over other people because it registered first,
+which is exactly what a shared-expense app does not have. Nobody administers anybody on
+Splitwise either. The only authority this model recognises over other people is a group's
+owner over their own group, and that is not an account role — it goes per group.
+
+So `isAdmin` is false whenever a provider is configured, and that one line closes the
+page, its menu entry and both `/api/admin` routes at once. `scripts/reset-password.mjs`
+stops meaning anything too, since local sign-in answers 404.
+
+Nothing is lost by it: **server failures also go to `console.error`**, which is the
+container log — where whoever runs the machine already looks — and they keep accruing in
+`error_log`, which unlike the log does not rotate. If an operator-facing view of that is
+ever wanted, the honest way to gate it is a group claim from the provider, not a role
+handed to whoever arrived first.
 
 Everything below is about the local-accounts mode.
 

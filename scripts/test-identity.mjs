@@ -213,25 +213,31 @@ async function provider() {
   check("which names no group", unknown.html.includes(tripName), false);
   check("and offers no way in", unknown.html.includes("/api/auth/oidc"), false);
 
-  // ── El panel de administración ────────────────────────────────────
-  // La sesión es la misma de la fase anterior: la sesión vive en la base y la base no
-  // ha cambiado. Aquí no se podría abrir una, que es justo el sentido de delegar.
+  // ── Administrar la instancia ──────────────────────────────────────
+  //
+  // No hay quien la administre, y ésa es la comprobación. La cuenta de abajo se
+  // registró la primera y por eso lleva `role: admin` en la base — la sesión sobrevive
+  // al cambio de servidor porque vive ahí— pero con la identidad delegada ese papel no
+  // se reparte: dejar entrar a la gente, que era su único cometido, lo hace el
+  // proveedor. Una aplicación de gastos compartidos no tiene usuarios con mando sobre
+  // otros; el único mando es el de cada grupo sobre el suyo, y ése va por grupo.
   const admin = client(adminCookie);
-  check("the admin is still signed in across the change", (await admin("/api/auth/me")).body.user.admin, true);
-  check("but the accounts list is the provider's business now", (await admin("/api/admin/users")).status, 403);
+  const me = await admin("/api/auth/me");
+  check("the session survives the change of server", me.body.user?.name, "Anfitriona");
+  check("but nobody administers this instance", me.body.user.admin, false);
+  check("the accounts list is nobody's to read", (await admin("/api/admin/users")).status, 403);
   check(
-    "and so is approving anybody",
+    "nor is approving anybody",
     (await admin("/api/admin/users", {
       method: "POST",
       body: JSON.stringify({ id: "cualquiera", action: "approve" }),
     })).status,
     403
   );
-  // Lo que sí queda: los fallos del servidor, que no son de nadie más.
-  check("the error log stays, which is what the panel is for now", (await admin("/api/admin/errors")).status, 200);
-  // Sin cookie de administrador la página no existe, y eso no cambia: se pide con la
-  // sesión puesta, que es lo que se está comprobando que sigue sirviendo para algo.
-  check("and the page still opens for the admin", (await page("/admin", adminCookie)).status, 200);
+  // El registro de errores tampoco: los fallos van también a `console.error`, o sea al
+  // log del contenedor, que es donde mira quien opera la máquina.
+  check("and the error log is not a user-facing screen here", (await admin("/api/admin/errors")).status, 403);
+  check("the panel does not exist, even for them", (await page("/admin", adminCookie)).status, 404);
 
   // ── Cerrar la propia cuenta ───────────────────────────────────────
   const doomed = client(doomedCookie);

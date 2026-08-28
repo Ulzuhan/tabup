@@ -23,9 +23,7 @@ export async function GET() {
   return NextResponse.json({
     user: { ...publicUser(user), admin: isAdmin(user) },
     // Surfaced here so the header can badge the menu without a second request.
-    // Con proveedor no hay nada que aprobar aquí y la sección no se pinta: un aviso
-    // sobre el menú llevaría a una pantalla que ya no tiene dónde llevarlo.
-    pendingApprovals: isAdmin(user) && !oidcConfigured() ? pendingUsers().length : 0,
+    pendingApprovals: isAdmin(user) ? pendingUsers().length : 0,
     usage: {
       trips: ownedTripCount(user.id),
       // null means no cap, which is the default.

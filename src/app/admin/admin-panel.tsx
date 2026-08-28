@@ -48,15 +48,14 @@ interface ServerError {
  * —con la forma de darle una contraseña nueva cuando pierde la suya— y qué ha fallado
  * en el servidor sin que nadie estuviera mirando.
  *
- * **Con un proveedor de identidad solo queda la tercera.** Las dos primeras eran de la
- * era de las cuentas locales: con proveedor, ni hay solicitudes que aprobar aquí ni se
- * puede hacer nada sobre las cuentas, así que enseñarlas era prometer un mando que no
- * existe. Quien administra va al proveedor, y esta pantalla lo dice.
+ * **Con un proveedor de identidad esta pantalla no existe.** No es que se vacíe: es que
+ * el papel de administrador no se reparte, porque su único cometido —dejar entrar a la
+ * gente— pasa a ser del proveedor. Ver `isAdmin`.
  *
  * Reachable only from the admin's own menu, and every API call re-checks the role:
  * hiding a page is not access control.
  */
-export function AdminPanel({ localAuth }: { localAuth: boolean }) {
+export function AdminPanel() {
   const t = useT();
   const serverError = useServerError();
   const locale = useIntlLocale();
@@ -71,32 +70,22 @@ export function AdminPanel({ localAuth }: { localAuth: boolean }) {
   const [resetLink, setResetLink] = useState<{ url: string; email: string } | null>(null);
 
   const load = useCallback(async () => {
-    // Con proveedor de identidad no se pide la lista de cuentas: ese endpoint
-    // responde 403 —las cuentas son del proveedor— y pedirlo igualmente dejaría la
-    // pantalla entera en "algo ha ido mal", incluidos los errores del servidor, que
-    // es lo único que esta página sigue teniendo que enseñar.
     const [usersRes, errorsRes] = await Promise.all([
-      localAuth ? fetch("/api/admin/users").catch(() => null) : Promise.resolve(null),
+      fetch("/api/admin/users").catch(() => null),
       fetch("/api/admin/errors").catch(() => null),
     ]);
 
-    if (localAuth && !usersRes?.ok) {
-      setAllowed(false);
-      return;
-    }
-    if (!localAuth && !errorsRes?.ok) {
+    if (!usersRes?.ok) {
       setAllowed(false);
       return;
     }
 
-    if (usersRes?.ok) {
-      const data = await usersRes.json();
-      setPending(data.pending ?? []);
-      setAccounts(data.users ?? []);
-    }
+    const data = await usersRes.json();
     setAllowed(true);
+    setPending(data.pending ?? []);
+    setAccounts(data.users ?? []);
     if (errorsRes?.ok) setErrors((await errorsRes.json()).errors ?? []);
-  }, [localAuth]);
+  }, []);
 
   useEffect(() => {
     Promise.resolve().then(load);
@@ -194,9 +183,7 @@ export function AdminPanel({ localAuth }: { localAuth: boolean }) {
       </Link>
 
       <h1 className="text-xl font-semibold tracking-tight">{t("admin.title")}</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {t(localAuth ? "admin.subtitle" : "admin.subtitleOidc")}
-      </p>
+      <p className="mt-1 text-sm text-muted-foreground">{t("admin.subtitle")}</p>
 
       {allowed === null ? (
         <div className="mt-8 space-y-3">
@@ -210,11 +197,6 @@ export function AdminPanel({ localAuth }: { localAuth: boolean }) {
       ) : (
         <div className="mt-8 space-y-10">
           {/* ── Account requests ──────────────────────────────────────── */}
-          {/* Solo cuando las cuentas son de TabUp. Con un proveedor de identidad no
-              hay solicitudes que aprobar aquí —quien puede entrar lo decide él— y
-              esta sección era una lista vacía para siempre: mobiliario que hacía
-              creer que las altas se gestionan en esta pantalla. */}
-          {localAuth && (
           <section>
             <SectionHeading title={t("admin.requests")} hint={t("admin.requestsHint")} />
 
@@ -267,11 +249,10 @@ export function AdminPanel({ localAuth }: { localAuth: boolean }) {
               </ul>
             )}
           </section>
-          )}
 
           {/* The link, once made. Sits above the list rather than inside a row: it is
               the thing to act on now, and it has to be easy to copy on a phone. */}
-          {localAuth && resetLink && (
+          {resetLink && (
             <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/[0.06] p-3">
               <div>
                 <p className="text-sm font-medium">{t("admin.resetLinkReady")}</p>
@@ -297,11 +278,6 @@ export function AdminPanel({ localAuth }: { localAuth: boolean }) {
           )}
 
           {/* ── Accounts ──────────────────────────────────────────────── */}
-          {/* Con proveedor, esta lista era el reflejo local de sus cuentas y no dejaba
-              hacer nada sobre ellas: ni contraseñas, ni enlaces de recuperación, ni
-              altas. Quien administra tiene que ir al proveedor de todas formas, así
-              que en vez de una copia que se queda vieja se dice dónde está lo real. */}
-          {localAuth ? (
           <section>
             <SectionHeading
               title={t("admin.accounts")}
@@ -333,8 +309,6 @@ export function AdminPanel({ localAuth }: { localAuth: boolean }) {
                         </p>
                       </div>
 
-                      {localAuth && (
-                        <>
                       {/* Two ways in, and the link is the one to reach for: it expires,
                           it works once, and the person chooses their own password
                           instead of being told one over a chat that keeps it forever. */}
@@ -363,19 +337,12 @@ export function AdminPanel({ localAuth }: { localAuth: boolean }) {
                         <KeyRound className="size-4" />
                         {t("admin.changePassword")}
                       </Button>
-                        </>
-                      )}
                     </CardContent>
                   </Card>
                 </li>
               ))}
             </ul>
           </section>
-          ) : (
-            <p className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
-              {t("admin.identityElsewhere")}
-            </p>
-          )}
 
           {/* ── Server errors ─────────────────────────────────────────── */}
           <section>
@@ -477,14 +444,14 @@ export function AdminPanel({ localAuth }: { localAuth: boolean }) {
         </div>
       )}
 
-      {localAuth && <PasswordDialog
+      <PasswordDialog
         user={resetting}
         onClose={() => setResetting(null)}
         onDone={(name) => {
           setResetting(null);
           toast.success(t("admin.passwordChanged", { name }));
         }}
-      />}
+      />
     </main>
   );
 }

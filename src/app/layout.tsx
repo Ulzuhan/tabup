@@ -93,8 +93,7 @@ async function resolveSession() {
   const admin = isAdmin(user);
   return {
     user: { ...publicUser(user), admin },
-    // Con proveedor no hay solicitudes que aprobar aquí, así que tampoco aviso.
-    pendingApprovals: admin && !providerAccounts ? pendingUsers().length : 0,
+    pendingApprovals: admin ? pendingUsers().length : 0,
     providerAccounts,
   };
 }

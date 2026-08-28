@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { AdminPanel } from "./admin-panel";
-import { oidcConfigured } from "@/lib/oidc";
 
 export const metadata = { title: "TabUp" };
 
@@ -17,8 +16,11 @@ export const metadata = { title: "TabUp" };
  * `notFound` rather than a refusal, for the same reason a trip you cannot see is a 404:
  * whether this instance has an admin panel at a guessable path is not worth confirming
  * to somebody who is trying paths.
+ *
+ * Con un proveedor de identidad esto no existe para nadie: `isAdmin` es falso siempre,
+ * porque aquí ya no hay nada que administrar sobre las personas. Ver `isAdmin`.
  */
 export default async function AdminPage() {
   if (!isAdmin(await getCurrentUser())) notFound();
-  return <AdminPanel localAuth={!oidcConfigured()} />;
+  return <AdminPanel />;
 }

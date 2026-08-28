@@ -6,6 +6,7 @@ import { eq, sql, isNull, isNotNull, and } from "drizzle-orm";
 import { db, users, sessions, trips, passwordResets } from "@/db";
 import type { UserRow } from "@/db";
 import type { ErrorCode } from "./api-error";
+import { oidcConfigured } from "./oidc";
 
 /**
  * Accounts, sessions and password hashing.
@@ -532,7 +533,30 @@ export function registrationOpen(): boolean {
 
 // ── Approvals ────────────────────────────────────────────────────────
 
-export const isAdmin = (user: UserRow | null) => user?.role === "admin";
+/**
+ * Quién administra ESTA INSTANCIA — y con un proveedor de identidad, nadie.
+ *
+ * El papel existe por una razón concreta y sólo una: con cuentas propias hay que dejar
+ * entrar a la gente, y eso lo hace una persona desde dentro de la aplicación. Se le da a
+ * la primera cuenta que existe porque en ese momento no hay nadie más a quien dárselo.
+ *
+ * Delegada la identidad, esa razón desaparece entera. Quién puede tener cuenta lo decide
+ * el proveedor, así que lo que quedaba aquí era un usuario con un papel sobre los demás
+ * por haberse registrado primero — que es justo lo que una aplicación de gastos
+ * compartidos no tiene: en Splitwise nadie administra a nadie. El único mando sobre otras
+ * personas que este modelo reconoce es el de cada grupo sobre el suyo, y ése no es un
+ * papel de cuenta: es el dueño del grupo, y va por grupo.
+ *
+ * Con esto se cierran a la vez la página, su entrada en el menú y las dos rutas de
+ * `/api/admin`, en un solo sitio en vez de en cinco. Lo que había detrás no se pierde:
+ * los fallos del servidor siguen yendo a `console.error` —o sea al log del contenedor,
+ * que es donde quien opera la máquina mira— además de a su tabla.
+ *
+ * `role` se sigue guardando y sigue repartiéndose igual: si algún día esta instancia
+ * dejara de tener proveedor, las cuentas propias vuelven a necesitar quien las apruebe.
+ */
+export const isAdmin = (user: UserRow | null) =>
+  user?.role === "admin" && !oidcConfigured();
 export const isApproved = (user: UserRow) => user.approvedAt != null;
 
 /** Accounts waiting on the admin, oldest request first. */
