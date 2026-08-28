@@ -64,10 +64,17 @@ async function parseBody(
 
   const category = CATEGORIES.find((c) => c.id === body.category) ? String(body.category) : "other";
 
-  const startedAt = body.startedAt ? new Date(String(body.startedAt)).getTime() : Date.now();
+  // Sin `String()`: los gastos y los pagos aceptan la fecha en milisegundos —su
+  // `new Date(raw)` la entiende— y aquí se convertía a texto antes, así que
+  // `new Date("1785764921797")` salía Invalid Date y un cliente que mandara lo mismo
+  // que manda a un gasto se llevaba un 400 sin saber por qué. La aplicación no lo
+  // notaba porque su formulario manda "aaaa-mm-dd"; lo notó un guion de siembra.
+  const startedAt = body.startedAt
+    ? new Date(body.startedAt as string | number).getTime()
+    : Date.now();
   if (!isFinite(startedAt)) return { error: "invalid_date" as const };
 
-  const endedAt = body.endedAt ? new Date(String(body.endedAt)).getTime() : null;
+  const endedAt = body.endedAt ? new Date(body.endedAt as string | number).getTime() : null;
   if (endedAt !== null && (!isFinite(endedAt) || endedAt < startedAt)) {
     return { error: "invalid_date" as const };
   }

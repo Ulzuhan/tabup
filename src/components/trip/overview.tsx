@@ -5,7 +5,7 @@ import type { Balance, Member } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { CategoryIcon, categoryTint, useCategoryName } from "@/components/category-icon";
 import { MemberAvatar } from "@/components/member-avatar";
-import { Money, currencySymbol, formatAmount } from "@/components/money";
+import { Money, currencySymbol, useAmountFormatter } from "@/components/money";
 import { useT, usePlural } from "@/i18n/provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -183,6 +183,7 @@ export function CategoryBreakdown({
   total: number;
   currency: string;
 }) {
+  const fmt = useAmountFormatter();
   const t = useT();
   const categoryName = useCategoryName();
   if (breakdown.length === 0) return null;
@@ -203,7 +204,7 @@ export function CategoryBreakdown({
                 <span className="tabular text-muted-foreground">{pct.toFixed(0)}%</span>
                 <span className="tabular w-20 text-right">
                   {currencySymbol(currency)}
-                  {formatAmount(amount)}
+                  {fmt(amount)}
                 </span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-secondary">

@@ -8,7 +8,7 @@ import { CATEGORIES, CURRENCIES } from "@/lib/types";
 import type { Member } from "@/lib/types";
 import { CategoryIcon, useCategoryName } from "@/components/category-icon";
 import { MemberAvatar } from "@/components/member-avatar";
-import { currencySymbol, formatAmount } from "@/components/money";
+import { currencySymbol, useAmountFormatter } from "@/components/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -375,6 +375,7 @@ function SplitEditor({
   currency: string;
   toggleSplit: (id: string) => void;
 }) {
+  const fmt = useAmountFormatter();
   const t = useT();
   const included = members.filter((m) => draft.splitAmong.includes(m.id));
 
@@ -497,7 +498,7 @@ function SplitEditor({
               {/* The point of all this: what it actually costs them. */}
               {inSplit && (
                 <span className="w-20 shrink-0 text-right text-sm text-muted-foreground tabular">
-                  {total > 0 ? `${currencySymbol(currency)}${formatAmount(share(m.id))}` : "—"}
+                  {total > 0 ? `${currencySymbol(currency)}${fmt(share(m.id))}` : "—"}
                 </span>
               )}
             </div>
@@ -511,8 +512,8 @@ function SplitEditor({
             {draft.splitMode === "percent"
               ? t("expense.ofHundred", { sum: round2(sum) })
               : t("expense.ofTotal", {
-                  sum: `${currencySymbol(currency)}${formatAmount(sum)}`,
-                  total: `${currencySymbol(currency)}${formatAmount(total)}`,
+                  sum: `${currencySymbol(currency)}${fmt(sum)}`,
+                  total: `${currencySymbol(currency)}${fmt(total)}`,
                 })}
           </span>
 
@@ -532,7 +533,7 @@ function SplitEditor({
                 amount:
                   draft.splitMode === "percent"
                     ? `${Math.abs(off)}%`
-                    : `${currencySymbol(currency)}${formatAmount(Math.abs(off))}`,
+                    : `${currencySymbol(currency)}${fmt(Math.abs(off))}`,
               })}
               {` — ${t("expense.fix")}`}
             </button>

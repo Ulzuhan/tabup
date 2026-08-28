@@ -362,7 +362,7 @@ export const es = {
   recurring: {
     title: "Gastos fijos",
     subtitle: "Suscripciones, seguros, alquiler: lo que se va cada mes sin que lo pienses.",
-    tabTrips: "Viajes",
+    tabTrips: "Grupos",
     tabRecurring: "Fijos",
     add: "Añadir gasto fijo",
     edit: "Editar gasto fijo",
@@ -930,7 +930,7 @@ export const en: Messages = {
   recurring: {
     title: "Fixed costs",
     subtitle: "Subscriptions, insurance, rent — what leaves every month without you thinking about it.",
-    tabTrips: "Trips",
+    tabTrips: "Groups",
     tabRecurring: "Fixed",
     add: "Add fixed cost",
     edit: "Edit fixed cost",

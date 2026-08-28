@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { TrendingUp } from "lucide-react";
 import type { Expense } from "@/lib/types";
 import { useT, useIntlLocale } from "@/i18n/provider";
-import { currencySymbol, formatAmount } from "@/components/money";
+import { currencySymbol, useAmountFormatter } from "@/components/money";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +27,7 @@ export function SpendingPace({
   budget?: number | null;
   startedAt: number;
 }) {
+  const fmt = useAmountFormatter();
   const t = useT();
   const locale = useIntlLocale();
 
@@ -86,7 +87,7 @@ export function SpendingPace({
               <TrendingUp className="size-3.5 text-muted-foreground" />
               <span className="tabular font-medium">
                 {currencySymbol(currency)}
-                {formatAmount(stats.perDay)}
+                {fmt(stats.perDay)}
               </span>
               <span className="text-xs text-muted-foreground">{t("pace.perDay")}</span>
             </span>
@@ -98,8 +99,8 @@ export function SpendingPace({
             <div className="flex items-baseline justify-between text-sm">
               <span className={cn("tabular", overBudget && "text-destructive")}>
                 {t("pace.ofBudget", {
-                  used: `${currencySymbol(currency)}${formatAmount(stats.total)}`,
-                  budget: `${currencySymbol(currency)}${formatAmount(budget)}`,
+                  used: `${currencySymbol(currency)}${fmt(stats.total)}`,
+                  budget: `${currencySymbol(currency)}${fmt(budget)}`,
                 })}
               </span>
               <span
@@ -123,10 +124,10 @@ export function SpendingPace({
             <p className={cn("text-xs", overBudget ? "text-destructive" : "text-muted-foreground")}>
               {overBudget
                 ? t("pace.over", {
-                    amount: `${currencySymbol(currency)}${formatAmount(stats.total - budget)}`,
+                    amount: `${currencySymbol(currency)}${fmt(stats.total - budget)}`,
                   })
                 : t("pace.left", {
-                    amount: `${currencySymbol(currency)}${formatAmount(budget - stats.total)}`,
+                    amount: `${currencySymbol(currency)}${fmt(budget - stats.total)}`,
                   })}
             </p>
           </div>
@@ -143,7 +144,7 @@ export function SpendingPace({
                 // against: without it the column shrinks to its content and the bars
                 // collapse to nothing.
                 className="group relative flex h-full flex-1 flex-col justify-end"
-                title={`${dayLabel(key)} · ${currencySymbol(currency)}${formatAmount(amount)}`}
+                title={`${dayLabel(key)} · ${currencySymbol(currency)}${fmt(amount)}`}
               >
                 <div
                   className="w-full rounded-sm bg-primary/60 transition-colors group-hover:bg-primary"

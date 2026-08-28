@@ -8,7 +8,7 @@ import { useT, useIntlLocale } from "@/i18n/provider";
 import type { SessionUser } from "@/components/account-menu";
 import { SectionTabs, SectionTabsSpacer } from "@/components/section-tabs";
 import { CategoryIcon, categoryTint, useCategoryName } from "@/components/category-icon";
-import { Money, currencySymbol, formatAmount } from "@/components/money";
+import { Money, currencySymbol, useAmountFormatter } from "@/components/money";
 import { RecurringDialog, type RecurringDraft, emptyRecurring } from "@/components/recurring/recurring-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,6 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function RecurringPage() {
+  const fmt = useAmountFormatter();
   const t = useT();
   const locale = useIntlLocale();
   const categoryName = useCategoryName();
@@ -183,7 +184,10 @@ export default function RecurringPage() {
                 <Money amount={perMonth} currency="EUR" />
               </p>
               <p className="mt-1 text-sm text-muted-foreground tabular">
-                {formatAmount(perMonth * 12)} € {t("recurring.perYear")} ·{" "}
+                {/* Delante, como en el resto de la aplicación: esta línea era la
+                    única que lo ponía detrás, y queda justo debajo del total mensual
+                    —"€922,72" encima, "11.072,68 €" debajo— que es donde más canta. */}
+                €{fmt(perMonth * 12)} {t("recurring.perYear")} ·{" "}
                 {t("recurring.active", { count: active.length })}
               </p>
             </CardContent>
@@ -212,7 +216,7 @@ export default function RecurringPage() {
                         <CategoryIcon category={id} className={cn("size-4", categoryTint(id))} />
                         <span className="min-w-0 flex-1 truncate">{categoryName(id)}</span>
                         <span className="text-muted-foreground tabular">{pct.toFixed(0)}%</span>
-                        <span className="w-20 text-right tabular">€{formatAmount(amount)}</span>
+                        <span className="w-20 text-right tabular">€{fmt(amount)}</span>
                       </div>
                       <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
                         <div
@@ -299,7 +303,7 @@ export default function RecurringPage() {
                       <p className="truncate text-sm font-medium">{item.name}</p>
                       <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
                         {currencySymbol(item.currency)}
-                        {formatAmount(item.amount)} / {t(`recurring.${item.period}`).toLowerCase()}
+                        {fmt(item.amount)} / {t(`recurring.${item.period}`).toLowerCase()}
                         {cancelled && (
                           <Badge variant="outline" className="ml-2 h-4 px-1 text-[10px]">
                             {t("recurring.cancelled")}

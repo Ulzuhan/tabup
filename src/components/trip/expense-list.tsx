@@ -12,8 +12,7 @@ import {
 import type { Expense, Member } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { CategoryBadge } from "@/components/category-icon";
-import { Money } from "@/components/money";
-import { currencySymbol, formatAmount } from "@/components/money";
+import { Money, currencySymbol, useAmountFormatter } from "@/components/money";
 import { useT, useIntlLocale, usePlural } from "@/i18n/provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,6 +50,7 @@ export function ExpenseList({
   onDelete: (expenseId: string) => void;
   onViewReceipt: (file: string) => void;
 }) {
+  const fmt = useAmountFormatter();
   const t = useT();
   const plural = usePlural();
   const intlLocale = useIntlLocale();
@@ -86,7 +86,7 @@ export function ExpenseList({
             </h3>
             <span className="tabular text-xs text-muted-foreground">
               {currencySymbol(currency)}
-              {formatAmount(dayExpenses.reduce((sum, e) => sum + e.amountBase, 0))}
+              {fmt(dayExpenses.reduce((sum, e) => sum + e.amountBase, 0))}
             </span>
           </div>
 
@@ -100,7 +100,7 @@ export function ExpenseList({
                 <li
                   key={expense.id}
                   className={cn(
-                    "group flex items-center gap-3 rounded-xl border bg-card p-3",
+                    "group flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3",
                     queued ? "border-warning/30 bg-warning/[0.04]" : "border-border"
                   )}
                 >
@@ -168,7 +168,15 @@ export function ExpenseList({
                   </div>
 
                   {!queued && (
-                    <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-100">
+                    /* En un móvil no hay `hover`, así que aquí los botones están
+                       siempre visibles — y en la misma línea se comían la fila: cuatro
+                       de ellos dejaban la descripción en tres letras ("Vue…", "Farm…")
+                       y el nombre de quien pagó en una. `basis-full` los baja a su
+                       propia línea, alineados a la derecha; la descripción recupera el
+                       ancho entero y todas las acciones siguen a un toque. Desde `sm`
+                       no cambia nada: vuelven a la fila y siguen apareciendo al pasar
+                       por encima. */
+                    <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 max-sm:basis-full max-sm:justify-end max-sm:opacity-100">
                       {/* Open to everyone, and the counterweight to the edit rule: the
                           person who may not change a figure is exactly the one who needs
                           a way to say it looks wrong. Stays visible once there are any,

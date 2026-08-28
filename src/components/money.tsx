@@ -21,17 +21,19 @@ export function currencySymbol(code: string): string {
  *
  * The locale is a parameter rather than a hook so this can also be called from
  * non-component code; `useAmountFormatter` below is the version components want.
+ *
+ * Aquí vivía además `formatAmount`, que fijaba `es-ES` «porque la agrupación
+ * española es la de por defecto». Quince sitios la usaban dentro de componentes que
+ * sí saben en qué idioma se está leyendo, así que en inglés una misma fila imprimía
+ * el mismo importe dos veces y de dos formas: «€780.00» a la derecha —eso venía de
+ * `Money`— y «€780,00 / month» debajo. Se ha ido: quien pinta dentro de la
+ * aplicación usa el hook.
  */
 export function formatAmountIn(value: number, locale: string): string {
   return new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
-}
-
-/** Kept for callers that render inside the app, where Spanish grouping is the default. */
-export function formatAmount(value: number): string {
-  return formatAmountIn(value, "es-ES");
 }
 
 export function useAmountFormatter() {
