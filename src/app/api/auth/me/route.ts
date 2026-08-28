@@ -12,6 +12,7 @@ import { deleteAccount, FREE_TRIP_LIMIT, ownedTripCount } from "@/lib/store";
 import { fail } from "@/lib/api-error";
 import { jsonBody } from "@/lib/body";
 import { logError } from "@/lib/errors";
+import { oidcConfigured } from "@/lib/oidc";
 
 /** Who is signed in, and how much of the free plan they have used. */
 export async function GET() {
@@ -22,7 +23,9 @@ export async function GET() {
   return NextResponse.json({
     user: { ...publicUser(user), admin: isAdmin(user) },
     // Surfaced here so the header can badge the menu without a second request.
-    pendingApprovals: isAdmin(user) ? pendingUsers().length : 0,
+    // Con proveedor no hay nada que aprobar aquí y la sección no se pinta: un aviso
+    // sobre el menú llevaría a una pantalla que ya no tiene dónde llevarlo.
+    pendingApprovals: isAdmin(user) && !oidcConfigured() ? pendingUsers().length : 0,
     usage: {
       trips: ownedTripCount(user.id),
       // null means no cap, which is the default.
@@ -38,6 +41,19 @@ export async function GET() {
  * holding the phone, and an unlocked phone left on a table should not be enough to delete
  * somebody's spending for good. It is the same reason a bank asks twice.
  *
+ * **Con un proveedor de identidad no hay contraseña que pedir**, y esto era un callejón
+ * sin salida: la de una cuenta creada por OIDC es `oidc$<aleatorio>`, que `verifyPassword`
+ * rechaza siempre por no ser un hash scrypt. O sea que cerrar la cuenta —lo único que
+ * esta pantalla existe para poder hacer— era imposible para todo el que entra por el
+ * proveedor, que con proveedor configurado son todos. Entonces se pide escribir la
+ * dirección de la cuenta.
+ *
+ * Y hay que decir qué es y qué no: escribir tu propia dirección **confirma la intención,
+ * no la identidad**. Quien tenga el teléfono desbloqueado la sabe. La credencial la
+ * guarda el proveedor y comprobarla de verdad exigiría un viaje de ida y vuelta a él en
+ * mitad del borrado; lo que esto impide es el toque accidental, que es contra lo que
+ * protege una confirmación escrita.
+ *
  * What happens to the trips is in `deleteAccount`. The short version, which the dialog
  * says out loud before anyone taps it: groups they run go to whoever else has been in them
  * longest, groups nobody else is in go with them, and the column of figures they left in
@@ -49,9 +65,14 @@ export async function DELETE(request: NextRequest) {
 
   const cuerpo = await jsonBody(request);
   if (!cuerpo) return fail("bad_json", 400);
-  const { password } = cuerpo;
+  const { password, confirm } = cuerpo;
 
-  if (typeof password !== "string" || !(await verifyPassword(password, user.passwordHash))) {
+  if (oidcConfigured()) {
+    const typed = typeof confirm === "string" ? confirm.trim().toLowerCase() : "";
+    if (typed !== user.email.toLowerCase()) {
+      return fail("wrong_confirmation", 403);
+    }
+  } else if (typeof password !== "string" || !(await verifyPassword(password, user.passwordHash))) {
     return fail("wrong_credentials", 403);
   }
 

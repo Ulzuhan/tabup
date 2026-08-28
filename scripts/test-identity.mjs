@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * The invitation path, in both kinds of instance.
+ * What changes when identity is delegated to a provider.
  *
- *   ./scripts/test-join.sh
+ *   ./scripts/test-identity.sh
  *
  * This suite exists because of a bug that nothing else could have caught: the join page
  * always rendered a local email-and-password form and posted it to /api/auth/register —
@@ -22,13 +22,20 @@
  *             provider carrying the invitation, and a way to ask for an account.
  *   noenroll  provider but no TABUP_ENROLL_URL: no sign-up button at all, rather than
  *             one pointing at somebody else's identity provider.
+ *
+ * The invitation is the loudest case but not the only one: everything that was built for
+ * TabUp's own accounts has to either work or step aside when the accounts are somebody
+ * else's. The admin panel used to offer approvals and passwords it could no longer act
+ * on, and closing your own account asked for a password that, on an account created
+ * through the provider, is a filler string no scrypt check will ever accept — so the one
+ * thing that screen exists for could not be done at all.
  */
 import { readFileSync, writeFileSync } from "fs";
 
 const BASE = process.env.BASE || "http://127.0.0.1:3117";
 const STATE = process.env.STATE || "/tmp/tabup-join-state.json";
 const PHASE = process.env.PHASE || "setup";
-/** Has to match the one test-join.sh starts the provider phases with. */
+/** Has to match the one test-identity.sh starts the provider phases with. */
 const ENROLL = "https://idp.example.invalid/if/flow/enroll-tabup/";
 
 let passed = 0;
@@ -43,28 +50,48 @@ function check(name, actual, expected) {
   else failed++;
 }
 
-/** A browser: remembers the session cookie across requests. */
-function client() {
-  let cookie = "";
-  return async (path, options = {}) => {
+/**
+ * A browser: remembers the session cookie across requests.
+ *
+ * La cookie queda a la vista porque las sesiones viven en la base de datos, y la base
+ * sobrevive al cambio de servidor entre fases: es la única forma de llegar a la fase
+ * del proveedor con una sesión de administrador, que allí no se puede abrir.
+ */
+function client(initial = "") {
+  const jar = { cookie: initial };
+  const call = async (path, options = {}) => {
     const res = await fetch(`${BASE}${path}`, {
       ...options,
       headers: {
         "Content-Type": "application/json",
-        ...(cookie ? { cookie } : {}),
+        ...(jar.cookie ? { cookie: jar.cookie } : {}),
         ...(options.headers || {}),
       },
     });
     const sc = res.headers.get("set-cookie");
-    if (sc) cookie = sc.split(";")[0];
+    if (sc) jar.cookie = sc.split(";")[0];
     return { status: res.status, body: await res.json().catch(() => ({})) };
   };
+  call.jar = jar;
+  return call;
 }
 
-/** A stranger loading a page: no cookie, and the HTML rather than JSON. */
-async function page(path) {
-  const res = await fetch(`${BASE}${path}`, { redirect: "manual" });
-  return { status: res.status, html: await res.text() };
+/**
+ * Somebody loading a page: the HTML rather than JSON.
+ *
+ * Sin cookie salvo que se le dé una — casi todo lo que se mira aquí es lo que ve
+ * quien llega de fuera con un enlace.
+ */
+async function page(path, cookie = "") {
+  const res = await fetch(`${BASE}${path}`, {
+    redirect: "manual",
+    headers: cookie ? { cookie } : {},
+  });
+  return {
+    status: res.status,
+    headers: { location: res.headers.get("location") },
+    html: await res.text(),
+  };
 }
 
 const uniq = () => Math.random().toString(36).slice(2, 10);
@@ -105,6 +132,20 @@ async function setup() {
   const seatToken = seated.body.invite.token;
   const seatName = guestEmail.split("@")[0];
 
+  // Quien registra primero es el administrador de la instancia.
+  const panel = await owner("/api/admin/users");
+  check("the first account administers this instance", panel.status, 200);
+
+  // Una cuenta de usar y tirar: la fase del proveedor comprueba que cerrarla es
+  // posible allí, y borrarla no puede llevarse por delante el grupo de arriba.
+  const doomed = client();
+  const doomedEmail = `sobra-${uniq()}@example.com`;
+  const madeDoomed = await doomed("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ email: doomedEmail, name: "De paso", password: "contrasena-larga" }),
+  });
+  check("and a second account exists to be closed later", madeDoomed.status, 200);
+
   const { status, html } = await page(`/join/${token}`);
   check("the invitation page answers", status, 200);
   check("it names the group, so the visitor knows what they were invited to", html.includes(tripName), true);
@@ -113,11 +154,23 @@ async function setup() {
   check("with local accounts the form is still there", html.includes('type="password"'), true);
   check("and there is no provider to send anybody to", html.includes("/api/auth/oidc"), false);
 
-  writeFileSync(STATE, JSON.stringify({ token, tripName, seatToken, seatName }));
+  writeFileSync(
+    STATE,
+    JSON.stringify({
+      token,
+      tripName,
+      seatToken,
+      seatName,
+      adminCookie: owner.jar.cookie,
+      doomedCookie: doomed.jar.cookie,
+      doomedEmail,
+    })
+  );
 }
 
 async function provider() {
-  const { token, tripName, seatToken, seatName } = JSON.parse(readFileSync(STATE, "utf8"));
+  const { token, tripName, seatToken, seatName, adminCookie, doomedCookie, doomedEmail } =
+    JSON.parse(readFileSync(STATE, "utf8"));
 
   const { status, html } = await page(`/join/${token}`);
   check("the invitation page answers", status, 200);
@@ -159,6 +212,59 @@ async function provider() {
   check("an unknown token gets the expired page", unknown.status, 200);
   check("which names no group", unknown.html.includes(tripName), false);
   check("and offers no way in", unknown.html.includes("/api/auth/oidc"), false);
+
+  // ── El panel de administración ────────────────────────────────────
+  // La sesión es la misma de la fase anterior: la sesión vive en la base y la base no
+  // ha cambiado. Aquí no se podría abrir una, que es justo el sentido de delegar.
+  const admin = client(adminCookie);
+  check("the admin is still signed in across the change", (await admin("/api/auth/me")).body.user.admin, true);
+  check("but the accounts list is the provider's business now", (await admin("/api/admin/users")).status, 403);
+  check(
+    "and so is approving anybody",
+    (await admin("/api/admin/users", {
+      method: "POST",
+      body: JSON.stringify({ id: "cualquiera", action: "approve" }),
+    })).status,
+    403
+  );
+  // Lo que sí queda: los fallos del servidor, que no son de nadie más.
+  check("the error log stays, which is what the panel is for now", (await admin("/api/admin/errors")).status, 200);
+  // Sin cookie de administrador la página no existe, y eso no cambia: se pide con la
+  // sesión puesta, que es lo que se está comprobando que sigue sirviendo para algo.
+  check("and the page still opens for the admin", (await page("/admin", adminCookie)).status, 200);
+
+  // ── Cerrar la propia cuenta ───────────────────────────────────────
+  const doomed = client(doomedCookie);
+  check(
+    "closing an account no longer takes a password — there is none to check",
+    (await doomed("/api/auth/me", {
+      method: "DELETE",
+      body: JSON.stringify({ password: "contrasena-larga" }),
+    })).status,
+    403
+  );
+  check(
+    "nor somebody else's address",
+    (await doomed("/api/auth/me", {
+      method: "DELETE",
+      body: JSON.stringify({ confirm: "otra@example.com" }),
+    })).status,
+    403
+  );
+  check(
+    "typing your own address closes it",
+    (await doomed("/api/auth/me", {
+      method: "DELETE",
+      body: JSON.stringify({ confirm: doomedEmail.toUpperCase() }),
+    })).status,
+    200
+  );
+  check("and the session goes with it", (await doomed("/api/auth/me")).body.user, null);
+
+  // ── Recuperar contraseña ──────────────────────────────────────────
+  const reset = await page("/reset/loquesea");
+  check("the password-reset screen sends people to the provider", reset.status, 307);
+  check("which is what /login knows how to do", reset.headers.location, "/login");
 
   // La portada, por el mismo motivo: la dirección del alta la pone quien despliega.
   const landing = await page("/");

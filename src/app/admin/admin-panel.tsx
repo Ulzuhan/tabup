@@ -43,10 +43,15 @@ interface ServerError {
 /**
  * Running the instance.
  *
- * Three things live here, and they are here rather than in an email because this
- * instance sends none: who is waiting to be let in, who is already in — with a way to
- * hand them a new password when they lose theirs — and what has failed on the server
- * while nobody was watching.
+ * Con cuentas propias hay tres cosas aquí, y están aquí y no en un correo porque esta
+ * instancia no manda ninguno: quién espera a que le dejen entrar, quién está ya dentro
+ * —con la forma de darle una contraseña nueva cuando pierde la suya— y qué ha fallado
+ * en el servidor sin que nadie estuviera mirando.
+ *
+ * **Con un proveedor de identidad solo queda la tercera.** Las dos primeras eran de la
+ * era de las cuentas locales: con proveedor, ni hay solicitudes que aprobar aquí ni se
+ * puede hacer nada sobre las cuentas, así que enseñarlas era prometer un mando que no
+ * existe. Quien administra va al proveedor, y esta pantalla lo dice.
  *
  * Reachable only from the admin's own menu, and every API call re-checks the role:
  * hiding a page is not access control.
@@ -66,22 +71,32 @@ export function AdminPanel({ localAuth }: { localAuth: boolean }) {
   const [resetLink, setResetLink] = useState<{ url: string; email: string } | null>(null);
 
   const load = useCallback(async () => {
+    // Con proveedor de identidad no se pide la lista de cuentas: ese endpoint
+    // responde 403 —las cuentas son del proveedor— y pedirlo igualmente dejaría la
+    // pantalla entera en "algo ha ido mal", incluidos los errores del servidor, que
+    // es lo único que esta página sigue teniendo que enseñar.
     const [usersRes, errorsRes] = await Promise.all([
-      fetch("/api/admin/users").catch(() => null),
+      localAuth ? fetch("/api/admin/users").catch(() => null) : Promise.resolve(null),
       fetch("/api/admin/errors").catch(() => null),
     ]);
 
-    if (!usersRes?.ok) {
+    if (localAuth && !usersRes?.ok) {
+      setAllowed(false);
+      return;
+    }
+    if (!localAuth && !errorsRes?.ok) {
       setAllowed(false);
       return;
     }
 
-    const data = await usersRes.json();
+    if (usersRes?.ok) {
+      const data = await usersRes.json();
+      setPending(data.pending ?? []);
+      setAccounts(data.users ?? []);
+    }
     setAllowed(true);
-    setPending(data.pending ?? []);
-    setAccounts(data.users ?? []);
     if (errorsRes?.ok) setErrors((await errorsRes.json()).errors ?? []);
-  }, []);
+  }, [localAuth]);
 
   useEffect(() => {
     Promise.resolve().then(load);
@@ -179,7 +194,9 @@ export function AdminPanel({ localAuth }: { localAuth: boolean }) {
       </Link>
 
       <h1 className="text-xl font-semibold tracking-tight">{t("admin.title")}</h1>
-      <p className="mt-1 text-sm text-muted-foreground">{t("admin.subtitle")}</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {t(localAuth ? "admin.subtitle" : "admin.subtitleOidc")}
+      </p>
 
       {allowed === null ? (
         <div className="mt-8 space-y-3">
@@ -193,6 +210,11 @@ export function AdminPanel({ localAuth }: { localAuth: boolean }) {
       ) : (
         <div className="mt-8 space-y-10">
           {/* ── Account requests ──────────────────────────────────────── */}
+          {/* Solo cuando las cuentas son de TabUp. Con un proveedor de identidad no
+              hay solicitudes que aprobar aquí —quien puede entrar lo decide él— y
+              esta sección era una lista vacía para siempre: mobiliario que hacía
+              creer que las altas se gestionan en esta pantalla. */}
+          {localAuth && (
           <section>
             <SectionHeading title={t("admin.requests")} hint={t("admin.requestsHint")} />
 
@@ -245,6 +267,7 @@ export function AdminPanel({ localAuth }: { localAuth: boolean }) {
               </ul>
             )}
           </section>
+          )}
 
           {/* The link, once made. Sits above the list rather than inside a row: it is
               the thing to act on now, and it has to be easy to copy on a phone. */}
@@ -274,10 +297,15 @@ export function AdminPanel({ localAuth }: { localAuth: boolean }) {
           )}
 
           {/* ── Accounts ──────────────────────────────────────────────── */}
+          {/* Con proveedor, esta lista era el reflejo local de sus cuentas y no dejaba
+              hacer nada sobre ellas: ni contraseñas, ni enlaces de recuperación, ni
+              altas. Quien administra tiene que ir al proveedor de todas formas, así
+              que en vez de una copia que se queda vieja se dice dónde está lo real. */}
+          {localAuth ? (
           <section>
             <SectionHeading
               title={t("admin.accounts")}
-              hint={t(localAuth ? "admin.accountsHint" : "admin.accountsOidcHint")}
+              hint={t("admin.accountsHint")}
             />
 
             <ul className="space-y-2">
@@ -343,6 +371,11 @@ export function AdminPanel({ localAuth }: { localAuth: boolean }) {
               ))}
             </ul>
           </section>
+          ) : (
+            <p className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+              {t("admin.identityElsewhere")}
+            </p>
+          )}
 
           {/* ── Server errors ─────────────────────────────────────────── */}
           <section>

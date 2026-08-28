@@ -30,16 +30,33 @@ async function requireAdmin() {
 
 const snapshot = () => ({ pending: pendingUsers(), users: approvedUsers() });
 
+/**
+ * Con un proveedor de identidad, aquí no se administran cuentas.
+ *
+ * Quién puede entrar, quién deja de poder y quién recupera su contraseña son
+ * decisiones del proveedor, y esta era la última puerta por la que se podían tomar
+ * desde dentro de TabUp: aprobar y rechazar seguían abiertos aunque el formulario de
+ * registro llevara meses devolviendo 404. Una cuenta local aprobada aquí tampoco
+ * podría entrar —el login también es 404 con proveedor—, así que lo único que hacía
+ * era sostener una pantalla que decía administrar algo que no administra.
+ *
+ * 403 y no 404: la ruta existe, y quien la llama es el administrador. No hay nada
+ * que ocultarle, solo un sitio distinto al que ir.
+ */
+const identityIsElsewhere = () => oidcConfigured();
+
 export async function GET() {
   if (!(await requireAdmin())) {
     return fail("not_allowed", 403);
   }
+  if (identityIsElsewhere()) return fail("not_allowed", 403);
   return NextResponse.json(snapshot());
 }
 
 export async function POST(request: NextRequest) {
   const admin = await requireAdmin();
   if (!admin) return fail("not_allowed", 403);
+  if (identityIsElsewhere()) return fail("not_allowed", 403);
 
   // `null` es JSON válido: pasaba el catch y reventaba al leer un campo.
   const body: { id?: string; action?: string; password?: string } | null = await jsonBody(request);
@@ -48,10 +65,6 @@ export async function POST(request: NextRequest) {
   if (!body.id) return fail("missing_field", 400, { field: "id" });
 
   try {
-    if (oidcConfigured() && (body.action === "reset-link" || body.action === "password")) {
-      return fail("not_allowed", 403);
-    }
-
     /**
      * A link, rather than a password read out over the phone.
      *

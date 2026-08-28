@@ -36,7 +36,7 @@
     "test:receipts": "node scripts/test-receipts.mjs",
     "test:races": "node scripts/test-races.mjs",
     "test:restart": "bash scripts/test-restart.sh",
-    "test:join": "bash scripts/test-join.sh"
+    "test:identity": "bash scripts/test-identity.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

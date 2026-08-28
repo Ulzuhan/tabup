@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Drives test-join.mjs: the same database served by three different configurations,
-# because the bug this suite pins only exists in one of them.
+# Drives test-identity.mjs: the same database served by three different configurations,
+# because the bugs this suite pins only exist in one of them.
 #
 # The other suites all run with the identity provider switched off — run-suites.sh unsets
 # those variables on purpose, so that the accounts they create can exist at all. That is
 # exactly why nothing caught a join page that only worked without a provider. Here the
 # provider is the point, so it gets its own runner.
 #
-#   npm run test:join            # needs a build first (npm run build)
+#   npm run test:identity        # needs a build first (npm run build)
 #
 # Nothing talks to the provider: no sign-in is ever completed. The URLs only have to be
 # well-formed for `oidcConfig()` to consider itself configured, which is what changes the
@@ -91,19 +91,19 @@ failed=0
 
 echo "Con cuentas propias"
 start local || exit 1
-PHASE=setup node scripts/test-join.mjs || failed=1
+PHASE=setup node scripts/test-identity.mjs || failed=1
 stop
 
 echo
 echo "Con proveedor de identidad"
 start provider || exit 1
-PHASE=provider node scripts/test-join.mjs || failed=1
+PHASE=provider node scripts/test-identity.mjs || failed=1
 stop
 
 echo
 echo "Con proveedor y sin alta publicada"
 start noenroll || exit 1
-PHASE=noenroll node scripts/test-join.mjs || failed=1
+PHASE=noenroll node scripts/test-identity.mjs || failed=1
 stop
 
 echo

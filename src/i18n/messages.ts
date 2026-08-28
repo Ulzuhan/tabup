@@ -49,6 +49,7 @@ export const es = {
     nothing_to_say: "No hay nada que decir, o ese gasto no existe",
     signin_required: "Hay que iniciar sesión",
     wrong_credentials: "El correo o la contraseña no son correctos",
+    wrong_confirmation: "Eso no coincide con la dirección de tu cuenta",
     pending_approval: "Tu cuenta todavía está esperando aprobación",
     registration_closed: "Este servidor no admite cuentas nuevas. Hace falta una invitación.",
     email_taken: "Ese correo ya tiene cuenta",
@@ -90,6 +91,9 @@ export const es = {
     deleteAlone: "Los grupos en los que no hay nadie más se borran contigo.",
     deleteFigures: "Tu columna en los grupos de otros se queda como está, con tu nombre: lo que pagaste sigue siendo verdad.",
     deleteConfirm: "Escribe tu contraseña para confirmar",
+    // Con proveedor de identidad no hay contraseña aquí que comprobar; lo que se pide
+    // es la dirección de la cuenta, escrita a mano.
+    deleteConfirmEmail: "Escribe {email} para confirmar",
     deleteAction: "Borrar la cuenta",
     deleteFailed: "No se ha podido borrar la cuenta",
   },
@@ -261,10 +265,15 @@ export const es = {
     removeWarning:
       "A quien está dentro le quitas el acceso y su columna se queda con todo lo suyo. Al que ya está fuera, o a un nombre a secas, lo borras con sus gastos.",
     addSomeone: "Nombre o correo",
+    // Decía "sitio en el reparto y acceso, de una vez", y eso solo es verdad si esa
+    // dirección ya tiene cuenta aquí. Si no, lo que sale es un enlace que hay que
+    // mandarle — y con proveedor de identidad, además, tendrá que conseguir cuenta
+    // antes de poder abrirlo. La frase lo dice ahora en los dos casos.
     addHint:
-      "Un correo la mete en el viaje: sitio en el reparto y acceso, de una vez. Un nombre a secas vale para quien no tiene cuenta aquí, y podrá reclamarlo después.",
+      "Un correo le guarda sitio en el reparto: si ya tiene cuenta, entra directo; si no, sale un enlace para mandarle. Un nombre a secas es solo una columna del reparto, y alguien con cuenta podrá reclamarla después.",
     inviteReady: "Invitación creada",
-    inviteReadyHint: "Todavía no tiene cuenta. Mándale este enlace: su sitio ya está guardado.",
+    inviteReadyHint:
+      "Todavía no tiene cuenta aquí. Mándale este enlace: su sitio está guardado y desde ahí puede conseguirla.",
     you: "tú",
     hasAccount: "con cuenta",
     noAccount: "sin cuenta",
@@ -401,6 +410,10 @@ export const es = {
   admin: {
     title: "Administración",
     subtitle: "Quién entra, quién es quién y qué se ha roto.",
+    // Con proveedor solo queda lo tercero: lo demás lo lleva él.
+    subtitleOidc: "Qué se ha roto sin que nadie estuviera mirando.",
+    identityElsewhere:
+      "Las cuentas, las altas y las contraseñas se gestionan en el proveedor de identidad, no aquí.",
     requests: "Solicitudes de cuenta",
     requestsHint: "Gente que ha pedido entrar en este servidor.",
     none: "No hay solicitudes pendientes",
@@ -413,7 +426,6 @@ export const es = {
 
     accounts: "Cuentas",
     accountsHint: "Cada uno puede recuperar su contraseña desde la pantalla de entrada; esto es para cuando no puede.",
-    accountsOidcHint: "El acceso y la recuperación se gestionan en Authentik.",
     adminRole: "Admin",
     joinedOn: "Desde el {date}",
     changePassword: "Cambiar contraseña",
@@ -632,6 +644,7 @@ export const en: Messages = {
     nothing_to_say: "Nothing to say, or no such expense",
     signin_required: "You need to sign in",
     wrong_credentials: "That email or password is wrong",
+    wrong_confirmation: "That does not match your account's address",
     pending_approval: "Your account is still waiting to be approved",
     registration_closed: "This server is not taking new accounts. You need an invitation.",
     email_taken: "That email already has an account",
@@ -673,6 +686,7 @@ export const en: Messages = {
     deleteAlone: "Groups with nobody else in them go with you.",
     deleteFigures: "Your column in other people's groups stays as it is, with your name on it: what you paid is still true.",
     deleteConfirm: "Type your password to confirm",
+    deleteConfirmEmail: "Type {email} to confirm",
     deleteAction: "Delete the account",
     deleteFailed: "The account could not be deleted",
   },
@@ -845,9 +859,10 @@ export const en: Messages = {
       "Someone still in the trip loses their access and their column keeps everything of theirs. Someone already out, or a bare name, is deleted along with their expenses.",
     addSomeone: "Name or email",
     addHint:
-      "An email puts them in the trip: a seat in the split and the access to reach it, in one go. A bare name works for anyone without an account here, and they can claim it later.",
+      "An email keeps them a seat in the split: if they already have an account they are in at once, otherwise you get a link to send them. A bare name is only a column in the split, and someone with an account can claim it later.",
     inviteReady: "Invitation created",
-    inviteReadyHint: "They have no account yet. Send them this link — their seat is already saved.",
+    inviteReadyHint:
+      "They have no account here yet. Send them this link — their seat is saved, and the link is where they get one.",
     you: "you",
     hasAccount: "has an account",
     noAccount: "no account",
@@ -982,6 +997,9 @@ export const en: Messages = {
   admin: {
     title: "Administration",
     subtitle: "Who gets in, who is who, and what has broken.",
+    subtitleOidc: "What has broken while nobody was watching.",
+    identityElsewhere:
+      "Accounts, sign-ups and passwords are managed in the identity provider, not here.",
     requests: "Account requests",
     requestsHint: "People who have asked to join this server.",
     none: "No pending requests",
@@ -994,7 +1012,6 @@ export const en: Messages = {
 
     accounts: "Accounts",
     accountsHint: "People can reset their own password from the sign-in screen; these are for when they cannot.",
-    accountsOidcHint: "Sign-in and account recovery are managed in Authentik.",
     adminRole: "Admin",
     joinedOn: "Joined {date}",
     changePassword: "Change password",

@@ -21,6 +21,7 @@ export const ERROR_TEXT = {
   // Who you are
   signin_required: "Sign in first",
   wrong_credentials: "Wrong email or password",
+  wrong_confirmation: "That does not match the account's address",
   pending_approval: "This account is waiting to be approved",
   registration_closed: "This server is not accepting new accounts. Use an invitation link.",
   email_taken: "That email is already registered",

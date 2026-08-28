@@ -37,9 +37,12 @@ export interface SessionUser {
 export function AccountMenu({
   user,
   pendingApprovals = 0,
+  providerAccounts = false,
 }: {
   user: SessionUser | null;
   pendingApprovals?: number;
+  /** Las cuentas las lleva un proveedor de identidad: cambia cómo se confirma el borrado. */
+  providerAccounts?: boolean;
 }) {
   const t = useT();
   // Fuera del menú a propósito: elegir la opción lo cierra, y un diálogo montado
@@ -150,7 +153,12 @@ export function AccountMenu({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <DeleteAccountDialog open={deleting} onOpenChange={setDeleting} />
+      <DeleteAccountDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        providerAccounts={providerAccounts}
+        email={user.email}
+      />
     </>
   );
 }

@@ -12,6 +12,7 @@ import { ThemeSync } from "@/components/theme";
 import { THEME_COOKIE, isTheme } from "@/lib/theme";
 import { getCurrentUser, isAdmin, pendingUsers, publicUser } from "@/lib/auth";
 import { startHousekeeping } from "@/lib/housekeeping";
+import { oidcConfigured } from "@/lib/oidc";
 import "./globals.css";
 
 const display = Space_Grotesk({ variable: "--font-display", weight: ["500", "700"], subsets: ["latin"] });
@@ -87,11 +88,14 @@ async function resolveTheme() {
  */
 async function resolveSession() {
   const user = await getCurrentUser();
-  if (!user) return { user: null, pendingApprovals: 0 };
+  const providerAccounts = oidcConfigured();
+  if (!user) return { user: null, pendingApprovals: 0, providerAccounts };
   const admin = isAdmin(user);
   return {
     user: { ...publicUser(user), admin },
-    pendingApprovals: admin ? pendingUsers().length : 0,
+    // Con proveedor no hay solicitudes que aprobar aquí, así que tampoco aviso.
+    pendingApprovals: admin && !providerAccounts ? pendingUsers().length : 0,
+    providerAccounts,
   };
 }
 
@@ -122,7 +126,11 @@ export default async function RootLayout({
       <body className="brand-glow flex min-h-full flex-col bg-background text-foreground">
         <I18nProvider locale={locale}>
           <KaiCorpHeader app="TabUp">
-            <AccountMenu user={session.user} pendingApprovals={session.pendingApprovals} />
+            <AccountMenu
+              user={session.user}
+              pendingApprovals={session.pendingApprovals}
+              providerAccounts={session.providerAccounts}
+            />
           </KaiCorpHeader>
           {children}
           <KaiCorpFooter current="tabup" />

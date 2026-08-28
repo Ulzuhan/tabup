@@ -32,13 +32,25 @@ import { clearSessionCache } from "@/lib/session-cache";
  * sure?" is a confirmation of nothing.
  *
  * The password is asked for again on purpose. A session is whoever is holding the phone.
+ *
+ * Salvo que las cuentas sean de un proveedor de identidad: entonces aquí no hay
+ * contraseña que comprobar —la de una cuenta OIDC es un relleno que no valida nunca— y
+ * pedirla dejaba esta pantalla sin salida. En ese caso se escribe la dirección de la
+ * cuenta, que confirma la intención aunque no pruebe la identidad. El porqué completo
+ * está en `DELETE /api/auth/me`.
  */
 export function DeleteAccountDialog({
   open,
   onOpenChange,
+  providerAccounts = false,
+  email,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Las cuentas las lleva un proveedor: no hay contraseña propia que pedir. */
+  providerAccounts?: boolean;
+  /** La dirección que hay que escribir para confirmar, cuando es el caso. */
+  email?: string;
 }) {
   const t = useT();
   const serverError = useServerError();
@@ -55,7 +67,7 @@ export function DeleteAccountDialog({
       const res = await fetch("/api/auth/me", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify(providerAccounts ? { confirm: password } : { password }),
       });
       const data = await res.json().catch(() => ({}));
 
@@ -101,11 +113,17 @@ export function DeleteAccountDialog({
 
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="delete-password">{t("account.deleteConfirm")}</Label>
+            <Label htmlFor="delete-password">
+              {providerAccounts
+                ? t("account.deleteConfirmEmail", { email: email ?? "" })
+                : t("account.deleteConfirm")}
+            </Label>
             <Input
               id="delete-password"
-              type="password"
-              autoComplete="current-password"
+              type={providerAccounts ? "email" : "password"}
+              autoComplete={providerAccounts ? "off" : "current-password"}
+              inputMode={providerAccounts ? "email" : undefined}
+              autoCapitalize={providerAccounts ? "none" : undefined}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required

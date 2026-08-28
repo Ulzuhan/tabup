@@ -506,18 +506,23 @@ nothing:
 npm run test:restart    # 6 — what a restart must not change
 ```
 
-`test:join` does the same, three times over, because it is the one suite that needs an
+`test:identity` does the same, three times over, because it is the one suite that needs an
 identity provider configured — and the others cannot have one, since they create the
 accounts they test with:
 
 ```bash
 npm run build
-npm run test:join       # 27 — the invitation path, with local accounts and with a provider
+npm run test:identity   # 40 — what changes when the accounts are somebody else's
 ```
 
 It runs one database under three servers: local accounts, a provider with a sign-up URL,
-and a provider without one. That gap is where a join page that only worked without a
-provider survived every green build — see [Invitations](#invitations).
+and a provider without one. The session survives the change because sessions live in the
+database, which is how the admin assertions get an admin in a mode where no sign-in is
+possible.
+
+That gap is where three things survived every green build: a join page that only worked
+without a provider, an admin panel offering approvals and passwords it could no longer act
+on, and an account you could not close because it was asked for a password it never had.
 
 It exists because every other suite talks to one long-lived server, and so none of them
 can see a bug that only happens at boot — which is where the repairs live, and repairs
@@ -684,6 +689,16 @@ From the account menu, with the password typed again — a session is whoever is
 phone, and an unlocked phone on a table should not be enough to delete somebody's spending
 for good.
 
+**With an identity provider there is no password here to check**, and this was a dead end:
+the hash on an account created through the provider is a filler string that no scrypt
+check accepts, so the one thing this screen exists for could not be done by anybody who
+signed in through the provider — which, with one configured, is everybody. It asks for the
+account's own address instead. Worth being precise about what that is: typing your own
+address **confirms intent, not identity**. Anyone holding the unlocked phone knows it. The
+credential lives in the provider and checking it for real would mean a round trip to it in
+the middle of a deletion; what this stops is the accidental tap, which is what a typed
+confirmation is for.
+
 The dialog says what will happen before it asks for anything, because the consequences
 reach other people's screens and none of them are guessable:
 
@@ -743,6 +758,16 @@ rotated out, so a bad backup can never destroy the good ones.
 
 Restore by stopping the server, gunzipping a snapshot over the database file, and
 starting it again.
+
+**The admin panel holds three things** — who is waiting to be let in, who is already in,
+and what has failed on the server while nobody was watching — and **with an identity
+provider only the third is there**. The first two were of the local-accounts era: with a
+provider there are no requests to approve here and nothing that can be done to an account
+from here, so `/api/admin/users` refuses and the panel says where the accounts live
+instead of showing a copy of them it cannot act on. `scripts/reset-password.mjs` also
+stops meaning anything, since local sign-in answers 404.
+
+Everything below is about the local-accounts mode.
 
 **Getting back into an account** has no email behind it, so it has no self-service
 "forgot my password" either: you ask whoever runs the instance, and they generate a
