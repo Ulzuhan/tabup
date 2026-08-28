@@ -1,15 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink, Globe, LogOut, SlidersHorizontal, User as UserIcon, UserCheck } from "lucide-react";
+import { Globe, User as UserIcon, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { KaiCorpAccountMenu, KaiCorpMenuItem } from "@/components/kaicorp-account-menu";
 import { useT } from "@/i18n/provider";
 import { ThemeItems } from "@/components/theme";
 import { LanguageItems } from "@/components/language";
@@ -30,6 +30,14 @@ export interface SessionUser {
 /**
  * Lo propio de TabUp dentro de la cabecera común de KaiCorp Labs.
  *
+ * El menú de la cuenta ya no se pinta aquí: es `KaiCorpAccountMenu`, cromado común
+ * repartido por `sync-theme.sh` como la cabecera y el pie. Las cinco aplicaciones lo
+ * resolvían de cinco formas distintas —dos desplegables con dos implementaciones, dos
+ * sin menú y una con la cuenta fuera de la cabecera— y esto es lo mismo que ya se hizo
+ * con la letra y el marco. Lo que sigue siendo de TabUp: el enlace de administración
+ * cuando lo hay, la caché sin conexión que hay que limpiar al salir, y lo que ve quien
+ * no ha entrado, que es donde vive el selector de idioma para quien no tiene cuenta.
+ *
  * La sesión llega ya resuelta desde el layout, que es servidor. Antes esto vivía
  * en `AppHeader`, la pedía por `fetch` al montar y mostraba un esqueleto mientras
  * llegaba; ahora el primer pintado ya trae el nombre puesto y no hay parpadeo que
@@ -46,17 +54,6 @@ export function AccountMenu({
   accountUrl?: string | null;
 }) {
   const t = useT();
-
-  const signOut = async () => {
-    const res = await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
-    // La caché offline es del navegador, no de la cuenta: dejarla ahí le entrega
-    // los viajes a quien entre después en este dispositivo.
-    clearSessionCache();
-    // Recargar no bastaba: la sesión del proveedor seguía viva y "Sign in"
-    // volvía a entrar sin pedir nada.
-    const next = res ? (await res.json().catch(() => ({}))).next : null;
-    window.location.href = next ?? "/";
-  };
 
   if (!user) {
     return (
@@ -93,77 +90,36 @@ export function AccountMenu({
   }
 
   return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button variant="ghost" size="sm" className="gap-2 rounded-full pr-3 pl-2">
-              {/* Tu cara si la elegiste, y si no la inicial de siempre: es el mismo
-                  dibujo que llevas en los grupos, y verlo aquí es lo que hace que
-                  elegirla signifique algo fuera de la página de ajustes. */}
-              <span className="relative flex size-6 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
-                {user.emoji ?? user.name.slice(0, 1).toUpperCase()}
-                {pendingApprovals > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-primary ring-2 ring-background" />
-                )}
+    <KaiCorpAccountMenu
+      email={user.email}
+      name={user.name}
+      emoji={user.emoji}
+      settingsHref="/settings"
+      accountUrl={accountUrl}
+      beforeSignOut={clearSessionCache}
+      labels={{
+        menu: t("settings.title"),
+        settings: t("settings.title"),
+        account: t("settings.providerAccount"),
+        signOut: t("auth.signOut"),
+        signingOut: t("common.loading"),
+      }}
+      extra={
+        user.admin ? (
+          <KaiCorpMenuItem href="/admin">
+            <UserCheck className="size-4" />
+            {t("admin.title")}
+            {pendingApprovals > 0 && (
+              <span
+                className="ml-auto flex size-5 items-center justify-center rounded-full text-[11px] font-semibold"
+                style={{ background: "var(--kc-accent)", color: "var(--kc-accent-ink)" }}
+              >
+                {pendingApprovals}
               </span>
-              <span className="max-w-28 truncate text-sm">{user.name}</span>
-            </Button>
-          }
-        />
-        <DropdownMenuContent align="end" className="w-56">
-          {/*
-            Un div normal, no DropdownMenuLabel. Eso mapea a Menu.GroupLabel de Base
-            UI, que exige un Menu.Group alrededor — sin él lanza y el menú entero
-            deja de abrirse, que es justo lo que pasaba aquí: pulsar tu propio
-            nombre no hacía nada.
-          */}
-          <div className="px-1.5 py-1">
-            <p className="text-sm font-medium">{user.name}</p>
-            <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-          </div>
-          <DropdownMenuSeparator />
-          {/*
-            Cuatro líneas, y las cuatro son navegación: quién eres, dónde se cambia lo
-            tuyo, dónde vive tu cuenta de verdad y la salida.
-
-            Aquí había nueve, y con ellas el idioma, el aspecto, los avisos y el borrado
-            de la cuenta. Un menú vale mientras los ajustes son tres interruptores sin
-            nada que explicar; en cuanto lo que se ajusta es lo que otra gente ve de ti
-            —tu nombre en sus grupos, tu cara, cómo te pagan— hace falta sitio para decir
-            a quién afecta cada cosa, y eso es una página. Están todos en /settings.
-          */}
-          {user.admin && (
-            <DropdownMenuItem render={<Link href="/admin" />}>
-              <UserCheck className="size-4" />
-              {t("admin.title")}
-              {pendingApprovals > 0 && (
-                <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-                  {pendingApprovals}
-                </span>
-              )}
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem render={<Link href="/settings" />}>
-            <SlidersHorizontal className="size-4" />
-            {t("settings.title")}
-          </DropdownMenuItem>
-          {accountUrl && (
-            <DropdownMenuItem
-              render={<a href={accountUrl} target="_blank" rel="noreferrer" />}
-            >
-              <ExternalLink className="size-4" />
-              {t("settings.providerAccount")}
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem onClick={signOut}>
-            <LogOut className="size-4" />
-            {t("auth.signOut")}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-
-    </>
+            )}
+          </KaiCorpMenuItem>
+        ) : null
+      }
+    />
   );
 }
