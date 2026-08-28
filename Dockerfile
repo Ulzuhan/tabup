@@ -13,7 +13,13 @@ RUN npm run build
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production HOSTNAME=0.0.0.0 PORT=3457 TABUP_DB=/data/tabup.db TABUP_DATA_DIR=/data
 WORKDIR /app
-RUN groupadd --system --gid 10001 tabup && useradd --system --uid 10001 --gid tabup --home /nonexistent tabup \
+# apt upgrade: la base arrastra arreglos de seguridad de Debian (medido por el
+# Trivy semanal). Y npm/npx/yarn FUERA: el runtime ejecuta `node server.js` y
+# nada más — el npm CLI trae sus propios node_modules (tar, brace-expansion…)
+# que salen en los escáneres y jamás se usarían.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /opt/yarn* /usr/local/bin/yarn /usr/local/bin/yarnpkg \
+    && groupadd --system --gid 10001 tabup && useradd --system --uid 10001 --gid tabup --home /nonexistent tabup \
     && mkdir /data && chmod 0700 /data && chown tabup:tabup /data
 COPY --from=build --chown=tabup:tabup /app/.next/standalone ./
 USER tabup
