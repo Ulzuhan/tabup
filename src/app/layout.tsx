@@ -18,17 +18,39 @@ const display = Space_Grotesk({ variable: "--font-display", weight: ["500", "700
 const sans = Inter({ variable: "--font-sans", weight: ["400", "500"], subsets: ["latin"] });
 const mono = JetBrains_Mono({ variable: "--font-mono", weight: ["400", "500"], subsets: ["latin"] });
 
+/**
+ * The public origin, for canonical and social previews.
+ *
+ * It comes from TABUP_PUBLIC_HOST, which already exists for the origin check:
+ * no new variable, and whoever deploys this on their own domain gets their own
+ * canonical without touching code. Unset, none is emitted — Next would resolve
+ * relative URLs against localhost, and a canonical pointing there is worse than
+ * no canonical at all.
+ */
+const publicHost = process.env.TABUP_PUBLIC_HOST?.trim();
+const base = publicHost ? new URL(`https://${publicHost}`) : undefined;
+
+const TITLE = "TabUp — shared expenses, settled";
+const DESCRIPTION =
+  "Track what a group spends across currencies and get the fewest payments that make everyone even. Self-hosted and open source, with no fintech upsell.";
+
 export const metadata: Metadata = {
-  title: "TabUp — Shared Expense Tracker",
-  description: "Split expenses with friends. See who owes whom. No account needed.",
+  ...(base ? { metadataBase: base, alternates: { canonical: "/" } } : {}),
+  title: TITLE,
+  description: DESCRIPTION,
   appleWebApp: { capable: true, title: "TabUp", statusBarStyle: "black-translucent" },
   icons: { icon: "/icon-192.png", apple: "/apple-icon.png" },
   openGraph: {
-    title: "TabUp — Shared Expense Tracker",
-    description: "Split expenses with friends. See who owes whom. No account needed.",
+    title: TITLE,
+    description: DESCRIPTION,
     type: "website",
-    locale: "es_ES",
+    siteName: "TabUp",
+    // en_US, no es_ES: la interfaz y todo este texto están en inglés, y
+    // declarar un idioma que no es el del contenido confunde a quien lo lea.
+    locale: "en_US",
+    ...(base ? { url: "/", images: [{ url: "/og.jpg", width: 760, height: 475, alt: "TabUp: balances between three people and how to settle them" }] } : {}),
   },
+  twitter: { card: "summary_large_image" },
 };
 
 /**

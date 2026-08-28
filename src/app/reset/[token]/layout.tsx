@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 /**
- * Never in a search index: A trip belongs to its members and to nobody else.
+ * Never in a search index: A password-reset token in the path is a way into an account.
  * `robots.txt` disallows this prefix as well — two layers, because a crawler
  * that indexes one of these publishes something private.
  *
@@ -12,6 +12,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function TripLayout({ children }: { children: React.ReactNode }) {
+export default function ResetLayout({ children }: { children: React.ReactNode }) {
   return children;
 }
