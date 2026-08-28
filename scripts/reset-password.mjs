@@ -30,14 +30,29 @@ const db = new Database(DB_PATH);
 
 const [target, chosen] = process.argv.slice(2);
 
+/**
+ * Una cuenta creada a través de un proveedor de identidad no tiene contraseña aquí.
+ *
+ * Su hash es `oidc$<aleatorio>`, un relleno que ninguna comprobación acepta, y mientras
+ * el proveedor esté configurado la entrada local contesta 404 de todas formas. Ponerle
+ * una contraseña a eso no rompe nada, pero tampoco sirve para nada: quien la reciba
+ * seguirá sin poder entrar con ella, y habrá perdido la tarde averiguando por qué. Se
+ * lee del propio dato, no del entorno, porque quien ejecuta esto desde la máquina no
+ * tiene por qué tener a mano las variables del servicio.
+ */
+const desdeProveedor = (hash) => typeof hash === "string" && hash.startsWith("oidc$");
+
 if (!target || target === "--list") {
-  const users = db.prepare("SELECT email, name, created_at FROM users ORDER BY created_at").all();
+  const users = db
+    .prepare("SELECT email, name, created_at, password_hash FROM users ORDER BY created_at")
+    .all();
   if (users.length === 0) {
     console.log("No accounts yet.");
   } else {
     console.log(`${users.length} account${users.length === 1 ? "" : "s"}:\n`);
     for (const u of users) {
-      console.log(`  ${u.email.padEnd(32)} ${u.name}  (since ${new Date(u.created_at).toISOString().slice(0, 10)})`);
+      const marca = desdeProveedor(u.password_hash) ? "  [identity provider]" : "";
+      console.log(`  ${u.email.padEnd(32)} ${u.name}  (since ${new Date(u.created_at).toISOString().slice(0, 10)})${marca}`);
     }
   }
   if (!target) console.log("\nUsage: node scripts/reset-password.mjs <email> [new-password]");
@@ -45,10 +60,20 @@ if (!target || target === "--list") {
 }
 
 const email = target.trim().toLowerCase();
-const user = db.prepare("SELECT id, email, name FROM users WHERE email = ?").get(email);
+const user = db
+  .prepare("SELECT id, email, name, password_hash FROM users WHERE email = ?")
+  .get(email);
 
 if (!user) {
   console.error(`No account with email ${email}. Run with --list to see them all.`);
+  process.exit(1);
+}
+
+if (desdeProveedor(user.password_hash)) {
+  console.error(
+    `${email} signs in through the identity provider; there is no password here to set.\n` +
+      `Reset it there instead — while a provider is configured, local sign-in answers 404.`
+  );
   process.exit(1);
 }
 

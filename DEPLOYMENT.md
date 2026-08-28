@@ -7,10 +7,13 @@ TabUp conserva datos duraderos en SQLite y fotos de recibos en disco. Debe ejecu
 1. Copia `.env.example` a `.env`. Sin nada más, la aplicación funciona con sus propias cuentas; con las cuatro variables OIDC fijadas, entrar es cosa del proveedor (cualquier OIDC estándar: Authentik, Keycloak, Zitadel, Auth0…).
 2. Ejecuta `docker compose up -d --build`.
 3. Publica únicamente el proxy TLS; Compose enlaza la aplicación a `127.0.0.1:3457`.
+4. Con proveedor: `TABUP_ENROLL_URL` decide dónde se pide cuenta. Sin fijarla no se ofrece el botón —que es lo correcto si tu proveedor no tiene alta autoservicio— y con ella aparece en la portada y en cada invitación.
 
 El contenedor corre como UID 10001, sin capacidades, con raíz de solo lectura y un volumen escribible para la base y los recibos. El esquema se crea o completa solo al arrancar; nunca destruye una base existente.
 
-**La primera cuenta entra siempre** —sin eso una instalación nueva no podría inicializarse— y es el admin. Eso corta en las dos direcciones: una instancia recién levantada y ya pública es de quien llegue primero. Crea la primera cuenta antes de darle nombre público.
+**Con cuentas propias, la primera entra siempre** —sin eso una instalación nueva no podría inicializarse— y es el admin: el único que ve y resuelve las solicitudes de cuenta. Eso corta en las dos direcciones: una instancia recién levantada y ya pública es de quien llegue primero. Crea la primera cuenta antes de darle nombre público.
+
+**Con un proveedor de identidad no hay admin.** Ese papel existe para dejar entrar a la gente y nada más, así que delegando la identidad desaparece entero: no hay panel, ni solicitudes, ni contraseñas que reponer desde dentro. Los fallos del servidor van al log del contenedor (`docker logs`) además de a su tabla. Y añade `TABUP_ENROLL_URL` con el flujo de alta de tu proveedor, o quien llegue sin cuenta no verá dónde pedirla.
 
 ## Proxy inverso
 
@@ -38,4 +41,6 @@ No copies sólo `tabup.db` mientras el servicio escribe en modo WAL: usa `sqlite
 
 ## Antes de desplegar
 
-`npm ci`, `npm run lint`, `npx tsc --noEmit`, `npm run build`, `./scripts/run-suites.sh`, `npm audit --omit=dev`, `docker compose config -q`.
+`npm ci`, `npm run lint`, `npx tsc --noEmit`, `npm run build`, `./scripts/run-suites.sh`, `npm run test:identity`, `npm audit --omit=dev`, `docker compose config -q`.
+
+`test:identity` va aparte porque es la única suite que necesita el proveedor configurado: si despliegas con OIDC, es la que comprueba lo que cambia por tenerlo.

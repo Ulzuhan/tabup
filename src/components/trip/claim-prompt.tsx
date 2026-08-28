@@ -15,9 +15,9 @@ import { Input } from "@/components/ui/input";
  *
  * Shown to somebody who can open a trip but is in nobody's split. Being able to read a
  * trip and being one of the people it divides its bills between were never the same
- * thing, and until now only the first was modelled — so a guest could add expenses
- * while the app had no idea which column was theirs, and every balance had to be read
- * as a list of names rather than as what *you* owe.
+ * thing, and until now only the first was modelled — so somebody let into a trip could
+ * add expenses while the app had no idea which column was theirs, and every balance had
+ * to be read as a list of names rather than as what *you* owe.
  *
  * It asks instead of guessing. The names were typed by whoever created the trip, and
  * matching "Andoni" to an account by spelling would be a guess about money. It is also

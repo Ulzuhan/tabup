@@ -368,8 +368,8 @@ function touchTrip(writer: Writer, tripId: string): void {
  *
  * Authorisation is per trip, and every id below arrives in a request body rather than
  * in the URL that was authorised. Without this pairing, write access to any one trip
- * was write access to every row in the database whose id you happened to know — and a
- * read-only guest is handed the ids of everything they can see.
+ * was write access to every row in the database whose id you happened to know — and
+ * everyone in a trip is handed the ids of everything in it.
  */
 function belongsToTrip(
   table: typeof expenses | typeof payments | typeof members,

@@ -25,10 +25,11 @@
  *
  * The invitation is the loudest case but not the only one: everything that was built for
  * TabUp's own accounts has to either work or step aside when the accounts are somebody
- * else's. The admin panel used to offer approvals and passwords it could no longer act
- * on, and closing your own account asked for a password that, on an account created
+ * else's. Closing your own account asked for a password that, on an account created
  * through the provider, is a filler string no scrypt check will ever accept — so the one
- * thing that screen exists for could not be done at all.
+ * thing that screen exists for could not be done at all. And there was an admin panel,
+ * offering approvals and passwords it could no longer act on: the role behind it exists
+ * to let people in, so with a provider it is not handed out and the panel is not there.
  */
 import { readFileSync, writeFileSync } from "fs";
 
@@ -132,7 +133,8 @@ async function setup() {
   const seatToken = seated.body.invite.token;
   const seatName = guestEmail.split("@")[0];
 
-  // Quien registra primero es el administrador de la instancia.
+  // Con cuentas propias, quien registra primero administra la instancia: es lo que
+  // hace significativo que en la fase siguiente esa misma sesión no administre nada.
   const panel = await owner("/api/admin/users");
   check("the first account administers this instance", panel.status, 200);
 

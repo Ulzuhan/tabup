@@ -191,7 +191,7 @@ async function main() {
   );
 
   // ── Claiming ───────────────────────────────────────────────────────
-  console.log("\nA guest says which participant they are");
+  console.log("\nSomebody who joined says which participant they are");
   const erin = client();
   const erinReg = await register(erin, "Erin");
   assertNotThrottled(erinReg);
