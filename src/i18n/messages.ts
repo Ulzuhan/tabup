@@ -441,8 +441,11 @@ export const es = {
     headline: "Las cuentas del viaje, claras al volver",
     sub: "Apunta lo que paga cada uno, en cualquier moneda, y TabUp calcula quién debe a quién con los menos pagos posibles.",
     getStarted: "Crear cuenta",
+    // Sin nombrar a nuestro proveedor: esto se compila en un repositorio con
+    // licencia MIT y lo lee quien despliegue TabUp en su casa. Solo se enseña
+    // cuando las cuentas son de un proveedor, que es cuando la frase es cierta.
     accountHint:
-      "¿Ya tienes cuenta de KaiCorp Labs? Usa el mismo botón: pide acceso a este servicio.",
+      "¿Ya tienes cuenta? Ese mismo botón sirve para pedir acceso a este servicio.",
     signIn: "Entrar",
     demoTitle: "Fin de semana en Lisboa",
     demoTotal: "Total gastado",
@@ -475,16 +478,28 @@ export const es = {
     title: "Te han invitado a un grupo",
     subtitle: "Entra o crea una cuenta para unirte a {trip}.",
     subtitleSeat: "Entra o crea una cuenta para unirte a {trip}. Tu sitio, «{name}», ya está reservado.",
+    /** Con la sesión ya abierta no hay nada que crear: solo falta aceptar. */
+    subtitleIn: "Únete a {trip}.",
+    subtitleInSeat: "Únete a {trip}. Tu sitio, «{name}», ya está reservado.",
     joinAs: "Unirte como {name}",
     joining: "Uniéndote…",
     joined: "Ya estás dentro",
     expired: "Esta invitación ya no vale",
-    expiredHint: "Pide al dueño del viaje que te mande una nueva.",
+    expiredHint: "Pide una nueva a quien te invitó.",
     createAccount: "Crear cuenta y unirme",
     signIn: "Ya tengo cuenta",
+    /** Instancias con proveedor de identidad: la sesión se abre allí y se vuelve aquí. */
+    signInToJoin: "Entrar para unirme",
+    askAccount: "Pedir una cuenta",
+    askAccountHint: "Si aún no tienes, pídela y vuelve a este enlace cuando la tengas.",
     inviteLink: "Enlace de invitación",
+    // Antes prometía "aunque todavía no tenga cuenta", que era verdad cuando las
+    // cuentas eran de TabUp y una invitación valía como permiso para registrarse.
+    // Con un proveedor de identidad delante, el invitado necesita cuenta; lo que el
+    // enlace garantiza es que desde él se puede conseguir. Eso es cierto en los dos
+    // modos, y es lo que dice ahora.
     inviteHint:
-      "Quien lo abra entra en el grupo y en el reparto, aunque todavía no tenga cuenta.",
+      "Quien lo abra entra en el grupo y en el reparto. Si todavía no tiene cuenta, desde el enlace puede conseguirla.",
     createInvite: "Crear invitación",
     creating: "Creando…",
     ownerInvites: "Solo quien creó el grupo puede invitar a más gente.",
@@ -1008,7 +1023,7 @@ export const en: Messages = {
     sub: "Log what everyone paid, in any currency, and TabUp works out who owes whom in the fewest possible payments.",
     getStarted: "Create account",
     accountHint:
-      "Already have a KaiCorp Labs account? Use the same button — it asks for access to this one.",
+      "Already have an account? That same button is where you ask for access to this one.",
     signIn: "Sign in",
     demoTitle: "Weekend in Lisbon",
     demoTotal: "Total spent",
@@ -1041,16 +1056,21 @@ export const en: Messages = {
     title: "You have been invited to a trip",
     subtitle: "Sign in or create an account to join {trip}.",
     subtitleSeat: "Sign in or create an account to join {trip}. Your place, “{name}”, is already saved.",
+    subtitleIn: "Join {trip}.",
+    subtitleInSeat: "Join {trip}. Your place, “{name}”, is already saved.",
     joinAs: "Join as {name}",
     joining: "Joining…",
     joined: "You are in",
     expired: "This invitation is no longer valid",
-    expiredHint: "Ask the trip owner to send you a new one.",
+    expiredHint: "Ask whoever invited you for a new one.",
     createAccount: "Create account and join",
     signIn: "I already have an account",
+    signInToJoin: "Sign in to join",
+    askAccount: "Ask for an account",
+    askAccountHint: "If you have not got one yet, ask for it and come back to this link.",
     inviteLink: "Invitation link",
     inviteHint:
-      "Whoever opens it joins the trip and its split, even without an account yet.",
+      "Whoever opens it joins the group and its split. If they have no account yet, the link is where they get one.",
     createInvite: "Create invitation",
     creating: "Creating…",
     ownerInvites: "Only whoever created the trip can invite people.",

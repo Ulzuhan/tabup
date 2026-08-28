@@ -1,6 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { getCurrentUser, registrationOpen } from "@/lib/auth";
-import { oidcConfigured } from "@/lib/oidc";
+import { enrollUrl, oidcConfigured } from "@/lib/oidc";
 import { LOCALE_COOKIE, isLocale, localeFromHeader } from "@/i18n/config";
 import { Landing } from "@/components/landing";
 import { TripsView } from "./trips-view";
@@ -23,11 +23,16 @@ export default async function Home() {
 
   // Sin proveedor, "crear cuenta" va al formulario propio: mandar a alguien al
   // flujo de alta de un Authentik que no existe es un callejón sin salida.
+  //
+  // Con proveedor, la dirección la pone quien despliega (`TABUP_ENROLL_URL`) y sin
+  // ella no hay botón. Antes caía en un valor por defecto que era nuestro Authentik,
+  // así que cualquier otra instancia mandaba a sus visitantes a pedir cuenta en casa
+  // ajena.
   return (
     <Landing
       locale={locale}
       canRegister={registrationOpen()}
-      enrollUrl={oidcConfigured() ? undefined : "/login?new=1"}
+      enrollUrl={oidcConfigured() ? enrollUrl() : "/login?new=1"}
     />
   );
 }

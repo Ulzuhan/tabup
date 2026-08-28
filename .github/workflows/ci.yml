@@ -45,6 +45,12 @@ jobs:
       - name: Test
         run: ./scripts/run-suites.sh
 
+      # Aparte de las anteriores porque necesita justo lo que aquéllas apagan: un
+      # proveedor de identidad configurado. Es el hueco por el que se coló una página
+      # de invitación que solo funcionaba sin él. Ver scripts/test-join.sh.
+      - name: Invitations, with and without an identity provider
+        run: npm run test:join
+
       - name: Recurring dates outside UTC
         run: TZ=Europe/Madrid npm run test:recurring
 

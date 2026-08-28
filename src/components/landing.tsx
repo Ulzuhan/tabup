@@ -23,27 +23,35 @@ import { Button } from "@/components/ui/button";
  * for those expenses — rather than a stock illustration. Showing the one screen that
  * matters says more than any amount of copy about balances.
  */
-/**
- * Where somebody asks for an account.
- *
- * The flow lives in the identity provider and is specific to this service: it
- * creates the account inactive AND already in TabUp's group, so approving it is
- * one click and cannot forget to grant access.
- */
-const ENROLL_URL = "https://auth.kaicorplabs.com/if/flow/enroll-tabup/";
-
 export function Landing({
   locale,
-  enrollUrl = ENROLL_URL,
+  enrollUrl,
 }: {
   locale: Locale;
   canRegister?: boolean;
-  /** Dónde se pide cuenta. Con proveedor, su flujo de alta; sin él, el
-      formulario propio. Lo decide el servidor, que es quien sabe si hay
-      proveedor configurado. */
-  enrollUrl?: string;
+  /**
+   * Dónde se pide cuenta. Con proveedor, su flujo de alta (`TABUP_ENROLL_URL`);
+   * sin él, el formulario propio. Lo decide el servidor, que es quien sabe si hay
+   * proveedor configurado.
+   *
+   * Aquí había un valor por defecto: el flujo de alta de NUESTRO Authentik, escrito
+   * a fuego en un repositorio con licencia MIT. Cualquiera que desplegara TabUp
+   * publicaba un botón "Crear cuenta" que llevaba a sus visitantes al proveedor de
+   * identidad de otra persona. `null` es ahora una respuesta legítima —una instancia
+   * cuyo proveedor no tiene alta autoservicio no debe ofrecer el botón— y la portada
+   * se reordena sin él.
+   */
+  enrollUrl?: string | null;
 }) {
   const t = MESSAGES[locale].landing;
+
+  /**
+   * La pista sobre pedir acceso solo tiene sentido cuando las cuentas son de un
+   * proveedor: es su flujo el que sirve tanto para una cuenta nueva como para pedir
+   * este servicio. Con cuentas propias el botón va al formulario de aquí —una ruta
+   * relativa— y la frase sobraría.
+   */
+  const providerAccounts = Boolean(enrollUrl && /^https?:\/\//.test(enrollUrl));
 
   const features = [
     { Icon: Coins, title: t.f1Title, body: t.f1Body },
@@ -72,16 +80,25 @@ export function Landing({
               {t.sub}
             </p>
 
+            {/* Sin sitio donde pedir cuenta, "Entrar" es la única acción y pasa a ser
+                la principal: dos botones cuando uno de ellos no lleva a ninguna parte
+                es peor que uno. */}
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
-              <Button size="lg" className="h-12 px-7 text-base" render={<Link href={enrollUrl}>{t.getStarted}</Link>} />
+              {enrollUrl && (
+                <Button
+                  size="lg"
+                  className="h-12 px-7 text-base"
+                  render={<Link href={enrollUrl}>{t.getStarted}</Link>}
+                />
+              )}
               <Button
                 size="lg"
-                variant="outline"
+                variant={enrollUrl ? "outline" : undefined}
                 className="h-12 px-7 text-base"
                 render={<Link href="/login">{t.signIn}</Link>}
               />
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">{t.accountHint}</p>
+            {providerAccounts && <p className="mt-3 text-xs text-muted-foreground">{t.accountHint}</p>}
           </div>
 
           <DemoCard t={t} locale={locale} />
@@ -119,8 +136,8 @@ export function Landing({
           size="lg"
           className="mt-7 h-12 px-7 text-base"
           render={
-            <Link href={enrollUrl}>
-              {t.getStarted}
+            <Link href={enrollUrl ?? "/login"}>
+              {enrollUrl ? t.getStarted : t.signIn}
               <ArrowRight className="size-4" />
             </Link>
           }

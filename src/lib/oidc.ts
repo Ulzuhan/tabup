@@ -197,3 +197,34 @@ export function safeNext(raw: string | undefined | null): string {
   if (limpio.startsWith("//") || limpio.startsWith("/\\")) return "/";
   return limpio;
 }
+
+/**
+ * Dónde se manda a quien no tiene cuenta a pedir una.
+ *
+ * Es propio de cada despliegue, así que llega por entorno. Estaba escrito a fuego
+ * en la portada —el flujo de alta de NUESTRO Authentik—, de modo que cualquiera que
+ * desplegara este repositorio le ponía a sus visitantes un botón de alta hacia el
+ * proveedor de identidad de un desconocido. Con `TABUP_ENROLL_URL` sin fijar no hay
+ * botón, que es la misma regla que sigue DocDrop: un proveedor sin alta autoservicio
+ * no debe mandar a nadie a una página que lo va a rechazar.
+ *
+ * No reutiliza `validUrl`: aquélla quita la barra final y rechaza la query, y un
+ * flujo de Authentik es exactamente `.../if/flow/<slug>/` —con barra— y puede
+ * llevar parámetros.
+ */
+export function enrollUrl(): string | null {
+  const raw = process.env.TABUP_ENROLL_URL?.trim();
+  if (!raw) return null;
+
+  try {
+    const url = new URL(raw);
+    // https, porque es un enlace donde alguien va a escribir una contraseña. El
+    // loopback en http se admite por lo mismo que en el proveedor: desarrollo.
+    const loopback = ["127.0.0.1", "localhost", "::1"].includes(url.hostname);
+    if (url.protocol !== "https:" && !(loopback && url.protocol === "http:")) return null;
+    if (url.username || url.password) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}

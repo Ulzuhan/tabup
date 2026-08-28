@@ -62,6 +62,7 @@ npm run start
 | `TABUP_OIDC_REDIRECT_URI` | unset | `https://your-host/api/auth/callback` |
 | `TABUP_OIDC_PUBLIC_BASE` | unset | The provider as the browser sees it. There is no default provider: each URL arrives by environment and is validated |
 | `TABUP_OIDC_INTERNAL_BASE` | falls back to `PUBLIC_BASE` | The provider as this server sees it, when that differs — e.g. loopback to a provider on the same machine |
+| `TABUP_ENROLL_URL` | unset | Where somebody with no account is sent to ask for one: your provider's enrolment flow. Shown on the landing page and on an invitation. Unset means no button at all, which is right when the provider has no self-service sign-up — the alternative, a default baked into the source, pointed everyone who deployed this at *our* provider |
 | `TABUP_PUBLIC_HOST` | unset | Public hostname the origin check compares against. Unset, the incoming `Host` is used, which is right behind a tunnel that preserves it — verified. Only needed behind a proxy that rewrites `Host` with an internal name. |
 
 The database file and its directory are created on first start. There is no separate
@@ -326,9 +327,24 @@ link returned 404 to them, and registration is closed by default, so there was n
 in at all — a friend scanning the QR of an owned trip simply hit a dead end.
 
 The share dialog now offers an invitation link for owned trips, and the QR encodes that
-instead of the raw URL. Opening it names the trip and lets the visitor sign in or
-register; either way they land inside. **A valid invitation is itself permission to
-register**, which is what makes this work on a closed instance.
+instead of the raw URL. Opening it names the trip and offers whatever way in this
+instance actually has — which is decided on the server, and is the whole point:
+
+- **With TabUp's own accounts**, a form to register or sign in, with the token travelling
+  alongside the credentials. **A valid invitation is itself permission to register**,
+  which is what makes this work on a closed instance.
+- **With an identity provider**, no form at all: a link into the provider that carries
+  the invitation back here, and — when `TABUP_ENROLL_URL` is set — where to ask for an
+  account first.
+
+That second case was broken from the day this instance moved to a provider, and it is
+worth writing down because nothing caught it. The page was rendered in the browser and
+always drew the local form, posting it to `/api/auth/register` — which answers **404 by
+design** once a provider is configured, since identity is the provider's business and an
+old password must not slip past its MFA. So every invited person met the one door that
+does not exist. Every suite passed throughout: they all run with the provider switched
+off, because that is the only way they can create the accounts they need.
+`npm run test:join` is the one that runs it both ways.
 
 Invitations last 7 days and are not single-use — a trip link gets forwarded around a
 group, and a one-shot invite would work for whoever tapped first and leave everyone
@@ -489,6 +505,19 @@ nothing:
 ```bash
 npm run test:restart    # 6 — what a restart must not change
 ```
+
+`test:join` does the same, three times over, because it is the one suite that needs an
+identity provider configured — and the others cannot have one, since they create the
+accounts they test with:
+
+```bash
+npm run build
+npm run test:join       # 27 — the invitation path, with local accounts and with a provider
+```
+
+It runs one database under three servers: local accounts, a provider with a sign-up URL,
+and a provider without one. That gap is where a join page that only worked without a
+provider survived every green build — see [Invitations](#invitations).
 
 It exists because every other suite talks to one long-lived server, and so none of them
 can see a bug that only happens at boot — which is where the repairs live, and repairs

@@ -370,11 +370,10 @@ async function main() {
   check("and the trip stays shut to them", (await bob(`/api/trips/${tripId}`)).status, 404);
   // Narrow on purpose: it is that person who is refused, not the link that is burnt.
   // Everyone else in the group chat still has a working invitation.
-  check(
-    "while the link itself is still live",
-    (await heidi(`/api/join?token=${encodeURIComponent(stillLive.body.token)}`)).status,
-    200
-  );
+  // Que siga viva se ve donde se ve de verdad: la página de la invitación sigue
+  // nombrando el grupo para cualquiera del chat que abra el mismo enlace.
+  const stillLivePage = await fetch(`${BASE}/join/${stillLive.body.token}`).then((r) => r.text());
+  check("while the link itself is still live", stillLivePage.includes("Shared"), true);
   // The owner can still let them back in deliberately, which is the difference that
   // matters: the door is shut, not walled up.
   check(

@@ -399,8 +399,10 @@ async function main() {
   const guest = client();
   check("stranger cannot see the trip", (await guest(`/api/trips/${inviteTrip.id}`)).status, 404);
 
-  const lookup = await guest(`/api/join?token=${encodeURIComponent(invite.body.token)}`);
-  check("the invitation names the trip", lookup.body.tripName, "Invited trip");
+  // La página de la invitación es quien nombra el grupo, y lo hace en el servidor:
+  // el GET de /api/join que se preguntaba esto se retiró al dejar de tener llamantes.
+  const lookup = await fetch(`${BASE}/join/${invite.body.token}`).then((r) => r.text());
+  check("the invitation page names the trip", lookup.includes("Invited trip"), true);
 
   // A valid invitation is permission to register even when sign-ups are closed.
   const joined = await guest("/api/auth/register", {
