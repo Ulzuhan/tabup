@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Camera, Check, ChevronDown, Loader2 } from "lucide-react";
@@ -572,6 +572,20 @@ function ReceiptScanner({
   onScanned: (fields: ScannedFields, filename: string) => void;
   onRemoved: () => void;
 }) {
+  // Una sola pregunta al montar: es una propiedad de la instancia, no cambia mientras
+  // alguien rellena un gasto.
+  const [sale, setSale] = useState(false);
+  useEffect(() => {
+    let cancelado = false;
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((d: { ocrLeavesMachine?: boolean }) => !cancelado && setSale(Boolean(d.ocrLeavesMachine)))
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
   const t = useT();
   const serverError = useServerError();
   const [busy, setBusy] = useState(false);
@@ -658,6 +672,17 @@ function ReceiptScanner({
           </>
         )}
       </Button>
+      {/*
+        Dicho antes de pulsar, no después.
+
+        El modelo que lee un ticket arrugado no cabe en la máquina que sirve esto, así
+        que en la configuración por defecto —y en la instancia pública— Ollama reenvía
+        la foto a su servicio. Estaba escrito en el README y en un comentario del
+        código: los dos sitios donde no mira quien está fotografiando un ticket encima
+        de una mesa. Si el modelo configurado sí corre en local, esta línea no aparece,
+        porque entonces no sería verdad.
+      */}
+      {sale && <p className="text-xs text-warning">{t("expense.scanLeaves")}</p>}
     </>
   );
 }

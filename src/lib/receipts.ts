@@ -20,6 +20,22 @@ export const RECEIPTS_DIR = CUSTOM_DATA_DIR
   ? resolve(CUSTOM_DATA_DIR, "receipts")
   : join(/* turbopackIgnore: true */ process.cwd(), "data", "receipts");
 
+/**
+ * Si la foto sale de esta máquina al leerla.
+ *
+ * Ollama nombra `<modelo>:<tamaño>-cloud` a los que no ejecuta en local: los reenvía a
+ * su servicio. El valor por defecto es uno de ésos, porque el modelo que lee un ticket
+ * arrugado bien pesa cientos de gigas y no cabe en un mini PC — así que en una
+ * instalación que no toque nada, **la foto sale**.
+ *
+ * Esto existe para poder decírselo a quien va a pulsar el botón. Estaba escrito en el
+ * README y en un comentario de este fichero, que son exactamente los dos sitios donde no
+ * mira quien está fotografiando un ticket en una mesa.
+ */
+export function ocrLeavesMachine(): boolean {
+  return /(^|[:-])cloud$/.test(OCR_MODEL);
+}
+
 /** Bigger than any phone photo needs to be for this, small enough to bound abuse. */
 export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 

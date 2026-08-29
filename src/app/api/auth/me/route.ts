@@ -13,6 +13,7 @@ import { deleteAccount, FREE_TRIP_LIMIT, ownedTripCount } from "@/lib/store";
 import { fail } from "@/lib/api-error";
 import { jsonBody } from "@/lib/body";
 import { logError } from "@/lib/errors";
+import { ocrLeavesMachine } from "@/lib/receipts";
 import { oidcConfigured } from "@/lib/oidc";
 
 /** Who is signed in, and how much of the free plan they have used. */
@@ -25,6 +26,10 @@ export async function GET() {
     user: { ...publicUser(user), admin: isAdmin(user) },
     // Surfaced here so the header can badge the menu without a second request.
     pendingApprovals: isAdmin(user) ? pendingUsers().length : 0,
+    // Una capacidad de la instancia, no de la cuenta: si leer un ticket manda la foto
+    // fuera de esta máquina. Lo pregunta el botón de escanear para poder advertirlo
+    // antes de que alguien lo pulse, no después.
+    ocrLeavesMachine: ocrLeavesMachine(),
     usage: {
       trips: ownedTripCount(user.id),
       // null means no cap, which is the default.

@@ -684,7 +684,15 @@ which is too slow to use at a table. Set `TABUP_OCR_MODEL` to change it.
 The reading is a shortcut, never a gate: if the model is slow, missing or unsure, the
 photo is still attached and the fields are typed by hand.
 
-**The photo leaves the machine when the model is a cloud one, which the default is.** A
+**The photo leaves the machine when the model is a cloud one, which the default is** —
+and since 2026-08-29 the app says so **next to the button**, not only here: `/api/auth/me`
+reports whether the configured model runs locally, and the scan control carries the
+warning when it does not. It was written in this README and in a comment in
+`lib/receipts.ts`, which are the two places nobody reads while photographing a receipt on
+a table. Point `TABUP_OCR_MODEL` at a local model and the warning disappears, because
+then it would not be true.
+
+A
 397-billion-parameter model at BF16 is some 800 GB of weights; it does not run on a mini
 PC, and Ollama forwards the image to run it. That is a fair trade for OCR that works at a
 table on modest hardware, but it is a fact about somebody's receipt and belongs in writing
