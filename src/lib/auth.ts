@@ -36,7 +36,32 @@ const SCRYPT_MAXMEM = 64 * 1024 * 1024;
 const KEY_LENGTH = 64;
 
 export const SESSION_COOKIE = "tabup_session";
-const SESSION_DAYS = 30;
+
+/**
+ * How long a session lives — and why this is hours and not the month it used
+ * to be.
+ *
+ * When identity moved to a provider, this number stopped being only a
+ * convenience setting and became **how long it takes for losing access to
+ * actually mean something**. Nothing asks the provider again once you are in,
+ * so revoking somebody kept them working here for as long as their cookie
+ * lasted: thirty days. The other four tools of the suite already capped
+ * themselves at twelve hours; this one was the outlier, and the one with real
+ * users.
+ *
+ * Twelve hours is the same trade the others make: long enough to cover a day
+ * of use without asking again, short enough that "access removed" is true by
+ * tomorrow. Configurable up to 24 for a deployment that wants it, never more
+ * — a cap that a setting can lift is not a cap.
+ *
+ * There is no sliding renewal on purpose: a session that renews itself on
+ * every request never expires, and the bound would be fiction.
+ */
+const requestedTtl = Number(process.env.TABUP_SESSION_TTL_HOURS ?? 12);
+const SESSION_TTL_HOURS = Number.isFinite(requestedTtl)
+  ? Math.min(24, Math.max(1, requestedTtl))
+  : 12;
+const SESSION_TTL_MS = SESSION_TTL_HOURS * 60 * 60 * 1000;
 
 // ── Passwords ────────────────────────────────────────────────────────────
 
@@ -92,7 +117,7 @@ const hashToken = (token: string) => createHash("sha256").update(token).digest("
 export async function createSession(userId: string): Promise<void> {
   const token = randomBytes(32).toString("base64url");
   const now = Date.now();
-  const expiresAt = now + SESSION_DAYS * 24 * 60 * 60 * 1000;
+  const expiresAt = now + SESSION_TTL_MS;
 
   db.insert(sessions)
     .values({ tokenHash: hashToken(token), userId, createdAt: now, expiresAt })
@@ -104,7 +129,7 @@ export async function createSession(userId: string): Promise<void> {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: SESSION_DAYS * 24 * 60 * 60,
+    maxAge: Math.floor(SESSION_TTL_MS / 1000),
   });
 }
 

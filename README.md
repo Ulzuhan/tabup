@@ -415,6 +415,14 @@ password paths are simply never reached. That is how the deployment this was wri
 for runs it: one account opens five different services, so a login form per service
 would mean five places to get password handling right.
 
+**Losing access takes effect, and quickly.** Two mechanisms, on purpose:
+`POST /api/auth/backchannel-logout` implements OIDC Back-Channel Logout, so the
+provider can end somebody's sessions here the moment it ends its own — point it
+at that URL in the client's *Logout URI*. And sessions expire on their own after
+`TABUP_SESSION_TTL_HOURS` (12 by default, 24 maximum, no sliding renewal), which
+is the bound that holds even when no notification arrives: the provider only
+notifies clients whose access token is still alive.
+
 The provider does not replace the account: it decides who may sign in. Everything
 below — trips, members, approvals — works the same either way. Somebody arriving by
 OIDC is matched first on the provider's `sub` claim and then on their email address,

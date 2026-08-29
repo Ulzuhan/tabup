@@ -49,6 +49,12 @@ jobs:
       # proveedor de identidad configurado. Es el hueco por el que se colaron una
       # página de invitación y un borrado de cuenta que solo funcionaban sin él.
       # Ver scripts/test-identity.sh.
+      # También con proveedor, y además con uno que FIRMA: el aviso de cierre
+      # de sesión solo se puede probar de verdad si alguien emite logout_token
+      # válidos. Ver scripts/test-backchannel.sh.
+      - name: Back-channel logout
+        run: npm run test:backchannel
+
       - name: What changes when identity is delegated
         run: npm run test:identity
 
