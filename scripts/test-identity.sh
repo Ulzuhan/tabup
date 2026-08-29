@@ -54,11 +54,13 @@ trap cleanup EXIT
 
 # $1: "local" | "provider" | "noenroll"
 start() {
-  local oidc_id="" oidc_secret="" oidc_public="" oidc_redirect="" enroll=""
+  local oidc_id="" oidc_secret="" oidc_issuer="" oidc_redirect="" enroll=""
   if [ "$1" != local ]; then
     oidc_id=tabup-pruebas
     oidc_secret=secreto-de-pruebas
-    oidc_public="$IDP"
+    # El EMISOR, no la base: desde el paso a discovery es lo único que se
+    # configura del proveedor (lib/oidc.ts).
+    oidc_issuer="$IDP/application/o/tabup/"
     oidc_redirect="https://tabup.example.invalid/api/auth/callback"
     [ "$1" = provider ] && enroll="$ENROLL"
   fi
@@ -67,7 +69,7 @@ start() {
   # sirve `.next` y es otro programa. Toma HOSTNAME y PORT del entorno.
   TABUP_DB="$DB" TABUP_DATA_DIR="$WORK" TABUP_REGISTRATION=open \
     TABUP_OIDC_CLIENT_ID="$oidc_id" TABUP_OIDC_CLIENT_SECRET="$oidc_secret" \
-    TABUP_OIDC_PUBLIC_BASE="$oidc_public" TABUP_OIDC_REDIRECT_URI="$oidc_redirect" \
+    TABUP_OIDC_ISSUER="$oidc_issuer" TABUP_OIDC_REDIRECT_URI="$oidc_redirect" \
     TABUP_ENROLL_URL="$enroll" \
     HOSTNAME=127.0.0.1 PORT="$PORT" \
     node .next/standalone/server.js >>"$LOG" 2>&1 &

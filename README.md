@@ -57,10 +57,10 @@ npm run start
 | `TABUP_BACKUP_KEEP` | `14` | Snapshots to keep |
 | `TABUP_BACKUP_REMOTE` | unset | rsync target for offsite copies |
 | `TABUP_PUSH_SUBJECT` | `mailto:tabup@localhost` | Contact a push service can complain to; part of VAPID |
-| `TABUP_OIDC_CLIENT_ID` | unset | Setting these, plus `TABUP_OIDC_PUBLIC_BASE`, delegates sign-in to an identity provider; see [Two ways in](#two-ways-in) |
+| `TABUP_OIDC_CLIENT_ID` | unset | Setting these, plus `TABUP_OIDC_ISSUER`, delegates sign-in to an identity provider; see [Two ways in](#two-ways-in) |
 | `TABUP_OIDC_CLIENT_SECRET` | unset | |
 | `TABUP_OIDC_REDIRECT_URI` | unset | `https://your-host/api/auth/callback` |
-| `TABUP_OIDC_PUBLIC_BASE` | unset | The provider as the browser sees it. There is no default provider: each URL arrives by environment and is validated |
+| `TABUP_OIDC_ISSUER` | The provider's issuer URL. Every endpoint (authorize, token, userinfo, end-session, JWKS) is read from its `/.well-known/openid-configuration`, so no provider-specific paths are baked in | The provider as the browser sees it. There is no default provider: each URL arrives by environment and is validated |
 | `TABUP_OIDC_INTERNAL_BASE` | falls back to `PUBLIC_BASE` | The provider as this server sees it, when that differs — e.g. loopback to a provider on the same machine |
 | `TABUP_ACCOUNT_URL` | unset | The provider's own account page — email, password, second factor, sessions. None of that belongs to TabUp, and without this the app links nowhere: it appears in the account menu and in Settings. Authentik serves it at `/if/user/` |
 | `TABUP_ENROLL_URL` | unset | Where somebody with no account is sent to ask for one: your provider's enrolment flow. Shown on the landing page and on an invitation. Unset means no button at all, which is right when the provider has no self-service sign-up — the alternative, a default baked into the source, pointed everyone who deployed this at *our* provider |
@@ -407,7 +407,7 @@ passwords live in TabUp's own database, hashed with scrypt. Nothing else is need
 which is the point of it being the default.
 
 **Or an identity provider,** when `TABUP_OIDC_CLIENT_ID`, `TABUP_OIDC_CLIENT_SECRET`,
-`TABUP_OIDC_REDIRECT_URI` and `TABUP_OIDC_PUBLIC_BASE` are set. Any standard OIDC
+`TABUP_OIDC_REDIRECT_URI` and `TABUP_OIDC_ISSUER` are set. Any standard OIDC
 provider works — Authentik, Keycloak, Zitadel, Auth0 — this repository is not tied to
 one. Then `/login` stops rendering a form and sends
 people to the provider instead, `/api/auth/callback` brings them back, and the local

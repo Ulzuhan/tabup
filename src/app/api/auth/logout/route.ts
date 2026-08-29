@@ -29,7 +29,10 @@ export async function POST(request: NextRequest) {
   const cfg = oidcConfig();
   // El usuario acaba en la pantalla de entrada de KaiCorp Labs; el porqué de no
   // devolverlo aquí está explicado en `endSessionUrl`.
-  const next = cfg ? endSessionUrl(cfg) : "/";
+  // Si el proveedor no anuncia el cierre de sesión, o preguntarle falla, se
+  // sale igualmente: la sesión propia ya está cerrada y eso no puede quedar
+  // a medias por un fallo de red.
+  const next = cfg ? (await endSessionUrl(cfg).catch(() => null)) ?? "/" : "/";
 
   return NextResponse.json({ ok: true, next });
 }
