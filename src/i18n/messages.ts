@@ -263,6 +263,8 @@ export const es = {
     scanFailed: "No se ha podido leer el ticket. Rellénalo a mano.",
     // El aviso solo aparece si el modelo configurado no corre en esta máquina.
     scanLeaves: "Leer el ticket manda la foto a un modelo que no corre en esta máquina. Si prefieres que no salga, escribe los datos a mano.",
+    attach: "Adjuntar foto",
+    attachOnly: "Se guarda la foto con el gasto. Leerla sola no está disponible en esta instancia: el modelo que lo hace bien no cabe aquí.",
     receipt: "Ticket",
     removePhoto: "Quitar foto",
     duplicate: "Duplicar",
@@ -884,6 +886,8 @@ export const en: Messages = {
     scanned: "Filled in from the receipt",
     scanFailed: "Could not read that receipt. Fill it in by hand.",
     scanLeaves: "Reading the receipt sends the photo to a model that does not run on this machine. Prefer it not to leave? Type the amounts instead.",
+    attach: "Attach photo",
+    attachOnly: "The photo is kept with the expense. Having it read for you is not available on this instance: the model that does it well does not fit here.",
     receipt: "Receipt",
     removePhoto: "Remove photo",
     duplicate: "Duplicate",

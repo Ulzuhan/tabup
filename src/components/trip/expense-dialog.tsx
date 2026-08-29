@@ -574,12 +574,12 @@ function ReceiptScanner({
 }) {
   // Una sola pregunta al montar: es una propiedad de la instancia, no cambia mientras
   // alguien rellena un gasto.
-  const [sale, setSale] = useState(false);
+  const [ocr, setOcr] = useState<"off" | "local" | "cloud">("off");
   useEffect(() => {
     let cancelado = false;
     fetch("/api/auth/me")
       .then((r) => (r.ok ? r.json() : {}))
-      .then((d: { ocrLeavesMachine?: boolean }) => !cancelado && setSale(Boolean(d.ocrLeavesMachine)))
+      .then((d: { ocr?: "off" | "local" | "cloud" }) => !cancelado && setOcr(d.ocr ?? "off"))
       .catch(() => {});
     return () => {
       cancelado = true;
@@ -668,7 +668,9 @@ function ReceiptScanner({
         ) : (
           <>
             <Camera className="size-4" />
-            {t("expense.scan")}
+            {/* Sin lectura, el botón hace una sola cosa y se llama por ella: adjuntar.
+                Llamarlo "escanear" prometería algo que esta instancia no hace. */}
+            {ocr === "off" ? t("expense.attach") : t("expense.scan")}
           </>
         )}
       </Button>
@@ -682,7 +684,8 @@ function ReceiptScanner({
         de una mesa. Si el modelo configurado sí corre en local, esta línea no aparece,
         porque entonces no sería verdad.
       */}
-      {sale && <p className="text-xs text-warning">{t("expense.scanLeaves")}</p>}
+      {ocr === "cloud" && <p className="text-xs text-warning">{t("expense.scanLeaves")}</p>}
+      {ocr === "off" && <p className="text-xs text-muted-foreground">{t("expense.attachOnly")}</p>}
     </>
   );
 }

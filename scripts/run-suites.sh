@@ -65,6 +65,11 @@ start() {
   local mode=open
   [ "$1" = admin ] && mode=approval
 
+  # Leer recibos está apagado salvo que se nombre un modelo, así que la suite que lo
+  # ejercita lo enciende y las demás corren como corre producción: sin él.
+  local modelo="modelo-de-pruebas"
+  [ "$1" = receipts ] || modelo=""
+
   # Las variables OIDC se desactivan A PROPÓSITO para el servidor de pruebas.
   #
   # Con un proveedor configurado, /api/auth/register y /api/auth/login devuelven
@@ -81,6 +86,7 @@ start() {
     TABUP_OIDC_CLIENT_ID= TABUP_OIDC_CLIENT_SECRET= TABUP_OIDC_REDIRECT_URI= \
     TABUP_OIDC_PUBLIC_BASE= TABUP_OIDC_INTERNAL_BASE= \
     TABUP_OLLAMA_URL="http://127.0.0.1:11500" \
+    TABUP_OCR_MODEL="$modelo" \
     HOSTNAME=127.0.0.1 PORT="$PORT" \
     node .next/standalone/server.js >"$LOG" 2>&1 &
   server_pid=$!

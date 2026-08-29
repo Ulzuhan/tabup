@@ -32,8 +32,18 @@ export const RECEIPTS_DIR = CUSTOM_DATA_DIR
  * README y en un comentario de este fichero, que son exactamente los dos sitios donde no
  * mira quien está fotografiando un ticket en una mesa.
  */
-export function ocrLeavesMachine(): boolean {
-  return /(^|[:-])cloud$/.test(OCR_MODEL);
+export type OcrMode = "off" | "local" | "cloud";
+
+/**
+ * En qué estado está leer tickets, para que la pantalla pueda decirlo:
+ *
+ *   off    nadie ha configurado un modelo — solo se adjunta la foto
+ *   local  hay modelo y corre en esta máquina: la foto no sale
+ *   cloud  hay modelo y Ollama lo reenvía: la foto sale, y se avisa
+ */
+export function ocrMode(): OcrMode {
+  if (!OCR_MODEL) return "off";
+  return /(^|[:-])cloud$/.test(OCR_MODEL) ? "cloud" : "local";
 }
 
 /** Bigger than any phone photo needs to be for this, small enough to bound abuse. */
@@ -45,7 +55,19 @@ export function runtimeChild(parent: string, child: string): string {
 }
 
 const OLLAMA = process.env.TABUP_OLLAMA_URL?.trim() || "http://127.0.0.1:11434";
-const OCR_MODEL = process.env.TABUP_OCR_MODEL?.trim() || "qwen3.5:397b-cloud";
+/**
+ * Leer un ticket está APAGADO salvo que alguien lo encienda a propósito.
+ *
+ * El valor por defecto era `qwen3.5:397b-cloud`, y eso significaba que una instalación
+ * recién hecha mandaba la foto de un ticket a un tercero sin que su dueño hubiera pedido
+ * nada: un modelo capaz de leer un ticket arrugado pesa cientos de gigas, no cabe en una
+ * máquina normal, y Ollama lo reenvía. Un valor por defecto no debería tomar por su
+ * cuenta la decisión de sacar de casa la foto de la compra de alguien.
+ *
+ * Ahora hay que nombrar el modelo para que exista la función. Un modelo local la deja
+ * dentro; uno `-cloud` la manda fuera y la aplicación lo advierte junto al botón.
+ */
+const OCR_MODEL = process.env.TABUP_OCR_MODEL?.trim() || "";
 /** Measured 7–15s on real photos; this is the ceiling before giving up. */
 const OCR_TIMEOUT_MS = Number(process.env.TABUP_OCR_TIMEOUT || 60_000);
 
@@ -141,6 +163,9 @@ If a field is unreadable, omit it. Never invent a value.`;
  * talkative must never stop an expense from being added.
  */
 export async function readReceiptFields(image: Buffer): Promise<ReceiptReading | null> {
+  // Sin modelo configurado no hay lectura, y la foto no va a ninguna parte: se queda
+  // adjunta al gasto, que es lo que de verdad guarda el ticket.
+  if (ocrMode() === "off") return null;
   try {
     const res = await fetch(`${OLLAMA}/api/generate`, {
       method: "POST",

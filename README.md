@@ -48,7 +48,7 @@ npm run start
 | `TABUP_REGISTRATION` | `closed` | `closed`, `approval` or `open`; see [Registration](#registration) |
 | `TABUP_ALLOW_REGISTRATION` | unset | Old flag, still honoured as `open` so upgrades do not change behaviour |
 | `TABUP_OLLAMA_URL` | `http://127.0.0.1:11434` | Where the receipt-reading model lives |
-| `TABUP_OCR_MODEL` | `qwen3.5:397b-cloud` | Vision model used to read receipts |
+| `TABUP_OCR_MODEL` | unset — **reading receipts is off** | Name a vision model to turn it on. Off, a photographed receipt is still attached to the expense; only the reading is missing. The default used to be a cloud model, which meant a fresh install forwarded somebody's receipt to a third party without anyone asking for it |
 | `TABUP_OCR_TIMEOUT` | `60000` | Milliseconds before giving up on the model |
 | `TABUP_RATE_TIMEOUT` | `5000` | Milliseconds before giving up on the exchange-rate table. Every expense in a foreign currency goes through it, so a third party that hangs would otherwise hang whoever is writing down what they just paid |
 | `TABUP_OIDC_TIMEOUT` | `10000` | Milliseconds before giving up on the identity provider. This is on the sign-in path: without a timeout, a provider that accepts the connection and then goes quiet holds a request handler open for good, and enough of those eat the server's handlers |
@@ -516,7 +516,7 @@ npm run test:social     # 69 — balances, authorship, comments, the feed, kinds
 npm run test:races      # 18 — two people doing the same thing at the same instant
 npm run test:account    # 26 — closing an account, and what it does to everyone else
 npm run test:recurring  # 17 — fixed costs; pure functions, no server needed
-npm run test:profile    # 29 — the profile, and where each part of it shows up
+npm run test:profile    # 33 — the profile, where each part shows up, and receipts with reading off
 ```
 
 `test:admin` needs its own empty database and `TABUP_REGISTRATION=approval`, because
@@ -684,13 +684,21 @@ which is too slow to use at a table. Set `TABUP_OCR_MODEL` to change it.
 The reading is a shortcut, never a gate: if the model is slow, missing or unsure, the
 photo is still attached and the fields are typed by hand.
 
-**The photo leaves the machine when the model is a cloud one, which the default is** —
-and since 2026-08-29 the app says so **next to the button**, not only here: `/api/auth/me`
-reports whether the configured model runs locally, and the scan control carries the
-warning when it does not. It was written in this README and in a comment in
-`lib/receipts.ts`, which are the two places nobody reads while photographing a receipt on
-a table. Point `TABUP_OCR_MODEL` at a local model and the warning disappears, because
-then it would not be true.
+**Reading receipts is off unless you name a model**, and that default changed on
+2026-08-29. It used to be a cloud model, so a fresh install forwarded somebody's receipt
+to a third party without anyone having asked for it — a default should not make that
+decision on your behalf.
+
+The three states, which `/api/auth/me` reports so the screen can say which one it is:
+
+| `TABUP_OCR_MODEL` | What the button does | What it says |
+| --- | --- | --- |
+| unset | Attaches the photo | "the photo is kept; reading is not available here" |
+| a local model | Attaches and reads | nothing to warn about |
+| a `-cloud` model | Attaches and reads | **warns that the photo leaves the machine**, next to the button |
+
+That last warning exists because it used to live only in this README and in a comment in
+`lib/receipts.ts` — the two places nobody reads while photographing a receipt on a table.
 
 A
 397-billion-parameter model at BF16 is some 800 GB of weights; it does not run on a mini

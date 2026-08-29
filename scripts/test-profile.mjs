@@ -170,6 +170,32 @@ async function main() {
   check("never the password hash", crudo.includes("scrypt$"), false);
   check("nor anybody's session", crudo.includes("token_hash"), false);
 
+  // ── Leer recibos, apagado ───────────────────────────────────────────
+  //
+  // Esta suite corre SIN `TABUP_OCR_MODEL`, que es como corre producción, así que aquí
+  // se comprueba lo que eso significa: la sesión lo dice —para que la pantalla pueda
+  // llamar al botón por lo que hace— y subir una foto la guarda sin leerla ni llamar a
+  // nadie. El valor por defecto era un modelo de nube, o sea que una instalación recién
+  // hecha mandaba fuera la foto de la compra de alguien sin habérselo preguntado.
+  console.log("\nLeer recibos, apagado");
+  check("the session says reading is off", (await ana("/api/auth/me")).body.ocr, "off");
+
+  const foto = Buffer.from(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082",
+    "hex"
+  );
+  const form = new FormData();
+  form.append("photo", new Blob([foto], { type: "image/png" }), "ticket.png");
+  const subida = await fetch(`${BASE}/api/trips/${grupo.id}/receipt`, {
+    method: "POST",
+    body: form,
+    headers: { cookie: ana.jar.cookie },
+  });
+  const recibo = await subida.json().catch(() => ({}));
+  check("a photo still uploads", subida.status, 200);
+  check("and is kept with the expense", typeof recibo.receipt, "string");
+  check("but nothing was read from it", recibo.fields ?? null, null);
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
 }
