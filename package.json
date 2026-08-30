@@ -1,6 +1,6 @@
 {
   "name": "tabup",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Self-hosted shared expense tracking: who paid what, in which currency, and who owes whom.",
   "license": "MIT",
   "author": "Ulzuhan",
@@ -38,7 +38,8 @@
     "test:restart": "bash scripts/test-restart.sh",
     "test:identity": "bash scripts/test-identity.sh",
     "test:profile": "node scripts/test-profile.mjs",
-    "test:backchannel": "bash scripts/test-backchannel.sh"
+    "test:backchannel": "bash scripts/test-backchannel.sh",
+    "test:enlace": "tsx scripts/test-enlace-correo.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

@@ -373,7 +373,11 @@ export async function createUser(
  *      their email address in the identity provider.
  *   2. Known email, never linked — this is the migration path. The account
  *      that already owns their trips gets the sub written onto it instead of a
- *      second, empty account appearing next to it.
+ *      second, empty account appearing next to it. **Only when the provider
+ *      says that email is verified**: without that check, anyone who could get
+ *      an account with someone else's address would inherit their trips. The
+ *      first enrolment here is approved by hand, so this was never wide open —
+ *      but the check costs nothing and does not depend on that staying true.
  *   3. Nobody — a new person. Created and approved on the spot: Authentik only
  *      issued this token because they are in the group for this application,
  *      so the queue has already been walked once and asking twice is theatre.
@@ -386,6 +390,7 @@ export async function linkOrCreateFromIdentity(identity: {
   sub: string;
   email: string;
   name?: string;
+  emailVerified?: boolean;
 }): Promise<UserRow> {
   const email = normalizeEmail(identity.email);
   const now = Date.now();
@@ -397,6 +402,21 @@ export async function linkOrCreateFromIdentity(identity: {
   }
 
   const byEmail = db.select().from(users).where(eq(users.email, email)).get();
+
+  // Si existe una cuenta con ese correo pero el proveedor NO lo da por
+  // verificado, no se enlaza y tampoco se sigue: `users.email` es único, así
+  // que caer al caso 3 chocaría con la restricción y el login moriría con un
+  // 500 sin explicar nada. Se para aquí, a propósito y con nombre propio.
+  //
+  // Fallar es lo único que no puede hacer daño: quien deba heredar sus viajes y
+  // no pueda entrar lo dirá y se arregla a mano en un minuto; quien se los
+  // llevara sin ser suyos no lo diría nunca.
+  if (byEmail && !identity.emailVerified) {
+    throw new Error(
+      `correo sin verificar y ya existe una cuenta con él: enlace no automático (${email})`
+    );
+  }
+
   if (byEmail) {
     db.update(users)
       .set({ oidcSub: identity.sub, approvedAt: byEmail.approvedAt ?? now })

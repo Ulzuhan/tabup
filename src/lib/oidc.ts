@@ -233,6 +233,16 @@ export interface OidcIdentity {
   sub: string;
   email: string;
   name?: string;
+  /**
+   * Si el proveedor dice que ese correo está verificado de verdad.
+   *
+   * Sólo se usa para UNA cosa —decidir si una identidad nueva puede adueñarse
+   * de una cuenta local que ya tenía ese correo (`auth.ts`)— y por eso importa
+   * que sea la verdad y no una constante. Hasta el 30-08 el proveedor devolvía
+   * `false` a fuego para todo el mundo aunque sus flujos de alta sí verifican
+   * el correo: exigirlo entonces habría dejado fuera a todos.
+   */
+  emailVerified: boolean;
 }
 
 export async function exchangeCode(
@@ -269,12 +279,27 @@ export async function exchangeCode(
     throw new Error(`userinfo: ${info.status}`);
   }
 
-  const claims = (await info.json()) as { sub?: string; email?: string; name?: string };
+  const claims = (await info.json()) as {
+    sub?: string;
+    email?: string;
+    name?: string;
+    email_verified?: unknown;
+  };
   if (!claims.sub || !claims.email) {
     throw new Error("userinfo: missing sub or email");
   }
 
-  return { sub: claims.sub, email: claims.email.toLowerCase(), name: claims.name };
+  // `email_verified` NO se exige: un proveedor que no lo mande, o que lo mande
+  // en false, sigue pudiendo iniciar sesión. Sólo cambia si esa identidad puede
+  // quedarse con una cuenta local preexistente. Exigirlo para entrar sería
+  // apagar el login de todo el que se diera de alta antes de que existiera la
+  // etapa que lo verifica.
+  return {
+    sub: claims.sub,
+    email: claims.email.toLowerCase(),
+    name: claims.name,
+    emailVerified: claims.email_verified === true,
+  };
 }
 
 /**
