@@ -170,7 +170,7 @@ export default function RecurringPage() {
           <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted-foreground">
             {t("recurring.signInHint")}
           </p>
-          <Button className="mt-6" render={<Link href="/login">{t("auth.signIn")}</Link>} />
+          <Button className="mt-6" render={<Link href="/login" prefetch={false}>{t("auth.signIn")}</Link>} />
         </div>
       ) : (
         <>

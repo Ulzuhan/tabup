@@ -79,7 +79,7 @@ export function AccountMenu({
           variant="ghost"
           size="sm"
           render={
-            <Link href="/login">
+            <Link href="/login" prefetch={false}>
               <UserIcon className="size-4" />
               {t("auth.signIn")}
             </Link>

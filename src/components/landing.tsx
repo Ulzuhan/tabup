@@ -94,7 +94,7 @@ export function Landing({
                 size="lg"
                 variant={enrollUrl ? "outline" : undefined}
                 className="h-12 px-7 text-base"
-                render={<Link href="/login">{t.signIn}</Link>}
+                render={<Link href="/login" prefetch={false}>{t.signIn}</Link>}
               />
             </div>
             {providerAccounts && <p className="mt-3 text-xs text-muted-foreground">{t.accountHint}</p>}

@@ -323,7 +323,7 @@ function EmptyState({ signedIn }: { signedIn: boolean }) {
       </p>
       {!signedIn && (
         <p className="mt-5 text-sm text-muted-foreground">
-          <Link href="/login" className="text-primary underline-offset-4 hover:underline">
+          <Link href="/login" prefetch={false} className="text-primary underline-offset-4 hover:underline">
             {t("auth.signIn")}
           </Link>{" "}
           {t("home.signInToKeep")}

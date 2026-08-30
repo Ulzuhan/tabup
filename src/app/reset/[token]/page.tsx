@@ -124,7 +124,7 @@ export default function ResetPage() {
           <Button
             variant="outline"
             className="mt-6"
-            render={<Link href="/login">{t("auth.signIn")}</Link>}
+            render={<Link href="/login" prefetch={false}>{t("auth.signIn")}</Link>}
           />
         </div>
       </div>
