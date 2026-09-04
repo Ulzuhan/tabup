@@ -58,6 +58,9 @@ jobs:
       - name: What changes when identity is delegated
         run: npm run test:identity
 
+      - name: Verified email account linking
+        run: npm run test:enlace
+
       - name: Recurring dates outside UTC
         run: TZ=Europe/Madrid npm run test:recurring
 
