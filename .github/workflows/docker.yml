@@ -97,6 +97,15 @@ jobs:
           # dependencies from scratch.
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Una release nunca reutiliza la capa de apt de ayer. Esta imagen es
+          # Debian y su runtime hace `apt-get upgrade`, pero eso no sirve de nada
+          # si la caché de capas devuelve el upgrade de un build viejo: el 14-09
+          # el escaneo semanal encontró en la 0.7.6 dos CVE altas de libpcre2 que
+          # Debian ya tenía arregladas. En main la caché sigue valiendo —ahí
+          # importa la velocidad—; en un tag se construye de cero, que es cuando
+          # el resultado se ancla en producción. PixelForge lleva esto desde el
+          # 02-09 por lo mismo, con libexpat1.
+          no-cache: ${{ startsWith(github.ref, 'refs/tags/') }}
 
       # Un nombre de imagen tiene que ir en minúsculas y github.repository
       # conserva la U del usuario; metadata-action ya lo normaliza para los

@@ -1,0 +1,667 @@
+{
+  "commit": "1e6da563ac7a4c03c02d273cb4d7ed59b2d7dfda",
+  "contract_source_files": [
+    "src/app/api/auth/backchannel-logout/route.ts",
+    "src/app/api/auth/callback/route.ts",
+    "src/app/api/auth/login/route.ts",
+    "src/app/api/auth/logout/route.ts",
+    "src/app/api/auth/me/route.ts",
+    "src/app/api/auth/oidc/route.ts",
+    "src/app/api/auth/register/route.ts",
+    "src/app/api/auth/reset/route.ts",
+    "src/db/schema.ts",
+    "src/lib/auth.ts",
+    "src/lib/authorize.ts",
+    "src/lib/backchannel.ts",
+    "src/lib/balances.ts",
+    "src/lib/store.ts"
+  ],
+  "cookie_literals": {
+    "tabup_locale": [
+      "src/i18n/config.ts"
+    ],
+    "tabup_oidc": [
+      "src/app/api/auth/callback/route.ts",
+      "src/app/api/auth/oidc/route.ts"
+    ],
+    "tabup_session": [
+      "src/lib/auth.ts"
+    ],
+    "tabup_theme": [
+      "src/lib/theme.ts"
+    ]
+  },
+  "environment_names": {
+    "KAICORP_FOOTER_LINKS": [
+      "src/components/kaicorp-footer.tsx"
+    ],
+    "NEXT_PHASE": [
+      "src/app/layout.tsx",
+      "src/db/index.ts"
+    ],
+    "NODE_ENV": [
+      "src/app/api/auth/oidc/route.ts",
+      "src/db/index.ts",
+      "src/lib/auth.ts",
+      "src/proxy.ts"
+    ],
+    "TABUP_ACCOUNT_URL": [
+      "src/lib/oidc.ts"
+    ],
+    "TABUP_ALLOW_REGISTRATION": [
+      "src/lib/auth.ts"
+    ],
+    "TABUP_BACKUP_DIR": [
+      "scripts/backup-db.mjs"
+    ],
+    "TABUP_BACKUP_KEEP": [
+      "scripts/backup-db.mjs"
+    ],
+    "TABUP_BACKUP_REMOTE": [
+      "scripts/backup-db.mjs"
+    ],
+    "TABUP_DATA_DIR": [
+      "src/lib/rates.ts",
+      "src/lib/receipts.ts"
+    ],
+    "TABUP_DB": [
+      "scripts/backup-db.mjs",
+      "scripts/migrate-json.mjs",
+      "scripts/reset-password.mjs",
+      "src/db/index.ts"
+    ],
+    "TABUP_ENROLL_URL": [
+      "src/lib/oidc.ts"
+    ],
+    "TABUP_FREE_TRIP_LIMIT": [
+      "src/lib/store.ts"
+    ],
+    "TABUP_OCR_MODEL": [
+      "src/lib/receipts.ts"
+    ],
+    "TABUP_OCR_TIMEOUT": [
+      "src/lib/receipts.ts"
+    ],
+    "TABUP_OIDC_CLIENT_ID": [
+      "src/lib/oidc.ts"
+    ],
+    "TABUP_OIDC_CLIENT_SECRET": [
+      "src/lib/oidc.ts"
+    ],
+    "TABUP_OIDC_INTERNAL_BASE": [
+      "src/lib/oidc.ts"
+    ],
+    "TABUP_OIDC_ISSUER": [
+      "src/lib/oidc.ts"
+    ],
+    "TABUP_OIDC_REDIRECT_URI": [
+      "src/lib/oidc.ts"
+    ],
+    "TABUP_OIDC_TIMEOUT": [
+      "src/lib/oidc.ts"
+    ],
+    "TABUP_OLLAMA_URL": [
+      "src/lib/receipts.ts"
+    ],
+    "TABUP_PUBLIC_HOST": [
+      "src/app/layout.tsx",
+      "src/app/robots.ts",
+      "src/app/sitemap.ts",
+      "src/lib/request-origin.ts"
+    ],
+    "TABUP_PUSH_SUBJECT": [
+      "src/lib/push.ts"
+    ],
+    "TABUP_RATE_TIMEOUT": [
+      "src/lib/rates.ts"
+    ],
+    "TABUP_REGISTRATION": [
+      "src/lib/auth.ts"
+    ],
+    "TABUP_SESSION_TTL_HOURS": [
+      "src/lib/auth.ts"
+    ]
+  },
+  "package_scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "lint": "eslint",
+    "migrate:json": "node scripts/migrate-json.mjs",
+    "postbuild": "node scripts/prepare-standalone.mjs",
+    "start": "next start",
+    "test:account": "node scripts/test-account.mjs",
+    "test:admin": "node scripts/test-admin.mjs",
+    "test:api": "node scripts/test-api.mjs",
+    "test:auth": "node scripts/test-auth.mjs",
+    "test:backchannel": "bash scripts/test-backchannel.sh",
+    "test:enlace": "tsx scripts/test-enlace-correo.mts",
+    "test:identity": "bash scripts/test-identity.sh",
+    "test:members": "node scripts/test-members.mjs",
+    "test:money": "node scripts/test-money.mjs",
+    "test:profile": "node scripts/test-profile.mjs",
+    "test:races": "node scripts/test-races.mjs",
+    "test:receipts": "node scripts/test-receipts.mjs",
+    "test:recurring": "tsx scripts/test-recurring.mts",
+    "test:restart": "bash scripts/test-restart.sh",
+    "test:social": "node scripts/test-social.mjs"
+  },
+  "routes": [
+    {
+      "kind": "page",
+      "methods": [
+        "GET"
+      ],
+      "path": "/admin",
+      "source": "src/app/admin/page.tsx",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "GET"
+      ],
+      "path": "/api/account/export",
+      "source": "src/app/api/account/export/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "path": "/api/admin/errors",
+      "source": "src/app/api/admin/errors/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "path": "/api/admin/users",
+      "source": "src/app/api/admin/users/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "POST"
+      ],
+      "path": "/api/auth/backchannel-logout",
+      "source": "src/app/api/auth/backchannel-logout/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "GET"
+      ],
+      "path": "/api/auth/callback",
+      "source": "src/app/api/auth/callback/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "POST"
+      ],
+      "path": "/api/auth/login",
+      "source": "src/app/api/auth/login/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "POST"
+      ],
+      "path": "/api/auth/logout",
+      "source": "src/app/api/auth/logout/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH"
+      ],
+      "path": "/api/auth/me",
+      "source": "src/app/api/auth/me/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "GET"
+      ],
+      "path": "/api/auth/oidc",
+      "source": "src/app/api/auth/oidc/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "POST"
+      ],
+      "path": "/api/auth/register",
+      "source": "src/app/api/auth/register/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "path": "/api/auth/reset",
+      "source": "src/app/api/auth/reset/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "POST"
+      ],
+      "path": "/api/join",
+      "source": "src/app/api/join/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "DELETE",
+        "GET",
+        "POST"
+      ],
+      "path": "/api/push",
+      "source": "src/app/api/push/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "GET"
+      ],
+      "path": "/api/rates",
+      "source": "src/app/api/rates/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "GET"
+      ],
+      "path": "/api/recurring/export",
+      "source": "src/app/api/recurring/export/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH",
+        "POST"
+      ],
+      "path": "/api/recurring",
+      "source": "src/app/api/recurring/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "GET"
+      ],
+      "path": "/api/trips/[id]/activity",
+      "source": "src/app/api/trips/[id]/activity/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "path": "/api/trips/[id]/claim",
+      "source": "src/app/api/trips/[id]/claim/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "DELETE",
+        "GET",
+        "POST"
+      ],
+      "path": "/api/trips/[id]/comment",
+      "source": "src/app/api/trips/[id]/comment/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "DELETE",
+        "PATCH",
+        "POST"
+      ],
+      "path": "/api/trips/[id]/expense",
+      "source": "src/app/api/trips/[id]/expense/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "GET"
+      ],
+      "path": "/api/trips/[id]/export",
+      "source": "src/app/api/trips/[id]/export/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "POST"
+      ],
+      "path": "/api/trips/[id]/invite",
+      "source": "src/app/api/trips/[id]/invite/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "GET"
+      ],
+      "path": "/api/trips/[id]/pay-to",
+      "source": "src/app/api/trips/[id]/pay-to/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "DELETE",
+        "POST"
+      ],
+      "path": "/api/trips/[id]/payment",
+      "source": "src/app/api/trips/[id]/payment/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "path": "/api/trips/[id]/receipt",
+      "source": "src/app/api/trips/[id]/receipt/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH"
+      ],
+      "path": "/api/trips/[id]",
+      "source": "src/app/api/trips/[id]/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "handler",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "path": "/api/trips",
+      "source": "src/app/api/trips/route.ts",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "page",
+      "methods": [
+        "GET"
+      ],
+      "path": "/join/[token]",
+      "source": "src/app/join/[token]/page.tsx",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "page",
+      "methods": [
+        "GET"
+      ],
+      "path": "/login",
+      "source": "src/app/login/page.tsx",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "page",
+      "methods": [
+        "GET"
+      ],
+      "path": "/",
+      "source": "src/app/page.tsx",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "page",
+      "methods": [
+        "GET"
+      ],
+      "path": "/recurring",
+      "source": "src/app/recurring/page.tsx",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "page",
+      "methods": [
+        "GET"
+      ],
+      "path": "/reset/[token]",
+      "source": "src/app/reset/[token]/page.tsx",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "page",
+      "methods": [
+        "GET"
+      ],
+      "path": "/settings",
+      "source": "src/app/settings/page.tsx",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "page",
+      "methods": [
+        "GET"
+      ],
+      "path": "/trip/[id]",
+      "source": "src/app/trip/[id]/page.tsx",
+      "syntax": "next-filesystem-review-special-segments"
+    },
+    {
+      "kind": "page",
+      "methods": [
+        "GET"
+      ],
+      "path": "/trip/[id]/print",
+      "source": "src/app/trip/[id]/print/page.tsx",
+      "syntax": "next-filesystem-review-special-segments"
+    }
+  ],
+  "schema": 2,
+  "scope": "source literals; review dynamic names, special Next segments and grouped Go routes manually",
+  "source_sha256": {
+    "scripts/backup-db.mjs": "139c6f52b5e17dbd9173c8de5258522c046220b7260f5f5d599770249dfd7693",
+    "scripts/generate-icons.mjs": "cd965e3f4739010dbe2d3d945e8d881ee2d39299a5f466ee38b86d838ca9fa3c",
+    "scripts/migrate-json.mjs": "f5d5fb17f139f385097d379be76e1f95b548a4ca70414e3ed872ab6cfd4d6c6a",
+    "scripts/prepare-standalone.mjs": "282156ad747492c315b5135219598699cc89b711cbea0cf60e53d8d73eb130fe",
+    "scripts/reset-password.mjs": "cb1c766957913dd04e3975625a01afad9002cdf1361216e9094dda8d0b92592d",
+    "scripts/run-suites.sh": "6a0a52208115f8a516bf4c27d3264b924b7dfce0a843a7c27f1b5f81f2ca4cc5",
+    "scripts/test-account.mjs": "6aac93f9045f31e5c86a00610ce26e2e9ec82c8cdd5ef2393fee9cceacc88384",
+    "scripts/test-admin.mjs": "d3fc828bbfbe9968d3887712674f4d3bb4fe4351f472380a0b7e4cc6b7bcc8aa",
+    "scripts/test-api.mjs": "382ab2e420aa875708b62fbccf4d087160a74a6a607427484d1500f79ae289c9",
+    "scripts/test-auth.mjs": "56a3b3fa10cd9865fcc7a2e9e2b1ec33b96b267e0f07808cdaab3531ce5a3d62",
+    "scripts/test-backchannel.mjs": "17dfe43c1775de6253e87224beb64a7034502a5c1a8e68c6b0c10f15d06ee528",
+    "scripts/test-backchannel.sh": "44540e194461d8e494554b04d98ae757d93f8bd878970fb3b5df62686c8361ad",
+    "scripts/test-identity.mjs": "202abeeae213396bee3b04ecf2929c1c00d4b42e3027dc54d82946ac163b585f",
+    "scripts/test-identity.sh": "7976a9ee33ae2edd46c6ef48e783bf10a04a6e565533886e06b54ce61ce6fa43",
+    "scripts/test-members.mjs": "331ed763dd8365a1ffeeb5cf3f9f4811c50afa9e4bbccc313a3beee3003fbeb8",
+    "scripts/test-money.mjs": "1bd06f75bb66e0908b97042dcecab2716268d8b50e5e84808d136a6dde97576b",
+    "scripts/test-profile.mjs": "a28bf9131fe92521e0d3e043178d5d2cc981b37761007a4ce55c8f502b249fd0",
+    "scripts/test-races.mjs": "b23c2c15508716b661c39c35e5c1fca8fe694f22c1d31dba62d04fce4ebca7e5",
+    "scripts/test-receipts.mjs": "e7a466a4be7af9cd58df880669e1895b7ce0634164bee04dc88663ea904421c4",
+    "scripts/test-restart.mjs": "1d7a05a4bbc22ba815bcbf68e66c79cd53c4ed8c704cdca21a3e73f59bc634ef",
+    "scripts/test-restart.sh": "28ccd3c5a8aceb547d8b63299d6fadf7c259a280aa178e41ddc10320ca7b448b",
+    "scripts/test-social.mjs": "f1b159c5f205877fe68fc10b4bde7ef9e57931b0eb3dec50e21dde9ad1f9020d",
+    "src/app/admin/admin-panel.tsx": "7af3197472e0bf3b633585bf5f54a1d7b533a7efb3ab13556c1fa95687837104",
+    "src/app/admin/page.tsx": "9d3c8f2941177d191f6b55362237ec09d9d77e2b8c0948639727850d786461ae",
+    "src/app/api/account/export/route.ts": "f93c526a5634517fddaed9aadc0936d4cfe6bd14cdc827a643398bacfc353750",
+    "src/app/api/admin/errors/route.ts": "31aed5ed150e46b5e4634ad469e3f947d442ee095fc985efdb7d0232d5b04a7c",
+    "src/app/api/admin/users/route.ts": "b9b56732c42905ed5279bed25e0ec526473f21eba0d11bf4933c62629915a769",
+    "src/app/api/auth/backchannel-logout/route.ts": "6547e772fadefbebc413e719df878007f1db629fd31c604b852068daa8c9fb31",
+    "src/app/api/auth/callback/route.ts": "60487c8c0816222f7ff669a3c1ed104e8938e155df2fa5667b3b14aebda38c58",
+    "src/app/api/auth/login/route.ts": "0788a3eac1145704f3c3d4c16bccd7d72b86770aa723b6c54d82d6c86ca7730c",
+    "src/app/api/auth/logout/route.ts": "f6aa8ee9cc5038ca9206cad418747e22e8049c00a24bd2f5ed77db858aa82307",
+    "src/app/api/auth/me/route.ts": "49600f5c749db6e0e5523a4bfd413a2718125752cdcef9f1f3843bfd36c31bd2",
+    "src/app/api/auth/oidc/route.ts": "8cbf83e5a21415cf2107fb198740c5fc57cb171a16f6c40c301fec44e4fe67a5",
+    "src/app/api/auth/register/route.ts": "1dd7cf0d13a182e458043c78e0bdfe71f6204a6f891b1b5baeac06262cdf1e5b",
+    "src/app/api/auth/reset/route.ts": "42a52a653d85d6ac3c52cc82437af5c75f333a267028cd6f53f70c767c90a47f",
+    "src/app/api/join/route.ts": "c003ebaefacfbed608e05de126c51c9798e4d8777b129afdf3caea3baaf80d0d",
+    "src/app/api/push/route.ts": "34e1c741fd41ba2d59300db510cd1f9055fa200da886ef7d0818b1efd2a61b01",
+    "src/app/api/rates/route.ts": "0a0fac95c2e3716f14fbf061ec01911a72ee89b0741f7668ba7a564d199dd13d",
+    "src/app/api/recurring/export/route.ts": "ae8704479d2f66413230ebfe0796fce28aff1bd6cf0d1665aba6b96075182d1f",
+    "src/app/api/recurring/route.ts": "b61eebd264455f07ffa3024d22e44b9416ae45c0583ab5c9a8b817943b6e54c8",
+    "src/app/api/trips/[id]/activity/route.ts": "d445b005f0a9c3f84129dc7a619b88d7422a195c202abf8c56d3e90929354b66",
+    "src/app/api/trips/[id]/claim/route.ts": "a7cae367ed5975ace009dfbd9179855e2a31398bb3bea525534bdd569df43fd8",
+    "src/app/api/trips/[id]/comment/route.ts": "3f89af326c615a7afc905c19f769fa7544f6055459d5ae38e9514c0e5f9f2827",
+    "src/app/api/trips/[id]/expense/route.ts": "8b7372ca279af4d6c515b54c936ac80a862a4eae074ee9252b349eb83cbcf964",
+    "src/app/api/trips/[id]/export/route.ts": "abda778656aa3f828bd7364307af5a4cc80066db7cb885859b06cccab315175a",
+    "src/app/api/trips/[id]/invite/route.ts": "4ccda6364780e9e16ff487cd3b4bd1128d4dadb5bf7b1966436c3319f5411fff",
+    "src/app/api/trips/[id]/pay-to/route.ts": "43ffc1b54818ea71307ef454f20b75ddd71d75027c685e08edff86de9cf293ee",
+    "src/app/api/trips/[id]/payment/route.ts": "1a5cce80dfb79651486e49d89c6717652a3152f23ad97f06b3742bde4766d930",
+    "src/app/api/trips/[id]/receipt/route.ts": "4dfa131321d92f405b036f2e9270e9beb89cb31992c050286e4f4d7d37458f2c",
+    "src/app/api/trips/[id]/route.ts": "b8ee4a6a39d04e904aaae1c0366575881fc90998ff37ff99b18729beaf8e39d2",
+    "src/app/api/trips/route.ts": "205756a8da553fa523d9ef98c667a3138b38aa0c7c6517c66570b2c2a27f99e7",
+    "src/app/join/[token]/join-client.tsx": "0294e6dca9624cc65810eaf9a89d800810ab66ab047a4e8273e779f65de32aa2",
+    "src/app/join/[token]/layout.tsx": "67b27a14840e5a123de2fa10d893c23e0bf1f12482fb22fe148df1a97a5c97ab",
+    "src/app/join/[token]/page.tsx": "a71eaeda8983705df0ed7bfa3ac149aa615a8021eb6e48dbab7f6f42d9e37add",
+    "src/app/layout.tsx": "af2e0fa007e31e7d5479e03aacc330babae08d7d78136fe3be784345152b37b3",
+    "src/app/login/local-form.tsx": "4fcb062b9357e06de451d373be3bff5ea871a43ed5b1ee78c32870c8ccd4a97b",
+    "src/app/login/page.tsx": "07a4cebe80808aaf001ef8c4c6b941b77c6b73416f03faa0a28eed56c6bf1765",
+    "src/app/manifest.ts": "519a1cbac3849a8904466dcc1c877565dccbb46706491a402fc1ac43c5ece937",
+    "src/app/not-found.tsx": "1412f3334d0605576f1497e094fd0e65e98ee6fe562cb4f92bb2902937bb13ea",
+    "src/app/page.tsx": "ae129812ea8929a06580e1a5bda1573de40ab8620674e3ec46f99c5d5903ebd5",
+    "src/app/recurring/page.tsx": "45fce1f57748692f308dac38491e6f2083461d4a067c61fbe208c35784f9102b",
+    "src/app/reset/[token]/layout.tsx": "a07fdf9d49d7f52eaad0786755c9fa8df5bc4337f9a731eefd34a5710e95af0f",
+    "src/app/reset/[token]/page.tsx": "b7e06a0f512d3c40661002b0594fa388ca0153b257cdf5a89e1d66255c006f8b",
+    "src/app/robots.ts": "cbad7bff9d48adbdb697578d42d3decb50434b0f056615083d7c0720d9e1b920",
+    "src/app/settings/page.tsx": "c1520d9667d72c9eb8e7748aaff677326d44e633044ba2aa22be76038db20eba",
+    "src/app/settings/settings-form.tsx": "a3571d139f81dc38a14abf34d3099847dcc56d23c2b757f7bee93db8711d45f9",
+    "src/app/sitemap.ts": "835828019838b48863eed0fb7ce7709cd2205d69baaddef77b581c584462d55e",
+    "src/app/trip/[id]/layout.tsx": "09f831cf83a6311c920efea86a2d512e8e99539fa1b3e6ecfe272284862c196d",
+    "src/app/trip/[id]/page.tsx": "07177c3624bbe36e7e9f2744fa8b972f4f7bcbd64ad9c97ab8544312ad55059e",
+    "src/app/trip/[id]/print/page.tsx": "6c3094b46faa64c57cc877f579bb10dc6950055273fe41e8382da3696d3a6c74",
+    "src/app/trip/[id]/print/print-button.tsx": "d1925f28e1fee1ee77415db36131ad08827bb2977107d154a67cf957369c8458",
+    "src/app/trips-view.tsx": "ab8e398e27397cb60f6a14199fa759d71d6a6e92e160aa4883862f50ef39e926",
+    "src/components/account-menu.tsx": "9528df4bbd57800bd198c91c03a230dabdc5888d1edf55ee0f6d9a0d34a6528f",
+    "src/components/category-icon.tsx": "8419e9242b0e2372268a340404cec62de7065382418e3cc00a1178cad598f620",
+    "src/components/delete-account.tsx": "3fd82f605e5c72549a654ddaaaef7e543575aa5094957dddef924c9e8c4e2e34",
+    "src/components/kaicorp-account-menu.tsx": "2400e7612d363801cfe2053f79805ee314f726e7db412bd1d2682d48963809e9",
+    "src/components/kaicorp-footer.tsx": "f8e2d9ce0ed22f930f66f49cc519d482d9bc510c793cb8aba6073202d1902bb0",
+    "src/components/kaicorp-header.tsx": "527800931eb95363509e2b18f462b035cf166dee63f5ff89bc56906766065b48",
+    "src/components/landing.tsx": "d186a31853d8007cec43074c5e142ab416831a032ff1cd5cad6c7fa365f9087d",
+    "src/components/language.tsx": "005e6ea45f0caca6fecced4602250ba3ba49d8cd694844ad82cd27bd3c2fb3f6",
+    "src/components/member-avatar.tsx": "6c064a830f7ca487589901c0effdfe9e4ef4f1687bfc6018dcf4b6e2e86e7fca",
+    "src/components/money.tsx": "eb39195bc1f93000cc1a623401c7d3350435f13d4b5fc70facbddb17a34f5dba",
+    "src/components/offline.tsx": "cc1bfb19ff82e19721ceac60e7c70ff8576b025d13c24c427b5812bdaa141095",
+    "src/components/push-toggle.tsx": "8e5bf44b8a189ce906441951ec5bba492a5e3477c298790577c4441e0961b3c2",
+    "src/components/recurring/recurring-dialog.tsx": "895590c84948e2e3a3dff7b3d981d720527cb57e7ae46649b5d22d9956246828",
+    "src/components/section-tabs.tsx": "f859844773f25bfc5e01148ae94a5f8248dd474f200c197f4a99b0ced8ed709b",
+    "src/components/theme.tsx": "e03a6e590233390e45e3efd1512440ebabe86087a8489abd4b3914f2f03e9c01",
+    "src/components/trip-kind.tsx": "53618517f16915968236b137809f77b921420a47115a98740921a575976977a4",
+    "src/components/trip/activity-feed.tsx": "d4450cd76f9c90069030bf58f05642a672bdd141ed2cbd3d5536918b28142dfb",
+    "src/components/trip/claim-prompt.tsx": "64fc5400878f129047f3b70ce3ea3fc5b1d53ced24f173d7790bc2515ac1988e",
+    "src/components/trip/comments-dialog.tsx": "58cf1d6bb3f3be46cb2bb3196109975e776f977c82dcf485739b67dfc2e1e8cd",
+    "src/components/trip/empty-panel.tsx": "a7b7d40afdff63c2bc30b56c7e94d0a4b2bb2f69d7bfc222f5c2eb56e0885090",
+    "src/components/trip/expense-dialog.tsx": "23e88795cbb9b720984ae8f736611cdc4d456ea8d409b68e358dd95c4e05ce34",
+    "src/components/trip/expense-filter.tsx": "ead89405fcc794a14117316ae6b0a23ca49df943f2a8e4091502ac89fc4450fa",
+    "src/components/trip/expense-list.tsx": "ae5a43575fd892e4f0a38f69318005d66fbd036df53c18a1a15bfed96ac14950",
+    "src/components/trip/manage-dialog.tsx": "13cfa7426139cde5fc38a0a79349d34619470d714dbfa8a7583fd3fa4b7f8692",
+    "src/components/trip/overview.tsx": "a22d5998a8bec193d8fcaf28e0d49237bd059cd6a0be682f58fa79b862ed9758",
+    "src/components/trip/settle-dialog.tsx": "a8ff808957080b30469090ee9dbd24cc3c1885910bfb6bca3fc1274135cfbb60",
+    "src/components/trip/settle-up.tsx": "7404ff473bd84e7eb363cd4a0e45f74646fa3d190d875e2021706cf580a464d6",
+    "src/components/trip/share-dialog.tsx": "32a42d3cc49290581acc3a391ef6cc5dc43c30476a844cad166c2fc86720dd65",
+    "src/components/trip/spending-pace.tsx": "8bec5712c84bab2e3979ef1c12f3041585048ca29081f96b431d05ed512d9b1b",
+    "src/components/trip/summary-image.ts": "f02055da30349ab0ed291fc54219c3c7006500be20ce5b8e8d1ada4c85ad0150",
+    "src/components/trip/trip-header.tsx": "f4ff947ad450036d96abb92760c4b7d6d343ecb5ff887f815153ffe95308eb9b",
+    "src/components/trip/types.ts": "7dc5e6978303933d166e8c223de293e3b29c823a0dc1a7e5d220daca344789ed",
+    "src/components/trip/use-trip-data.ts": "ec820b1daaac55b5e8f0edb9f60ce0bdb912968dcaef1de0576c2e30ac9f0283",
+    "src/components/ui/avatar.tsx": "357b2f9aac0192c071cb2ed65cb6e4c8ec01fa02fc15cf50d889b85731b75666",
+    "src/components/ui/badge.tsx": "968b0403af74a785c9408ca69a677235e49d0c80b2c27fb9858ad421a8778c7d",
+    "src/components/ui/button.tsx": "d14549ab3ba7a9d5d1f424c2599233bffa0b317121abf3b6efa2fb902d5e2781",
+    "src/components/ui/card.tsx": "d8113cbf964f8d1aadf2649d2944d8bbc6e3cfd49d36746f76868cbc4dde3cfe",
+    "src/components/ui/dialog.tsx": "d8d6a0592ca3916be18096b317bc4ab31120bc6dd81b74d8cbdc5029265327ad",
+    "src/components/ui/dropdown-menu.tsx": "1c1ae4ec02de9778286f84e0d15a1b74cc610c13c5b6a13c1ada2e6770eeb4e1",
+    "src/components/ui/input.tsx": "f7d6ecff9a4d631feeaf401c02bb87e26ddb38131c55d15a43b9290747390847",
+    "src/components/ui/label.tsx": "7f19b8476658d25ff197c84030e58cd7395059d876a54630e025951e474ebdae",
+    "src/components/ui/progress.tsx": "45e33890b5a82744fc27d0928f927c5942c1166e5e27de8f776b29112967d317",
+    "src/components/ui/select.tsx": "ca3bd1b370ea67b84632d435c22d8270752fa6013c06c365162af265e4a0e87e",
+    "src/components/ui/separator.tsx": "75085bd84ff6965e4a356c53a4689799cabf65caa93c0bba064d5a0c6fa78f13",
+    "src/components/ui/skeleton.tsx": "8110bba70d0cb9fe968c0b7bd092ad12258caef40b028b4a87f402bdab907faf",
+    "src/components/ui/sonner.tsx": "2dd975ad2170ba2570b00e58713dcbda90f26a7fffdaceb1ef7255f450c2d2a6",
+    "src/components/ui/tabs.tsx": "f4b90d8d70f2e30d5a9ea0744a02a785d6f0b557f38e712763d21e8a1b7367dd",
+    "src/components/ui/tooltip.tsx": "2cea2294d4947b88d815860f64e0b5e0eb47a59bde47cfd194aac2230c923865",
+    "src/components/wordmark.tsx": "0c1d7e7ca86c70279e9cc1fe5a6a1d03f592e1109d0cccca0622ba992c715a24",
+    "src/db/index.ts": "24fefd0d204aa6de61ab9034b8c42596ba589fecccd62fc5e4e73a293f071164",
+    "src/db/schema.ts": "9000c8935bc27bc2f8d965773f1344b57e177db51ca64db20fc23fbe5c0ef11e",
+    "src/i18n/config.ts": "24ce313606eb8b6a409b31fdbd21ab1bd9885502cbd16e7a0e3920c73a295905",
+    "src/i18n/messages.ts": "311cbc392c4d4f7ee981dc8f4d9358a9a4cd5fd6dfaf42b001c0df37ea98ff74",
+    "src/i18n/print.ts": "94f7baa58d14100557ccb8422e34221fe218302c033966aeb81e5a4d7551221a",
+    "src/i18n/provider.tsx": "99d7c9c9768643fe40e4fb3b370f1c7ad6a787bf3e2b71fdc7fe11811ca4c9bc",
+    "src/i18n/server.ts": "a91c31846e012ba8e484c7269ff10a1a722eb3dce527c70d81be85684da70f8a",
+    "src/lib/amount.ts": "badad3580acb209ca0d6f82b10b4f1862603c931c66ec9fa422698340fe05493",
+    "src/lib/api-error.ts": "a8fd0d9392edcda2ec9af111f015c7b0cbbdce596b9820fab7caf97d0405c64d",
+    "src/lib/auth.ts": "7c1bcd71016ba97252a363e6f3148cb1035ed6e3cbda90c13aeaac048e206dcb",
+    "src/lib/authorize.ts": "12805f492be4e0f5d842e6f2e6f0ab220a7121b3cdbc8eef2394646b99983efc",
+    "src/lib/backchannel.ts": "d8a53331f9d05159f0dbf4320ff2ad3debfa66bb1d4d154a9e3e5aafb8b57a12",
+    "src/lib/balances.ts": "c3def86ac0541b002f585928e8ae28d1830fa915f120df2f51edc108451b3623",
+    "src/lib/body.ts": "6bc20b11c481552cdfc4705ed685baf31b3ec78f8a7cf38014fdb5f74df39519",
+    "src/lib/errors.ts": "530f28f1d77db346f34bfaa8cbeccf031bf36ebc90d26287ca8781263e1afae1",
+    "src/lib/housekeeping.ts": "40b9d0a118765aa353d6e14618e7fa0f20092b3a98e65b6fd4b4a3d7996f0ac3",
+    "src/lib/oidc.ts": "9fba4c6e59c0ac49d228f3c64c2fb83d714a080650f50e78c0d3079026c79d6d",
+    "src/lib/push.ts": "4725f3ca1a8c157bdfd1c1b7d5b745960ad9fdf64adb1b9c833e4380e2814a76",
+    "src/lib/rates.ts": "295f850b8e384e4ab24ecd3e011ff212fe6e8227770564ba9b128b5b403dfea5",
+    "src/lib/receipts.ts": "46e8ae394789466ccb962a0362e7dfbb0824bbd5834be937da34fa54a985a10b",
+    "src/lib/recurring.ts": "c7e8e254395c20513fb42ee6f5a74964bfd58facc62a07e0ef41599e0d081d85",
+    "src/lib/request-origin.ts": "f7a1b1a926498e339acfa22e59ebbecc699ac546edb55487110b2d210d693bc2",
+    "src/lib/session-cache.ts": "b62c0d9b282171e3ef2f30be85f5435a93be15f72806fd272196e99b6f4141a0",
+    "src/lib/store.ts": "c3e41d8033d793f263bbc12842a2a643391ee57103584a3e79d677707a94111e",
+    "src/lib/theme.ts": "8dc87b64dd52a8b2a8dadae182601cbdb46e317feeb738a6c43e7f200bba4d38",
+    "src/lib/types.ts": "a7f8671ad0b42d51ba8bcb334305497a3d44c47b19dbeaa6cd230e29f7aa795d",
+    "src/lib/use-pending.ts": "ab5ec578d12304b80094a2a1d52102627457cdafa5d7428ee68f348590715034",
+    "src/lib/utils.ts": "7c8c3dfc0cdd370d44932828eb067ef771c8fe7996693221d5d4b90af6d54f2d",
+    "src/lib/write-queue.ts": "8fee754e167f464552f2d5b6bd4150ad83e82a2c7bdf77dc269eddaf4f2b5089",
+    "src/proxy.ts": "b7102f255353307fc38337472ac59d5e571746a90c6807cabc818a18cd3af296"
+  },
+  "test_files": [
+    "scripts/test-account.mjs",
+    "scripts/test-admin.mjs",
+    "scripts/test-api.mjs",
+    "scripts/test-auth.mjs",
+    "scripts/test-backchannel.mjs",
+    "scripts/test-backchannel.sh",
+    "scripts/test-identity.mjs",
+    "scripts/test-identity.sh",
+    "scripts/test-members.mjs",
+    "scripts/test-money.mjs",
+    "scripts/test-profile.mjs",
+    "scripts/test-races.mjs",
+    "scripts/test-receipts.mjs",
+    "scripts/test-restart.mjs",
+    "scripts/test-restart.sh",
+    "scripts/test-social.mjs"
+  ]
+}

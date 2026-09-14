@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-14 — Rebuild for two Debian security fixes
+
+- No application change. The weekly scan of what is running found two fixable
+  HIGH advisories in the 0.7.6 image — `libpcre2-8-0` 10.42-1, patched by Debian
+  in 10.42-1+deb12u1 (CVE-2026-86145 and CVE-2026-89161) — and a rebuild is the
+  whole fix: the runtime stage already runs `apt-get upgrade`.
+- Release builds no longer reuse the layer cache. That is what made the rebuild
+  necessary rather than automatic: the `apt-get upgrade` layer was being served
+  from cache, so the upgrade never ran in the image that shipped. Builds from
+  `main` still use the cache; a tag now builds from scratch.
+
 ## 2026-09-11 — Minor and patch dependencies, by hand
 
 - Sixteen packages move to the versions Renovate had been proposing since 30-08:
