@@ -9,15 +9,18 @@ import Link from "next/link";
  * No editar aquí: editar el original y sincronizar.
  *
  * Usa los tokens `--kc-*` y no los de la aplicación, a propósito: el cromado
- * (cabecera y pie) es lo que se reconoce igual en los cinco servicios,
+ * (cabecera y pie) es lo que se reconoce igual de una herramienta a otra,
  * mientras cada app conserva su propia paleta puertas adentro.
  *
  * Lleva enlaces al resto porque quien usa dos de estas aplicaciones no debería
  * tener que teclear la URL de la otra — pero SOLO si quien opera la instancia
  * lo pide con KAICORP_FOOTER_LINKS: en un despliegue ajeno, esos enlaces son
  * publicidad de servicios de otro. Sin la variable queda la atribución sola.
- * Es un componente de servidor y las páginas son dinámicas (CSP con nonce),
- * así que la variable se lee en tiempo de ejecución, no de build.
+ * La bandera se lee en tiempo de ejecución, no de build, y en las dos pilas:
+ * en Next porque esto es un componente de servidor con páginas dinámicas
+ * (CSP con nonce), y en las apps React+Vite porque la decide Go al servir el
+ * documento y el adaptador sólo lee `data-footer-links`. En ninguna de las
+ * dos entra el entorno del servidor en el bundle.
  */
 const SERVICES = [
   { name: "TabUp", url: "https://tabup.kaicorplabs.com", slug: "tabup" },

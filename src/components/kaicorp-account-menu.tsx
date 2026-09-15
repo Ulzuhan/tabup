@@ -24,7 +24,9 @@ import { useEffect, useRef, useState } from "react";
  * por `extra`; lo que no tenga —una página de ajustes, por ejemplo— simplemente no
  * aparece. Los idiomas y los temas no están aquí a propósito: son de quien los tenga.
  *
- * Sin dependencias, como el resto del cromado: React, `next/link` y los tokens `--kc-*`.
+ * Sin dependencias, como el resto del cromado: React, un enlace y los tokens `--kc-*`.
+ * El enlace lo pone cada pila —`next/link` en las Next, el suyo en las React+Vite—,
+ * y por eso la línea del import es lo único que cambia entre las dos versiones.
  * Las cinco aplicaciones tienen paletas distintas —`bg-card` en una es `bg-surface` en
  * otra—, así que los colores se toman de las variables comunes, que es el único idioma
  * que hablan todas.

@@ -17,7 +17,7 @@
    la paleta de marca. Se descartó: cambiar la paleta de una aplicación que
    funciona arriesga el contraste y el diseño en decenas de sitios que no se
    ven desde la portada, y a cambio el usuario no gana nada que no le dé ya
-   una cabecera y un pie iguales en los cinco servicios. El riesgo estaba
+   una cabecera y un pie iguales de una herramienta a otra. El riesgo estaba
    todo en el color; la identidad, casi toda en la letra y el marco.
 
    Así que estas primitivas las consumen SOLO `kaicorp-header.tsx` y
