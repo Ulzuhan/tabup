@@ -1,18 +1,39 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:recommended"
+  ],
   "timezone": "Europe/Madrid",
-  "schedule": ["before 8am on monday"],
-  "labels": ["dependencias"],
+  "schedule": [
+    "before 8am on monday"
+  ],
+  "labels": [
+    "dependencias"
+  ],
   "prConcurrentLimit": 3,
   "packageRules": [
     {
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
       "groupName": "menores y parches"
+    },
+    {
+      "description": "Keep ESLint 9 until eslint-plugin-react supports ESLint 10 APIs. Recheck on a compatible Next/plugin release.",
+      "matchPackageNames": [
+        "eslint",
+        "@eslint/js"
+      ],
+      "allowedVersions": "<10"
     }
   ],
   "vulnerabilityAlerts": {
-    "labels": ["seguridad"],
-    "schedule": ["at any time"]
+    "labels": [
+      "seguridad"
+    ],
+    "schedule": [
+      "at any time"
+    ]
   }
 }
