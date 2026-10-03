@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS build
+FROM node:24-bookworm-slim AS build
 # better-sqlite3 se compila con node-gyp cuando no hay binario precompilado para
 # esta versión de Node, y la imagen slim no trae ni Python ni toolchain. Solo en
 # la etapa de build: al runtime viaja el .node ya compilado, dentro del standalone.
@@ -10,7 +10,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production HOSTNAME=0.0.0.0 PORT=3457 TABUP_DB=/data/tabup.db TABUP_DATA_DIR=/data
 WORKDIR /app
 # apt upgrade: la base arrastra arreglos de seguridad de Debian (medido por el
