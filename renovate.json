@@ -26,6 +26,12 @@
         "@eslint/js"
       ],
       "allowedVersions": "<10"
+    },
+    {
+      "description": "Keep security overrides on their consumers' compatible majors",
+      "matchPackageNames": ["brace-expansion", "fast-uri", "ip-address"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
     }
   ],
   "vulnerabilityAlerts": {
