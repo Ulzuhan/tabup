@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   // Si el proveedor no anuncia el cierre de sesión, o preguntarle falla, se
   // sale igualmente: la sesión propia ya está cerrada y eso no puede quedar
   // a medias por un fallo de red.
-  const next = cfg ? (await endSessionUrl(cfg).catch(() => null)) ?? "/" : "/";
+  const next = cfg ? (await endSessionUrl(cfg).catch(() => null)) ?? "/?signed_out=1" : "/";
 
   return NextResponse.json({ ok: true, next });
 }

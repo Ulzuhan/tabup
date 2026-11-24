@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
 import { safeNext, oidcConfigured } from "@/lib/oidc";
 import { LocalLoginForm } from "./local-form";
 
@@ -24,9 +25,12 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ next?: string }>;
 }) {
+  const { next } = await searchParams;
+  const safe = safeNext(next);
+  if (await getCurrentUser()) {
+    redirect(safe);
+  }
   if (oidcConfigured()) {
-    const { next } = await searchParams;
-    const safe = safeNext(next);
     redirect(`/api/auth/oidc?next=${encodeURIComponent(safe)}`);
   }
 

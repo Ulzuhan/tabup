@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { accountSessionUrl, oidcConfigured, originOf } from "@/lib/oidc";
 
 /** A fresh nonce lets Next run its own inline bootstrap without allowing injected scripts. */
 export function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDev = process.env.NODE_ENV === "development";
+  const sessionOrigin = oidcConfigured() ? originOf(accountSessionUrl()) : null;
+  const connectSrc = sessionOrigin ? `connect-src 'self' ${sessionOrigin}` : "connect-src 'self'";
   const csp = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
@@ -11,7 +14,7 @@ export function proxy(request: NextRequest) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    "connect-src 'self'",
+    connectSrc,
     "worker-src 'self'",
     "manifest-src 'self'",
     "object-src 'none'",
