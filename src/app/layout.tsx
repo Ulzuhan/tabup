@@ -126,7 +126,11 @@ export default async function RootLayout({
     >
       <body className="brand-glow flex min-h-full flex-col bg-background text-foreground">
         <I18nProvider locale={locale}>
-          <KaiCorpHeader app="TabUp">
+          <KaiCorpHeader
+            app="TabUp"
+            current="tabup"
+            showSwitcher={Boolean(process.env.KAICORP_FOOTER_LINKS?.trim())}
+          >
             <AccountMenu
               user={session.user}
               pendingApprovals={session.pendingApprovals}
