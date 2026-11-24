@@ -100,6 +100,7 @@ export function AccountMenu({
       labels={{
         menu: t("settings.title"),
         settings: t("settings.title"),
+        tools: t("settings.tools"),
         account: t("settings.providerAccount"),
         signOut: t("auth.signOut"),
         signingOut: t("common.loading"),

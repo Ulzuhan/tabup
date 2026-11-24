@@ -1,5 +1,3 @@
-/* GENERADO por kaicorplabs/tools/sync-theme.sh — NO EDITAR AQUÍ.
-   El original está en el repo kaicorplabs (theme/). */
 "use client";
 
 import Link from "next/link";
@@ -40,6 +38,8 @@ export interface KaiCorpAccountLabels {
   /** Nombre accesible del botón que abre el menú. */
   menu: string;
   settings: string;
+  /** Portal de herramientas en KaiCorp Account. */
+  tools: string;
   /** La cuenta en el proveedor de identidad: correo, contraseña, segundo factor. */
   account: string;
   signOut: string;
@@ -49,6 +49,7 @@ export interface KaiCorpAccountLabels {
 const LABELS_POR_DEFECTO: KaiCorpAccountLabels = {
   menu: "Account",
   settings: "Settings",
+  tools: "Your tools",
   account: "Your account",
   signOut: "Sign out",
   signingOut: "Signing out…",
@@ -156,6 +157,14 @@ export function KaiCorpAccountMenu({
 
   const itemStyle = ITEM_CLASE;
   const item = ITEM_ESTILO;
+  const toolsUrl = (() => {
+    if (!accountUrl) return null;
+    try {
+      return new URL("/", accountUrl).toString();
+    } catch {
+      return null;
+    }
+  })();
 
   return (
     <div className="relative" ref={caja}>
@@ -201,6 +210,18 @@ export function KaiCorpAccountMenu({
               <IconSliders />
               {t.settings}
             </Link>
+          )}
+
+          {toolsUrl && (
+            <a
+              role="menuitem"
+              href={toolsUrl}
+              className={itemStyle}
+              style={item}
+            >
+              <IconGrid />
+              {t.tools}
+            </a>
           )}
 
           {accountUrl && (
@@ -253,6 +274,22 @@ function IconExternal() {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    </svg>
+  );
+}
+
+function IconGrid() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden>
+      <rect x="4" y="4" width="4" height="4" rx="1" />
+      <rect x="10" y="4" width="4" height="4" rx="1" />
+      <rect x="16" y="4" width="4" height="4" rx="1" />
+      <rect x="4" y="10" width="4" height="4" rx="1" />
+      <rect x="10" y="10" width="4" height="4" rx="1" />
+      <rect x="16" y="10" width="4" height="4" rx="1" />
+      <rect x="4" y="16" width="4" height="4" rx="1" />
+      <rect x="10" y="16" width="4" height="4" rx="1" />
+      <rect x="16" y="16" width="4" height="4" rx="1" />
     </svg>
   );
 }

@@ -13,7 +13,13 @@ const SERVICES = [
   { name: "LinkUp", url: "https://link.kaicorplabs.com", slug: "linkup", desc: "Privacy short links" },
 ];
 
-export function KaiCorpAppSwitcher({ current }: { current?: string }) {
+export function KaiCorpAppSwitcher({
+  current,
+  signedIn = false,
+}: {
+  current?: string;
+  signedIn?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLElement>(null);
 
@@ -74,10 +80,11 @@ export function KaiCorpAppSwitcher({ current }: { current?: string }) {
         <ul className="kc-switcher-list">
           {SERVICES.map((s) => {
             const isCurrent = s.slug === current;
+            const href = signedIn && !isCurrent ? `${s.url}/?sso=1` : s.url;
             return (
               <li key={s.slug}>
                 <a
-                  href={s.url}
+                  href={href}
                   aria-current={isCurrent ? "page" : undefined}
                   className="kc-switcher-link"
                 >

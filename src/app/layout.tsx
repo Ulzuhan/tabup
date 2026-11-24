@@ -130,6 +130,7 @@ export default async function RootLayout({
             app="TabUp"
             current="tabup"
             showSwitcher={Boolean(process.env.KAICORP_FOOTER_LINKS?.trim())}
+            signedIn={Boolean(session.user)}
           >
             <AccountMenu
               user={session.user}

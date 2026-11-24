@@ -16,6 +16,7 @@ export function KaiCorpHeader({
   app,
   current,
   showSwitcher = false,
+  signedIn = false,
   children,
 }: {
   /** Nombre del servicio, a la derecha de la marca. */
@@ -24,6 +25,8 @@ export function KaiCorpHeader({
   current?: string;
   /** Muestra el selector de aplicaciones KaiCorp Labs junto a la marca. */
   showSwitcher?: boolean;
+  /** Si el usuario tiene sesión activa, añade /?sso=1 al saltar entre herramientas. */
+  signedIn?: boolean;
   /** Acciones de la app: menú de cuenta, ajustes, entrar, etc. */
   children?: React.ReactNode;
 }) {
@@ -36,7 +39,7 @@ export function KaiCorpHeader({
       }}
     >
       <div className="mx-auto flex h-[60px] w-full max-w-[74rem] items-center gap-3 px-4 sm:px-6">
-        {showSwitcher && <KaiCorpAppSwitcher current={current} />}
+        {showSwitcher && <KaiCorpAppSwitcher current={current} signedIn={signedIn} />}
 
         <Link
           href="/"
