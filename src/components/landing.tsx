@@ -11,6 +11,7 @@ import {
 import type { Locale } from "@/i18n/config";
 import { MESSAGES } from "@/i18n/messages";
 import { Button } from "@/components/ui/button";
+import { LandingSession } from "@/components/landing-session";
 
 /**
  * What someone with no session sees.
@@ -26,23 +27,33 @@ import { Button } from "@/components/ui/button";
 export function Landing({
   locale,
   enrollUrl,
+  accountSessionUrl = null,
 }: {
   locale: Locale;
-  /**
-   * Dónde se pide cuenta. Con proveedor, su flujo de alta (`TABUP_ENROLL_URL`);
-   * sin él, el formulario propio. Lo decide el servidor, que es quien sabe si hay
-   * proveedor configurado.
-   *
-   * Aquí había un valor por defecto: el flujo de alta de NUESTRO Authentik, escrito
-   * a fuego en un repositorio con licencia MIT. Cualquiera que desplegara TabUp
-   * publicaba un botón "Crear cuenta" que llevaba a sus visitantes al proveedor de
-   * identidad de otra persona. `null` es ahora una respuesta legítima —una instancia
-   * cuyo proveedor no tiene alta autoservicio no debe ofrecer el botón— y la portada
-   * se reordena sin él.
-   */
   enrollUrl?: string | null;
+  accountSessionUrl?: string | null;
 }) {
   const t = MESSAGES[locale].landing;
+  const sessionLabels =
+    locale === "es"
+      ? {
+          signedInAs: "Sesión iniciada como {name}",
+          continueAs: "Continuar como {name}",
+          askAccess: "Pedir acceso",
+          pendingNote: "Esperando aprobación",
+          viewRequest: "Ver solicitud",
+          inviteNote: "Solo por invitación",
+          yourAccount: "Tu cuenta",
+        }
+      : {
+          signedInAs: "Signed in as {name}",
+          continueAs: "Continue as {name}",
+          askAccess: "Ask for access",
+          pendingNote: "Waiting for approval",
+          viewRequest: "View request",
+          inviteNote: "By invitation only",
+          yourAccount: "Your account",
+        };
 
   /**
    * La pista sobre pedir acceso solo tiene sentido cuando las cuentas son de un
@@ -82,22 +93,28 @@ export function Landing({
             {/* Sin sitio donde pedir cuenta, "Entrar" es la única acción y pasa a ser
                 la principal: dos botones cuando uno de ellos no lleva a ninguna parte
                 es peor que uno. */}
-            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
-              {enrollUrl && (
+            <LandingSession
+              sessionUrl={accountSessionUrl}
+              loginHref="/api/auth/oidc"
+              labels={sessionLabels}
+            >
+              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
+                {enrollUrl && (
+                  <Button
+                    size="lg"
+                    className="h-12 px-7 text-base"
+                    render={<Link href={enrollUrl}>{t.getStarted}</Link>}
+                  />
+                )}
                 <Button
                   size="lg"
+                  variant={enrollUrl ? "outline" : undefined}
                   className="h-12 px-7 text-base"
-                  render={<Link href={enrollUrl}>{t.getStarted}</Link>}
+                  render={<Link href="/login" prefetch={false}>{t.signIn}</Link>}
                 />
-              )}
-              <Button
-                size="lg"
-                variant={enrollUrl ? "outline" : undefined}
-                className="h-12 px-7 text-base"
-                render={<Link href="/login" prefetch={false}>{t.signIn}</Link>}
-              />
-            </div>
-            {providerAccounts && <p className="mt-3 text-xs text-muted-foreground">{t.accountHint}</p>}
+              </div>
+              {providerAccounts && <p className="mt-3 text-xs text-muted-foreground">{t.accountHint}</p>}
+            </LandingSession>
           </div>
 
           <DemoCard t={t} locale={locale} />

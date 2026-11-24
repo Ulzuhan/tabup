@@ -1,6 +1,7 @@
 import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { enrollUrl, oidcConfigured } from "@/lib/oidc";
+import { accountSessionUrl, enrollUrl, oidcConfigured } from "@/lib/oidc";
 import { LOCALE_COOKIE, isLocale, localeFromHeader } from "@/i18n/config";
 import { Landing } from "@/components/landing";
 import { TripsView } from "./trips-view";
@@ -9,11 +10,21 @@ import { TripsView } from "./trips-view";
  * The front door.
  *
  * Decided on the server: a stranger gets the landing page with no client JavaScript at
- * all, and somebody signed in goes straight to their trips. Doing this in the browser
- * would mean everyone downloads the app shell first and watches it decide.
+ * all, and somebody signed in goes straight to their trips. When linked with `?sso=1`
+ * from the hub with OIDC active, bounce straight into sign-in (or clear the query if a
+ * local session already exists) so there is no landing flash.
  */
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ sso?: string }>;
+}) {
   const user = await getCurrentUser();
+  const { sso } = await searchParams;
+  if (sso === "1") {
+    if (user) redirect("/");
+    if (oidcConfigured()) redirect("/api/auth/oidc");
+  }
   if (user) return <TripsView />;
 
   const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
@@ -21,14 +32,11 @@ export default async function Home() {
     ? stored
     : localeFromHeader((await headers()).get("accept-language"));
 
-  // Sin proveedor, "crear cuenta" va al formulario propio: mandar a alguien al
-  // flujo de alta de un Authentik que no existe es un callejón sin salida.
-  //
-  // Con proveedor, la dirección la pone quien despliega (`TABUP_ENROLL_URL`) y sin
-  // ella no hay botón. Antes caía en un valor por defecto que era nuestro Authentik,
-  // así que cualquier otra instancia mandaba a sus visitantes a pedir cuenta en casa
-  // ajena.
   return (
-    <Landing locale={locale} enrollUrl={oidcConfigured() ? enrollUrl() : "/login?new=1"} />
+    <Landing
+      locale={locale}
+      enrollUrl={oidcConfigured() ? enrollUrl() : "/login?new=1"}
+      accountSessionUrl={oidcConfigured() ? accountSessionUrl() : null}
+    />
   );
 }

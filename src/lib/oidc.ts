@@ -356,6 +356,20 @@ export function accountUrl(): string | null {
   return externalUrl(process.env.TABUP_ACCOUNT_URL);
 }
 
+export function accountSessionUrl(): string | null {
+  return externalUrl(process.env.TABUP_ACCOUNT_SESSION_URL);
+}
+
+export function originOf(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    return url.origin === "null" ? null : url.origin;
+  } catch {
+    return null;
+  }
+}
+
 export function enrollUrl(): string | null {
   return externalUrl(process.env.TABUP_ENROLL_URL);
 }
