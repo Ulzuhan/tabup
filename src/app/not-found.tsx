@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { cookies, headers } from "next/headers";
 import { Compass } from "lucide-react";
-import { LOCALE_COOKIE, isLocale, localeFromHeader } from "@/i18n/config";
+import { resolveLocale } from "@/i18n/server";
 import { MESSAGES } from "@/i18n/messages";
 import { Button } from "@/components/ui/button";
 
@@ -13,10 +12,7 @@ import { Button } from "@/components/ui/button";
  * would break exactly when this page matters most.
  */
 export default async function NotFound() {
-  const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
-  const locale = isLocale(stored)
-    ? stored
-    : localeFromHeader((await headers()).get("accept-language"));
+  const locale = await resolveLocale();
   const t = MESSAGES[locale];
 
   return (

@@ -114,6 +114,7 @@ export const es = {
     emojiAny: "La que toque",
     email: "Correo",
     emailHint: "El correo, la contraseña y el segundo factor son del proveedor de identidad.",
+    tools: "Tus herramientas",
     providerAccount: "Tu cuenta en el proveedor",
 
     preferences: "Preferencias",
@@ -738,6 +739,7 @@ export const en: Messages = {
     emojiAny: "Whichever",
     email: "Email",
     emailHint: "Your email, password and second factor belong to the identity provider.",
+    tools: "Your tools",
     providerAccount: "Your account at the provider",
 
     preferences: "Preferences",

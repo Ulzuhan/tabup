@@ -11,7 +11,7 @@
 export const LOCALES = ["es", "en"] as const;
 export type Locale = (typeof LOCALES)[number];
 
-export const DEFAULT_LOCALE: Locale = "es";
+export const DEFAULT_LOCALE: Locale = "en";
 export const LOCALE_COOKIE = "tabup_locale";
 
 export const LOCALE_NAMES: Record<Locale, string> = {

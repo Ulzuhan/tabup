@@ -10,20 +10,11 @@
 
    Se unifican la TIPOGRAFÍA y el CROMADO (cabecera y pie). Cada aplicación
    conserva SU PALETA puertas adentro.
-
-   La primera versión de esto re-apuntaba también los colores de cada app a
-   la paleta de marca. Se descartó: cambiar la paleta de una aplicación que
-   funciona arriesga el contraste y el diseño en decenas de sitios que no se
-   ven desde la portada, y a cambio el usuario no gana nada que no le dé ya
-   una cabecera y un pie iguales de una herramienta a otra. El riesgo estaba
-   todo en el color; la identidad, casi toda en la letra y el marco.
-
-   Así que estas primitivas las consumen SOLO `kaicorp-header.tsx` y
-   `kaicorp-footer.tsx`, además de las variables de fuente que sí usa toda
-   la app.
    ══════════════════════════════════════════════════════════════════════ */
 
 :root {
+  color-scheme: light dark;
+
   /* ── Superficies, de más honda a más cercana ── */
   --kc-bg: #05070d;
   --kc-bg-2: #080b13;
@@ -69,25 +60,24 @@
   --kc-font-mono: var(--font-mono), ui-monospace, "Cascadia Code", Menlo, monospace;
 }
 
+:root:has(> head > meta[name="color-scheme"][content="dark"]) {
+  color-scheme: dark;
+}
+
+:root:has(> head > meta[name="color-scheme"][content="light"]) {
+  color-scheme: light;
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    Variante clara
 
-   La marca es oscura y ese es el modo por defecto en todas las apps. Esto
-   existe solo para las dos que ya tenían interruptor (TabUp y DocDrop): que
-   alguien elija claro no debería sacarle de la identidad.
-
-   Se activa de dos maneras, y ambas cuentan: añadiendo `kc-light` al <html>,
-   o simplemente teniendo ya la clase `light` ahí. Lo segundo existe porque las
-   dos apps con interruptor lo mueven con next-themes, que escribe `light` o
-   `dark` en <html> — y next-themes no admite mapear un tema a DOS clases
-   (llama a classList.remove con el valor entero y revienta con un espacio).
-   Engancharse a su propia clase evita pedirle algo que no sabe hacer.
-
-   El acento cambia de tono a propósito: el cian brillante sobre blanco baja
-   de 2:1 de contraste y sería ilegible.
+   Se activa por clase (`.kc-light`, `html.light` en TabUp / DocDrop) O por
+   `<meta name="color-scheme" content="light">` / preferencia del sistema
+   cuando el meta vale `light dark` (Pixelforge, QR-Forge).
    ══════════════════════════════════════════════════════════════════════ */
 .kc-light,
-html.light {
+html.light,
+:root:has(> head > meta[name="color-scheme"][content="light"]) {
   --kc-bg: #f6f8fb;
   --kc-bg-2: #ffffff;
   --kc-panel: #ffffff;
@@ -102,7 +92,7 @@ html.light {
 
   --kc-text-1: #0c1420;
   --kc-text-2: #46566c;
-  --kc-text-3: #6b7c94;
+  --kc-text-3: #64748b;
 
   --kc-ok: #12855a;
   --kc-warn: #9a6600;
@@ -113,6 +103,105 @@ html.light {
 
   --kc-shadow: 0 18px 40px -28px #64748b66;
   --kc-edge: linear-gradient(90deg, transparent, #00000012 30%, #00000012 70%, transparent);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:has(> head > meta[name="color-scheme"][content="light dark"]):not(.dark) {
+    --kc-bg: #f6f8fb;
+    --kc-bg-2: #ffffff;
+    --kc-panel: #ffffff;
+    --kc-panel-2: #f1f4f9;
+    --kc-line: #dde4ee;
+    --kc-line-2: #c6d0de;
+
+    --kc-accent: #0b7f96;
+    --kc-accent-strong: #096b7f;
+    --kc-accent-soft: #0b7f9614;
+    --kc-accent-ink: #ffffff;
+
+    --kc-text-1: #0c1420;
+    --kc-text-2: #46566c;
+    --kc-text-3: #64748b;
+
+    --kc-ok: #12855a;
+    --kc-warn: #9a6600;
+    --kc-danger: #c0392f;
+    --kc-ok-soft: #12855a14;
+    --kc-warn-soft: #9a660014;
+    --kc-danger-soft: #c0392f14;
+
+    --kc-shadow: 0 18px 40px -28px #64748b66;
+    --kc-edge: linear-gradient(90deg, transparent, #00000012 30%, #00000012 70%, transparent);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Theme Toggle (two-state declarative visibility)
+   ══════════════════════════════════════════════════════════════════════ */
+.kc-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.kc-theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  flex-shrink: 0;
+  border-radius: var(--kc-radius-sm);
+  border: 1px solid var(--kc-line);
+  background: transparent;
+  color: var(--kc-text-2);
+  cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+
+.kc-theme-btn:hover {
+  color: var(--kc-text-1);
+  background: var(--kc-panel-2);
+  border-color: var(--kc-line-2);
+}
+
+.kc-theme-btn:focus-visible {
+  outline: 2px solid var(--kc-accent);
+  outline-offset: 2px;
+}
+
+.kc-theme-to-light,
+.kc-theme-to-dark {
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Default / light rendered: show "Switch to dark theme" (moon). */
+:root:has(> head > meta[name="color-scheme"][content="light"]) .kc-theme-to-dark {
+  display: inline-flex;
+}
+
+:root:has(> head > meta[name="color-scheme"][content="dark"]) .kc-theme-to-light {
+  display: inline-flex;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:has(> head > meta[name="color-scheme"][content="light dark"]) .kc-theme-to-dark {
+    display: inline-flex;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:has(> head > meta[name="color-scheme"][content="light dark"]) .kc-theme-to-light {
+    display: inline-flex;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════════

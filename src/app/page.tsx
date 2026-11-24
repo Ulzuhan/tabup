@@ -1,8 +1,7 @@
-import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { accountSessionUrl, enrollUrl, oidcConfigured } from "@/lib/oidc";
-import { LOCALE_COOKIE, isLocale, localeFromHeader } from "@/i18n/config";
+import { resolveLocale } from "@/i18n/server";
 import { Landing } from "@/components/landing";
 import { TripsView } from "./trips-view";
 
@@ -27,10 +26,7 @@ export default async function Home({
   }
   if (user) return <TripsView />;
 
-  const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
-  const locale = isLocale(stored)
-    ? stored
-    : localeFromHeader((await headers()).get("accept-language"));
+  const locale = await resolveLocale();
 
   return (
     <Landing
