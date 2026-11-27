@@ -78,6 +78,21 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.slug }}
           no-cache: ${{ startsWith(github.ref, 'refs/tags/') }}
 
+      - name: Check the exact tagged runtime for bundled Zod
+        shell: bash
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          REPOSITORY: ${{ steps.ref.outputs.ref }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          IMAGE="$REGISTRY/$REPOSITORY@$DIGEST"
+          docker pull --platform "$PLATFORM" "$IMAGE"
+          docker run --rm --pull=never --platform "$PLATFORM" -i \
+            --read-only --network none --cap-drop ALL --security-opt no-new-privileges \
+            --entrypoint node "$IMAGE" --input-type=module - /app < scripts/verify-runtime-zod.mjs
+
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ steps.ref.outputs.ref }}@${{ steps.build.outputs.digest }}
