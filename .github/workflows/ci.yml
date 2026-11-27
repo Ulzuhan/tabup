@@ -35,6 +35,9 @@ jobs:
       - name: Lint
         run: npx eslint src scripts
 
+      - name: Runtime Zod release guard
+        run: node --test scripts/test-runtime-zod.mjs
+
       - name: Build
         run: npm run build
 
