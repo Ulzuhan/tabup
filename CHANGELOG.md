@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0 — Unreleased
+
+- Add the KaiCorp app switcher, common navigation and refreshed TabUp brand.
+- Support entering from another KaiCorp tool and optionally continuing an existing
+  Account session. Add dedicated error pages and JSON 404 responses for unknown API routes.
+- Publish native AMD64 and ARM64 images and refresh compatible dependency locks.
+
 ## 2026-09-14 — Rebuild for two Debian security fixes
 
 - No application change. The weekly scan of what is running found two fixable
