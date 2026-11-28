@@ -77,6 +77,8 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.slug }}
           cache-to: type=gha,mode=max,scope=${{ matrix.slug }}
           no-cache: ${{ startsWith(github.ref, 'refs/tags/') }}
+          # Refresh Debian security packages in the served image on every push.
+          no-cache-filters: ${{ !startsWith(github.ref, 'refs/tags/') && 'runtime' || '' }}
 
       - name: Check the exact tagged runtime for bundled Zod
         shell: bash
