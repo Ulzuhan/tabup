@@ -45,3 +45,21 @@ No copies sólo `tabup.db` mientras el servicio escribe en modo WAL: usa `sqlite
 `npm ci`, `npm run lint`, `npx tsc --noEmit`, `npm run build`, `./scripts/run-suites.sh`, `npm run test:identity`, `npm audit --omit=dev`, `docker compose config -q`.
 
 `test:identity` va aparte porque es la única suite que necesita el proveedor configurado: si despliegas con OIDC, es la que comprueba lo que cambia por tenerlo.
+
+### Comprobación de Zod integrado en Next.js antes de publicar
+
+La alerta #43 / [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)
+no se puede cerrar actualizando sólo el lockfile: el runtime standalone incluye
+la copia compilada por Next. El workflow comprueba los bytes del contenedor
+exacto de cada arquitectura (por digest) antes de crear el índice etiquetado y
+atestado. Esto es adicional al escaneo Trivy, no un sustituto.
+
+No incorporar exclusiones, borrar la carpeta compilada, ni cambiar el
+identificador sin comprobar una corrección de Next soportada. Para desbloquear
+un tag: comprobar el tarball oficial con integridad npm y evidencia de la
+corrección/retirada; revisar la copia realmente empaquetada en ambas
+arquitecturas; registrar esa revisión y el valor exacto en
+`scripts/verify-runtime-zod.mjs`; ejecutar compilación y pruebas de arranque,
+login, cuentas/grupos, gastos y recibos en imágenes nativas. Si Next cambia la
+ubicación o estructura, revisar primero el verificador antes de aceptar la
+ausencia. Un bloqueo no etiqueta una nueva release y no cambia producción.
